@@ -429,7 +429,7 @@ void EditorNode::_version_control_menu_option(int p_idx) {
 
 void EditorNode::_update_title() {
 	const String appname = ProjectSettings::get_singleton()->get("application/config/name");
-	String title = (appname.is_empty() ? TTR("Unnamed Project") : appname) + String(" - ") + VERSION_NAME;
+	String title = (appname.is_empty() ? TTR("Unnamed Project") : appname);
 	const String edited = editor_data.get_edited_scene_root() ? editor_data.get_edited_scene_root()->get_scene_file_path() : String();
 	if (!edited.is_empty()) {
 		// Display the edited scene name before the program name so that it can be seen in the OS task bar.
@@ -439,8 +439,10 @@ void EditorNode::_update_title() {
 		// Display the "modified" mark before anything else so that it can always be seen in the OS task bar.
 		title = vformat("(*) %s", title);
 	}
-
-	DisplayServer::get_singleton()->window_set_title(title);
+	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + VERSION_NAME);
+	if (project_title) {
+		project_title->set_text(title);
+	}
 }
 
 void EditorNode::shortcut_input(const Ref<InputEvent> &p_event) {
@@ -659,6 +661,12 @@ void EditorNode::_notification(int p_what) {
 		case NOTIFICATION_ENTER_TREE: {
 			Engine::get_singleton()->set_editor_hint(true);
 
+			Window *window = static_cast<Window *>(get_tree()->get_root());
+			if (window) {
+				// Handle macOS fullscreen and extend-to-title changes.
+				window->connect("titlebar_changed", callable_mp(this, &EditorNode::_titlebar_resized));
+			}
+
 			OS::get_singleton()->set_low_processor_usage_mode_sleep_usec(int(EDITOR_GET("interface/editor/low_processor_mode_sleep_usec")));
 			get_tree()->get_root()->set_as_audio_listener_3d(false);
 			get_tree()->get_root()->set_as_audio_listener_2d(false);
@@ -713,6 +721,8 @@ void EditorNode::_notification(int p_what) {
 				ProjectSettings::get_singleton()->save();
 			}
 
+			_titlebar_resized();
+
 			/* DO NOT LOAD SCENES HERE, WAIT FOR FILE SCANNING AND REIMPORT TO COMPLETE */
 		} break;
 
@@ -750,7 +760,8 @@ void EditorNode::_notification(int p_what) {
 					EditorSettings::get_singleton()->check_changed_settings_in_group("text_editor/theme") ||
 					EditorSettings::get_singleton()->check_changed_settings_in_group("interface/editor/font") ||
 					EditorSettings::get_singleton()->check_changed_settings_in_group("interface/editor/main_font") ||
-					EditorSettings::get_singleton()->check_changed_settings_in_group("interface/editor/code_font");
+					EditorSettings::get_singleton()->check_changed_settings_in_group("interface/editor/code_font") ||
+					EditorSettings::get_singleton()->check_changed_settings_in_group("filesystem/file_dialog/thumbnail_size");
 
 			if (theme_changed) {
 				theme = create_custom_theme(theme_base->get_theme());
@@ -1167,6 +1178,18 @@ void EditorNode::_reload_project_settings() {
 }
 
 void EditorNode::_vp_resized() {
+}
+
+void EditorNode::_titlebar_resized() {
+	const Size2 &margin = DisplayServer::get_singleton()->window_get_safe_title_margins(DisplayServer::MAIN_WINDOW_ID);
+	if (left_menu_spacer) {
+		int w = (gui_base->is_layout_rtl()) ? margin.y : margin.x;
+		left_menu_spacer->set_custom_minimum_size(Size2(w, 0));
+	}
+	if (right_menu_spacer) {
+		int w = (gui_base->is_layout_rtl()) ? margin.x : margin.y;
+		right_menu_spacer->set_custom_minimum_size(Size2(w, 0));
+	}
 }
 
 void EditorNode::_version_button_pressed() {
@@ -2450,7 +2473,7 @@ void EditorNode::_run(bool p_current, const String &p_custom) {
 			write_movie_file = GLOBAL_GET("editor/movie_writer/movie_file");
 		}
 		if (write_movie_file == String()) {
-			show_accept(TTR("Movie Maker mode is enabled, but no movie file path has been specified.\nA default movie file path can be specified in the project settings under the 'Editor/Movie Writer' category.\nAlternatively, for running single scenes, a 'movie_path' metadata can be added to the root node,\nspecifying the path to a movie file that will be used when recording that scene."), TTR("OK"));
+			show_accept(TTR("Movie Maker mode is enabled, but no movie file path has been specified.\nA default movie file path can be specified in the project settings under the Editor > Movie Writer category.\nAlternatively, for running single scenes, a `movie_file` string metadata can be added to the root node,\nspecifying the path to a movie file that will be used when recording that scene."), TTR("OK"));
 			return;
 		}
 	}
@@ -3069,8 +3092,8 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 		case HELP_SUPPORT_GODOT_DEVELOPMENT: {
 			OS::get_singleton()->shell_open("https://godotengine.org/donate");
 		} break;
-		case SET_RENDERING_DRIVER_SAVE_AND_RESTART: {
-			ProjectSettings::get_singleton()->set("rendering/driver/driver_name", rendering_driver_request);
+		case SET_RENDERER_NAME_SAVE_AND_RESTART: {
+			ProjectSettings::get_singleton()->set("rendering/renderer/rendering_method", renderer_request);
 			ProjectSettings::get_singleton()->save();
 
 			save_all_scenes();
@@ -3389,7 +3412,7 @@ void EditorNode::add_editor_plugin(EditorPlugin *p_editor, bool p_config_changed
 		tb->add_theme_font_size_override("font_size", singleton->gui_base->get_theme_font_size(SNAME("main_button_font_size"), SNAME("EditorFonts")));
 
 		singleton->main_editor_buttons.push_back(tb);
-		singleton->main_editor_button_vb->add_child(tb);
+		singleton->main_editor_button_hb->add_child(tb);
 		singleton->editor_table.push_back(p_editor);
 
 		singleton->distraction_free->move_to_front();
@@ -5880,27 +5903,27 @@ void EditorNode::_bottom_panel_raise_toggled(bool p_pressed) {
 	top_split->set_visible(!p_pressed);
 }
 
-void EditorNode::_update_rendering_driver_color() {
-	if (rendering_driver->get_text() == "opengl3") {
-		rendering_driver->add_theme_color_override("font_color", Color::hex(0x5586a4ff));
-	} else if (rendering_driver->get_text() == "vulkan") {
-		rendering_driver->add_theme_color_override("font_color", theme_base->get_theme_color(SNAME("vulkan_color"), SNAME("Editor")));
+void EditorNode::_update_renderer_color() {
+	if (renderer->get_text() == "gl_compatibility") {
+		renderer->add_theme_color_override("font_color", Color::hex(0x5586a4ff));
+	} else if (renderer->get_text() == "forward_plus" || renderer->get_text() == "mobile") {
+		renderer->add_theme_color_override("font_color", theme_base->get_theme_color(SNAME("vulkan_color"), SNAME("Editor")));
 	}
 }
 
-void EditorNode::_rendering_driver_selected(int p_which) {
-	String driver = rendering_driver->get_item_metadata(p_which);
+void EditorNode::_renderer_selected(int p_which) {
+	String rendering_method = renderer->get_item_metadata(p_which);
 
-	String current_driver = OS::get_singleton()->get_current_rendering_driver_name();
+	String current_renderer = GLOBAL_GET("rendering/renderer/rendering_method");
 
-	if (driver == current_driver) {
+	if (rendering_method == current_renderer) {
 		return;
 	}
 
-	rendering_driver_request = driver;
+	renderer_request = rendering_method;
 	video_restart_dialog->popup_centered();
-	rendering_driver->select(rendering_driver_current);
-	_update_rendering_driver_color();
+	renderer->select(renderer_current);
+	_update_renderer_color();
 }
 
 void EditorNode::_resource_saved(Ref<Resource> p_resource, const String &p_path) {
@@ -6589,14 +6612,14 @@ EditorNode::EditorNode() {
 
 	if (can_expand) {
 		// Add spacer to avoid other controls under window minimize/maximize/close buttons (left side).
-		Control *menu_spacer = memnew(Control);
-		menu_spacer->set_mouse_filter(Control::MOUSE_FILTER_PASS);
-		menu_spacer->set_custom_minimum_size(Size2(DisplayServer::get_singleton()->window_get_safe_title_margins(DisplayServer::MAIN_WINDOW_ID).x, 0));
-		menu_hb->add_child(menu_spacer);
+		left_menu_spacer = memnew(Control);
+		left_menu_spacer->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+		menu_hb->add_child(left_menu_spacer);
 	}
 
 	main_menu = memnew(MenuBar);
 	menu_hb->add_child(main_menu);
+
 	main_menu->add_theme_style_override("hover", gui_base->get_theme_stylebox(SNAME("MenuHover"), SNAME("EditorStyles")));
 	main_menu->set_flat(true);
 	main_menu->set_start_index(0); // Main menu, add to the start of global menu.
@@ -6765,21 +6788,29 @@ EditorNode::EditorNode() {
 	project_menu->add_shortcut(ED_GET_SHORTCUT("editor/quit_to_project_list"), RUN_PROJECT_MANAGER, true);
 
 	// Spacer to center 2D / 3D / Script buttons.
-	Control *left_spacer = memnew(Control);
+	HBoxContainer *left_spacer = memnew(HBoxContainer);
 	left_spacer->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+	left_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	menu_hb->add_child(left_spacer);
 
-	menu_hb->add_spacer();
+	if (can_expand && global_menu) {
+		project_title = memnew(Label);
+		project_title->add_theme_font_override("font", gui_base->get_theme_font(SNAME("bold"), SNAME("EditorFonts")));
+		project_title->add_theme_font_size_override("font_size", gui_base->get_theme_font_size(SNAME("bold_size"), SNAME("EditorFonts")));
+		project_title->set_focus_mode(Control::FOCUS_NONE);
+		project_title->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+		project_title->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
+		project_title->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		left_spacer->add_child(project_title);
+	}
 
-	main_editor_button_vb = memnew(HBoxContainer);
-	menu_hb->add_child(main_editor_button_vb);
+	main_editor_button_hb = memnew(HBoxContainer);
+	menu_hb->add_child(main_editor_button_hb);
 
 	// Options are added and handled by DebuggerEditorPlugin.
 	debug_menu = memnew(PopupMenu);
 	debug_menu->set_name(TTR("Debug"));
 	main_menu->add_child(debug_menu);
-
-	menu_hb->add_spacer();
 
 	settings_menu = memnew(PopupMenu);
 	settings_menu->set_name(TTR("Editor"));
@@ -6854,6 +6885,7 @@ EditorNode::EditorNode() {
 	// Spacer to center 2D / 3D / Script buttons.
 	Control *right_spacer = memnew(Control);
 	right_spacer->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+	right_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	menu_hb->add_child(right_spacer);
 
 	launch_pad = memnew(PanelContainer);
@@ -6950,58 +6982,54 @@ EditorNode::EditorNode() {
 	HBoxContainer *right_menu_hb = memnew(HBoxContainer);
 	menu_hb->add_child(right_menu_hb);
 
-	rendering_driver = memnew(OptionButton);
-
+	renderer = memnew(OptionButton);
 	// Hide the renderer selection dropdown until OpenGL support is more mature.
 	// The renderer can still be changed in the project settings or using `--rendering-driver opengl3`.
-	rendering_driver->set_visible(false);
+	renderer->set_visible(false);
+	renderer->set_flat(true);
+	renderer->set_focus_mode(Control::FOCUS_NONE);
+	renderer->connect("item_selected", callable_mp(this, &EditorNode::_renderer_selected));
+	renderer->add_theme_font_override("font", gui_base->get_theme_font(SNAME("bold"), SNAME("EditorFonts")));
+	renderer->add_theme_font_size_override("font_size", gui_base->get_theme_font_size(SNAME("bold_size"), SNAME("EditorFonts")));
 
-	rendering_driver->set_flat(true);
-	rendering_driver->set_focus_mode(Control::FOCUS_NONE);
-	rendering_driver->connect("item_selected", callable_mp(this, &EditorNode::_rendering_driver_selected));
-	rendering_driver->add_theme_font_override("font", gui_base->get_theme_font(SNAME("bold"), SNAME("EditorFonts")));
-	rendering_driver->add_theme_font_size_override("font_size", gui_base->get_theme_font_size(SNAME("bold_size"), SNAME("EditorFonts")));
-
-	right_menu_hb->add_child(rendering_driver);
+	right_menu_hb->add_child(renderer);
 
 	if (can_expand) {
 		// Add spacer to avoid other controls under the window minimize/maximize/close buttons (right side).
-		Control *menu_spacer = memnew(Control);
-		menu_spacer->set_mouse_filter(Control::MOUSE_FILTER_PASS);
-		menu_spacer->set_custom_minimum_size(Size2(DisplayServer::get_singleton()->window_get_safe_title_margins(DisplayServer::MAIN_WINDOW_ID).y, 0));
-		menu_hb->add_child(menu_spacer);
+		right_menu_spacer = memnew(Control);
+		right_menu_spacer->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+		menu_hb->add_child(right_menu_spacer);
 	}
 
-	// Only display the render drivers that are available for this display driver.
-	int display_driver_idx = OS::get_singleton()->get_display_driver_id();
-	Vector<String> render_drivers = DisplayServer::get_create_function_rendering_drivers(display_driver_idx);
-	String current_rendering_driver = OS::get_singleton()->get_current_rendering_driver_name();
+	String current_renderer = GLOBAL_GET("rendering/renderer/rendering_method");
+
+	PackedStringArray renderers = ProjectSettings::get_singleton()->get_custom_property_info().get(StringName("rendering/renderer/rendering_method")).hint_string.split(",", false);
 
 	// As we are doing string comparisons, keep in standard case to prevent problems with capitals
 	// "vulkan" in particular uses lowercase "v" in the code, and uppercase in the UI.
-	current_rendering_driver = current_rendering_driver.to_lower();
+	current_renderer = current_renderer.to_lower();
 
-	for (int i = 0; i < render_drivers.size(); i++) {
-		String driver = render_drivers[i];
+	for (int i = 0; i < renderers.size(); i++) {
+		String rendering_method = renderers[i];
 
-		// Add the driver to the UI.
-		rendering_driver->add_item(driver);
-		rendering_driver->set_item_metadata(i, driver);
+		// Add the renderers name to the UI.
+		renderer->add_item(rendering_method);
+		renderer->set_item_metadata(i, rendering_method);
 
 		// Lowercase for standard comparison.
-		driver = driver.to_lower();
+		rendering_method = rendering_method.to_lower();
 
-		if (current_rendering_driver == driver) {
-			rendering_driver->select(i);
-			rendering_driver_current = i;
+		if (current_renderer == rendering_method) {
+			renderer->select(i);
+			renderer_current = i;
 		}
 	}
-	_update_rendering_driver_color();
+	_update_renderer_color();
 
 	video_restart_dialog = memnew(ConfirmationDialog);
-	video_restart_dialog->set_text(TTR("Changing the video driver requires restarting the editor."));
+	video_restart_dialog->set_text(TTR("Changing the renderer requires restarting the editor."));
 	video_restart_dialog->set_ok_button_text(TTR("Save & Restart"));
-	video_restart_dialog->connect("confirmed", callable_mp(this, &EditorNode::_menu_option).bind(SET_RENDERING_DRIVER_SAVE_AND_RESTART));
+	video_restart_dialog->connect("confirmed", callable_mp(this, &EditorNode::_menu_option).bind(SET_RENDERER_NAME_SAVE_AND_RESTART));
 	gui_base->add_child(video_restart_dialog);
 
 	progress_hb = memnew(BackgroundProgress);
@@ -7525,12 +7553,13 @@ EditorNode::EditorNode() {
 	screenshot_timer->set_owner(get_owner());
 
 	// Adjust spacers to center 2D / 3D / Script buttons.
-	int max_w = MAX(launch_pad_hb->get_minimum_size().x + right_menu_hb->get_minimum_size().x, main_menu->get_minimum_size().x);
+	int max_w = MAX(launch_pad->get_minimum_size().x + right_menu_hb->get_minimum_size().x, main_menu->get_minimum_size().x);
 	left_spacer->set_custom_minimum_size(Size2(MAX(0, max_w - main_menu->get_minimum_size().x), 0));
-	right_spacer->set_custom_minimum_size(Size2(MAX(0, max_w - launch_pad_hb->get_minimum_size().x - right_menu_hb->get_minimum_size().x), 0));
+	right_spacer->set_custom_minimum_size(Size2(MAX(0, max_w - launch_pad->get_minimum_size().x - right_menu_hb->get_minimum_size().x), 0));
 
 	// Extend menu bar to window title.
 	if (can_expand) {
+		DisplayServer::get_singleton()->window_set_window_buttons_offset(Vector2i(menu_hb->get_minimum_size().y / 2, menu_hb->get_minimum_size().y / 2), DisplayServer::MAIN_WINDOW_ID);
 		DisplayServer::get_singleton()->window_set_flag(DisplayServer::WINDOW_FLAG_EXTEND_TO_TITLE, true, DisplayServer::MAIN_WINDOW_ID);
 		menu_hb->set_can_move_window(true);
 	}

@@ -224,7 +224,7 @@ private:
 		HELP_ABOUT,
 		HELP_SUPPORT_GODOT_DEVELOPMENT,
 
-		SET_RENDERING_DRIVER_SAVE_AND_RESTART,
+		SET_RENDERER_NAME_SAVE_AND_RESTART,
 
 		GLOBAL_NEW_WINDOW,
 		GLOBAL_SCENE,
@@ -286,12 +286,12 @@ private:
 	Control *theme_base = nullptr;
 	Control *gui_base = nullptr;
 	VBoxContainer *main_vbox = nullptr;
-	OptionButton *rendering_driver = nullptr;
+	OptionButton *renderer = nullptr;
 
 	ConfirmationDialog *video_restart_dialog = nullptr;
 
-	int rendering_driver_current = 0;
-	String rendering_driver_request;
+	int renderer_current = 0;
+	String renderer_request;
 
 	// Split containers.
 	HSplitContainer *left_l_hsplit = nullptr;
@@ -322,6 +322,9 @@ private:
 	HBoxContainer *bottom_hb = nullptr;
 	Control *vp_base = nullptr;
 
+	Label *project_title = nullptr;
+	Control *left_menu_spacer = nullptr;
+	Control *right_menu_spacer = nullptr;
 	EditorTitleBar *menu_hb = nullptr;
 	VBoxContainer *main_screen_vbox = nullptr;
 	MenuBar *main_menu = nullptr;
@@ -397,7 +400,7 @@ private:
 	String current_path;
 	MenuButton *update_spinner = nullptr;
 
-	HBoxContainer *main_editor_button_vb = nullptr;
+	HBoxContainer *main_editor_button_hb = nullptr;
 	Vector<Button *> main_editor_buttons;
 	Vector<EditorPlugin *> editor_table;
 
@@ -560,6 +563,7 @@ private:
 	void _close_messages();
 	void _show_messages();
 	void _vp_resized();
+	void _titlebar_resized();
 	void _version_button_pressed();
 
 	int _save_external_resources();
@@ -597,8 +601,8 @@ private:
 
 	void _update_from_settings();
 
-	void _rendering_driver_selected(int);
-	void _update_rendering_driver_color();
+	void _renderer_selected(int);
+	void _update_renderer_color();
 
 	void _exit_editor(int p_exit_code);
 
