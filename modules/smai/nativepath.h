@@ -10,35 +10,38 @@
 class GameWorld;
 
 
-  class NativePath : public Line2D {
-    GDCLASS(NativePath, Line2D);
+class NativePath : public Line2D {
+  GDCLASS(NativePath, Line2D);
 
-  private:
+protected:
+  static void _bind_methods();
+  void _init();
+  void _ready();
 
-    bool is_automatically_generated;
+private:
 
-  public:
+  bool is_automatically_generated;
 
-    Path* path;
-    bool is_looped;
-    double radius;
+public:
 
-    static void _register_methods();
+  NativePath(Vector2D position);
 
-    NativePath(Vector2D position);
+  Path* path;
 
-    NativePath();
-    ~NativePath();
+  bool is_looped;
+  bool get_is_looped() const {return is_looped;}
+  void set_is_looped(const bool _is_looped) {is_looped = _is_looped;}
 
-    void create_world_path(Vector2D position);
+  double radius;
+  bool get_radius() const {return radius;}
+  void set_radius(const bool _radius) {radius = _radius;}
 
-    void _init();
-    void _ready();
 
-    bool is_defined = false;
+  bool is_defined = false;
 
-    bool automatically_generated() {return is_automatically_generated;}
-    void set_automatically_generated(bool is_auto) {is_automatically_generated = is_auto;}
+  bool automatically_generated() {return is_automatically_generated;}
+  void create_world_path(Vector2D position);
+  void set_automatically_generated(bool is_auto) {is_automatically_generated = is_auto;}
 
-  };
+};
 #endif

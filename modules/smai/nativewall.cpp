@@ -1,25 +1,13 @@
 #include "nativewall.h"
 
-using namespace godot;
-
-
-void NativeWall::_register_methods() {
-  register_method("_ready", &NativeWall::_ready);
-  register_method("automatically_generated", &NativeWall::automatically_generated);
-}
-
-NativeWall::NativeWall() {
-}
-
-NativeWall::~NativeWall() {
+void NativeWall::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_is_automatically_generated"), &NativeWall::get_is_automatically_generated);
+	ClassDB::bind_method(D_METHOD("set_is_automatically_generated"), &NativeWall::set_is_automatically_generated);
 }
 
 NativeWall::NativeWall(Vector2D position) {
   set_position(Vector2(position.x, position.y));
   is_defined = true;
-}
-
-void NativeWall::_init() {
 }
 
 void NativeWall::_ready() {

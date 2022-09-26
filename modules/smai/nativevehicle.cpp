@@ -4,94 +4,116 @@
 
 using namespace godot;
 
-void NativeVehicle::_register_methods(){
-  register_method("_process", &NativeVehicle::_process);
-  register_method("_ready", &NativeVehicle::_ready);
+void NativeVehicle::_bind_methods(){
 
-  register_method("get_steering_force", &NativeVehicle::get_steering_force);
+  ClassDB::bind_method(D_METHOD("_init"), &NativeVehicle::_init);
+  ClassDB::bind_method(D_METHOD("_process"), &NativeVehicle::_process);
+  ClassDB::bind_method(D_METHOD("_ready"), &NativeVehicle::_ready);
 
-  register_method("set_seek_on", &NativeVehicle::set_seek_on);
-  register_method("set_flee_on", &NativeVehicle::set_flee_on);
-  register_method("set_wander_on", &NativeVehicle::set_wander_on);
-  register_method("set_arrive_on", &NativeVehicle::set_arrive_on);
-  register_method("set_pursuit_on", &NativeVehicle::set_pursuit_on);
-  register_method("set_evade_on", &NativeVehicle::set_evade_on);
-  register_method("set_interpose_on", &NativeVehicle::set_interpose_on);
-  register_method("set_hide_on", &NativeVehicle::set_hide_on);
-  register_method("set_obstacle_avoidance_on", &NativeVehicle::set_obstacle_avoidance_on);
-  register_method("set_wall_avoidance_on", &NativeVehicle::set_wall_avoidance_on);
-  register_method("set_follow_path_on", &NativeVehicle::set_follow_path_on);
+  ClassDB::bind_method(D_METHOD("get_steering_force"), &NativeVehicle::get_steering_force);
 
-  register_method("set_weight_wander", &NativeVehicle::set_weight_wander);
-  register_method("set_weight_arrive", &NativeVehicle::set_weight_arrive);
-  register_method("set_weight_flee", &NativeVehicle::set_weight_flee);
-  register_method("set_weight_seek", &NativeVehicle::set_weight_seek);
-  register_method("set_weight_pursuit", &NativeVehicle::set_weight_pursuit);
-  register_method("set_weight_evade", &NativeVehicle::set_weight_evade);
-  register_method("set_weight_interpose", &NativeVehicle::set_weight_interpose);
-  register_method("set_weight_hide", &NativeVehicle::set_weight_hide);
-  register_method("set_weight_obstacle_avoidance", &NativeVehicle::set_weight_obstacle_avoidance);
-  register_method("set_weight_wall_avoidance", &NativeVehicle::set_weight_wall_avoidance);
-  register_method("set_weight_follow_path", &NativeVehicle::set_weight_follow_path);
+  ClassDB::bind_method(D_METHOD("set_seek_on"), &NativeVehicle::set_seek_on);
+  ClassDB::bind_method(D_METHOD("set_flee_on"), &NativeVehicle::set_flee_on);
+  ClassDB::bind_method(D_METHOD("set_wander_on"), &NativeVehicle::set_wander_on);
+  ClassDB::bind_method(D_METHOD("set_arrive_on"), &NativeVehicle::set_arrive_on);
+  ClassDB::bind_method(D_METHOD("set_pursuit_on"), &NativeVehicle::set_pursuit_on);
+  ClassDB::bind_method(D_METHOD("set_evade_on"), &NativeVehicle::set_evade_on);
+  ClassDB::bind_method(D_METHOD("set_interpose_on"), &NativeVehicle::set_interpose_on);
+  ClassDB::bind_method(D_METHOD("set_hide_on"), &NativeVehicle::set_hide_on);
+  ClassDB::bind_method(D_METHOD("set_obstacle_avoidance_on"), &NativeVehicle::set_obstacle_avoidance_on);
+  ClassDB::bind_method(D_METHOD("set_wall_avoidance_on"), &NativeVehicle::set_wall_avoidance_on);
+  ClassDB::bind_method(D_METHOD("set_follow_path_on"), &NativeVehicle::set_follow_path_on);
 
-  register_method("set_probability_wander", &NativeVehicle::set_probability_wander);
-  register_method("set_probability_arrive", &NativeVehicle::set_probability_arrive);
-  register_method("set_probability_flee", &NativeVehicle::set_probability_flee);
-  register_method("set_probability_seek", &NativeVehicle::set_probability_seek);
-  register_method("set_probability_evade", &NativeVehicle::set_probability_evade);
-  register_method("set_probability_interpose", &NativeVehicle::set_probability_interpose);
-  register_method("set_probability_hide", &NativeVehicle::set_probability_hide);
-  register_method("set_probability_obstacle_avoidance", &NativeVehicle::set_probability_obstacle_avoidance);
-  register_method("set_probability_wall_avoidance", &NativeVehicle::set_probability_wall_avoidance);
-  register_method("set_probability_follow_path", &NativeVehicle::set_probability_follow_path);
+  ClassDB::bind_method(D_METHOD("set_weight_wander"), &NativeVehicle::set_weight_wander);
+  ClassDB::bind_method(D_METHOD("set_weight_arrive"), &NativeVehicle::set_weight_arrive);
+  ClassDB::bind_method(D_METHOD("set_weight_flee"), &NativeVehicle::set_weight_flee);
+  ClassDB::bind_method(D_METHOD("set_weight_seek"), &NativeVehicle::set_weight_seek);
+  ClassDB::bind_method(D_METHOD("set_weight_pursuit"), &NativeVehicle::set_weight_pursuit);
+  ClassDB::bind_method(D_METHOD("set_weight_evade"), &NativeVehicle::set_weight_evade);
+  ClassDB::bind_method(D_METHOD("set_weight_interpose"), &NativeVehicle::set_weight_interpose);
+  ClassDB::bind_method(D_METHOD("set_weight_hide"), &NativeVehicle::set_weight_hide);
+  ClassDB::bind_method(D_METHOD("set_weight_obstacle_avoidance"), &NativeVehicle::set_weight_obstacle_avoidance);
+  ClassDB::bind_method(D_METHOD("set_weight_wall_avoidance"), &NativeVehicle::set_weight_wall_avoidance);
+  ClassDB::bind_method(D_METHOD("set_weight_follow_path"), &NativeVehicle::set_weight_follow_path);
 
-  register_method("is_wander_on", &NativeVehicle::is_wander_on);
-  register_method("get_wander_radius", &NativeVehicle::get_wander_radius);
-  register_method("get_wander_target_position", &NativeVehicle::get_wander_target_position);
-  register_method("get_wander_circle_position", &NativeVehicle::get_wander_circle_position);
-  register_method("automatically_generated", &NativeVehicle::automatically_generated);
-  register_method("is_obstacle_avoidance_on", &NativeVehicle::is_obstacle_avoidance_on);
-  register_method("is_wall_avoidance_on", &NativeVehicle::is_wall_avoidance_on);
+  ClassDB::bind_method(D_METHOD("set_probability_wander"), &NativeVehicle::set_probability_wander);
+  ClassDB::bind_method(D_METHOD("set_probability_arrive"), &NativeVehicle::set_probability_arrive);
+  ClassDB::bind_method(D_METHOD("set_probability_flee"), &NativeVehicle::set_probability_flee);
+  ClassDB::bind_method(D_METHOD("set_probability_seek"), &NativeVehicle::set_probability_seek);
+  ClassDB::bind_method(D_METHOD("set_probability_evade"), &NativeVehicle::set_probability_evade);
+  ClassDB::bind_method(D_METHOD("set_probability_interpose"), &NativeVehicle::set_probability_interpose);
+  ClassDB::bind_method(D_METHOD("set_probability_hide"), &NativeVehicle::set_probability_hide);
+  ClassDB::bind_method(D_METHOD("set_probability_obstacle_avoidance"), &NativeVehicle::set_probability_obstacle_avoidance);
+  ClassDB::bind_method(D_METHOD("set_probability_wall_avoidance"), &NativeVehicle::set_probability_wall_avoidance);
+  ClassDB::bind_method(D_METHOD("set_probability_follow_path"), &NativeVehicle::set_probability_follow_path);
 
-  register_method("set_wander_jitter", &NativeVehicle::set_wander_jitter);
-  register_method("set_wander_radius", &NativeVehicle::set_wander_radius);
-  register_method("set_wander_distance", &NativeVehicle::set_wander_distance);
-  register_method("set_wander_force_multiplier", &NativeVehicle::set_wander_force_multiplier);
+  ClassDB::bind_method(D_METHOD("is_wander_on"), &NativeVehicle::is_wander_on);
+  ClassDB::bind_method(D_METHOD("get_wander_radius"), &NativeVehicle::get_wander_radius);
+  ClassDB::bind_method(D_METHOD("get_wander_target_position"), &NativeVehicle::get_wander_target_position);
+  ClassDB::bind_method(D_METHOD("get_wander_circle_position"), &NativeVehicle::get_wander_circle_position);
+  ClassDB::bind_method(D_METHOD("automatically_generated"), &NativeVehicle::automatically_generated);
+  ClassDB::bind_method(D_METHOD("is_obstacle_avoidance_on"), &NativeVehicle::is_obstacle_avoidance_on);
+  ClassDB::bind_method(D_METHOD("is_wall_avoidance_on"), &NativeVehicle::is_wall_avoidance_on);
 
-  register_method("set_arrive_radius", &NativeVehicle::set_arrive_radius);
+  ClassDB::bind_method(D_METHOD("set_wander_jitter"), &NativeVehicle::set_wander_jitter);
+  ClassDB::bind_method(D_METHOD("set_wander_radius"), &NativeVehicle::set_wander_radius);
+  ClassDB::bind_method(D_METHOD("set_wander_distance"), &NativeVehicle::set_wander_distance);
+  ClassDB::bind_method(D_METHOD("set_wander_force_multiplier"), &NativeVehicle::set_wander_force_multiplier);
 
-  register_method("set_minimum_detection_box_length", &NativeVehicle::set_minimum_detection_box_length);
-  register_method("get_minimum_detection_box_length", &NativeVehicle::get_minimum_detection_box_length);
-  register_method("get_detection_box_length", &NativeVehicle::get_detection_box_length);
-  register_method("get_bounding_radius", &NativeVehicle::get_bounding_radius);
+  ClassDB::bind_method(D_METHOD("set_arrive_radius"), &NativeVehicle::set_arrive_radius);
 
-  register_method("get_number_of_feelers", &NativeVehicle::get_number_of_feelers);
-  register_method("get_feeler", &NativeVehicle::get_feeler);
+  ClassDB::bind_method(D_METHOD("set_minimum_detection_box_length"), &NativeVehicle::set_minimum_detection_box_length);
+  ClassDB::bind_method(D_METHOD("get_detection_box_length"), &NativeVehicle::get_detection_box_length);
+  ClassDB::bind_method(D_METHOD("get_bounding_radius"), &NativeVehicle::get_bounding_radius);
 
-  register_method("set_deceleration", &NativeVehicle::set_deceleration);
-  register_method("set_deceleration_tweaker", &NativeVehicle::set_deceleration_tweaker);
+  ClassDB::bind_method(D_METHOD("get_number_of_feelers"), &NativeVehicle::get_number_of_feelers);
+  ClassDB::bind_method(D_METHOD("get_feeler"), &NativeVehicle::get_feeler);
 
-  register_method("set_use_evade_threat_range", &NativeVehicle::set_use_evade_threat_range);
-  register_method("set_evade_threat_range", &NativeVehicle::set_evade_threat_range);
+  ClassDB::bind_method(D_METHOD("set_deceleration"), &NativeVehicle::set_deceleration);
+  ClassDB::bind_method(D_METHOD("set_deceleration_tweaker"), &NativeVehicle::set_deceleration_tweaker);
 
-  register_method("set_path_waypoint_seek_distance", &NativeVehicle::set_path_waypoint_seek_distance);
-  register_method("set_path_predict_position", &NativeVehicle::set_path_predict_position);
-  register_method("set_follow_path_force_multiplier", &NativeVehicle::set_follow_path_force_multiplier);
+  ClassDB::bind_method(D_METHOD("set_use_evade_threat_range"), &NativeVehicle::set_use_evade_threat_range);
+  ClassDB::bind_method(D_METHOD("set_evade_threat_range"), &NativeVehicle::set_evade_threat_range);
 
-  register_property<NativeVehicle, double>("mass", &NativeVehicle::mass, 1.0);
-  register_property<NativeVehicle, double>("max_steering_force", &NativeVehicle::max_steering_force, 100.0);
-  register_property<NativeVehicle, double>("max_speed", &NativeVehicle::max_speed, 150.0);
-  register_property<NativeVehicle, double>("max_turn_rate", &NativeVehicle::max_turn_rate, 30.0);
-  register_property<NativeVehicle, Vector2>("initial_velocity", &NativeVehicle::initial_velocity, Vector2(0,0));
-  register_property<NativeVehicle, Vector2>("scale_factor", &NativeVehicle::scale_factor, Vector2(1,1));
-  register_property<NativeVehicle, int>("logic", &NativeVehicle::logic, 1);
+  ClassDB::bind_method(D_METHOD("set_path_waypoint_seek_distance"), &NativeVehicle::set_path_waypoint_seek_distance);
+  ClassDB::bind_method(D_METHOD("set_path_predict_position"), &NativeVehicle::set_path_predict_position);
+  ClassDB::bind_method(D_METHOD("set_follow_path_force_multiplier"), &NativeVehicle::set_follow_path_force_multiplier);
 
-  register_method("get_heading", &NativeVehicle::get_heading);
-  register_method("get_side", &NativeVehicle::get_side);
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"mass"), "set_mass", "get_mass");
+  ClassDB::bind_method(D_METHOD("get_mass"), &NativeVehicle::get_mass);
+  ClassDB::bind_method(D_METHOD("set_mass"), &NativeVehicle::set_mass);
+
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_steering_force"),"set_max_steering_force", "get_max_steering_force");
+  ClassDB::bind_method(D_METHOD("get_max_steering_force"), &NativeVehicle::get_max_steering_force);
+  ClassDB::bind_method(D_METHOD("set_max_steering_force"), &NativeVehicle::set_max_steering_force);
+
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"max_speed"), "set_max_speed", "get_max_speed");
+  ClassDB::bind_method(D_METHOD("get_max_speed"), &NativeVehicle::get_max_speed);
+  ClassDB::bind_method(D_METHOD("set_max_speed"), &NativeVehicle::set_max_speed);
+
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"max_turn_rate"), "set_max_turn_rate", "get_max_turn_rate");
+  ClassDB::bind_method(D_METHOD("get_max_turn_rate"), &NativeVehicle::get_max_turn_rate);
+  ClassDB::bind_method(D_METHOD("set_max_turn_rate"), &NativeVehicle::set_max_turn_rate);
+
+
+  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2,"initial_velocity"), "set_initial_velocity", "get_initial_velocity");
+  ClassDB::bind_method(D_METHOD("get_initial_velocity"), &NativeVehicle::get_initial_velocity);
+  ClassDB::bind_method(D_METHOD("set_initial_velocity"), &NativeVehicle::set_initial_velocity);
+
+  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2,"scale_factor"), "set_scale_factor", "get_scale_factor");
+  ClassDB::bind_method(D_METHOD("get_scale_factor"), &NativeVehicle::get_scale_factor);
+  ClassDB::bind_method(D_METHOD("set_scale_factor"), &NativeVehicle::set_scale_factor);
+
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "ai_logic", PROPERTY_HINT_ENUM, "AI By Example,Nature_of_Code"),"set_ai_logic","get_ai_logic");
+  ClassDB::bind_method(D_METHOD("get_ai_logic"), &NativeVehicle::get_ai_logic);
+  ClassDB::bind_method(D_METHOD("set_ai_logic"), &NativeVehicle::set_ai_logic);
+
+  ClassDB::bind_method(D_METHOD("get_heading"), &NativeVehicle::get_heading);
+  ClassDB::bind_method(D_METHOD("get_side"), &NativeVehicle::get_side);
 
   //temp
-  register_method("get_temp_final_target", &NativeVehicle::get_temp_final_target);
-  register_method("get_temp_returned_wander", &NativeVehicle::get_temp_returned_wander);
+  ClassDB::bind_method(D_METHOD("get_temp_final_target"), &NativeVehicle::get_temp_final_target);
+  ClassDB::bind_method(D_METHOD("get_temp_returned_wander"), &NativeVehicle::get_temp_returned_wander);
 }
 
 NativeVehicle::NativeVehicle(Vector2D position,
@@ -104,7 +126,7 @@ NativeVehicle::NativeVehicle(Vector2D position,
                              Vector2D scale,
                              Vector2D scale_factor,
                              GameWorld* world,
-                             int logic) {
+                             NativeParameters::AiLogic ai_logic) {
 
   vehicle = new Vehicle(position,
                         rotation,
@@ -115,7 +137,7 @@ NativeVehicle::NativeVehicle(Vector2D position,
                         max_turn_rate,
                         Vector2D(scale.x * scale_factor.x, scale.y * scale_factor.y),
                         world,
-                        logic);
+                        ai_logic);
   is_defined = true;
 }
 
@@ -143,12 +165,12 @@ void NativeVehicle::_init() {
   max_turn_rate = 10.0;
   scale_factor = Vector2(1,1);
   initial_velocity = Vector2(0,0);
-  logic = 1;
+  ai_logic = NativeParameters::AILOGIC_AI_BY_EXAMPLE;
 }
 
 void NativeVehicle::_ready() {
   if (!is_defined) {
-    create_world_vehicle(Vector2D(get_position().x,get_position().y), get_rotation(), Vector2D(get_initial_velocity().x, get_initial_velocity().y), get_mass(), get_max_steering_force(), get_max_speed(), get_max_turn_rate(), Vector2D(get_scale().x,get_scale().y), Vector2D(get_scale_factor().x,get_scale_factor().y),NULL,1);
+    create_world_vehicle(Vector2D(get_position().x,get_position().y), get_rotation(), Vector2D(get_initial_velocity().x, get_initial_velocity().y), get_mass(), get_max_steering_force(), get_max_speed(), get_max_turn_rate(), Vector2D(get_scale().x,get_scale().y), Vector2D(get_scale_factor().x,get_scale_factor().y),NULL,NativeParameters::AILOGIC_AI_BY_EXAMPLE);
   }
 }
 
@@ -171,12 +193,12 @@ void NativeVehicle::create_world_vehicle(Vector2D position,
                                          Vector2D scale,
                                          Vector2D scale_factor,
                                          GameWorld* game_world,
-                                         int logic){
+                                         NativeParameters::AiLogic ai_logic){
 
   scale.x = scale.x * scale_factor.x;
   scale.y = scale.y * scale_factor.y;
 
-  vehicle->construct(position, rotation, velocity, mass, max_steering_force, max_speed, max_turn_rate, scale, game_world, logic);
+  vehicle->construct(position, rotation, velocity, mass, max_steering_force, max_speed, max_turn_rate, scale, game_world, ai_logic);
   is_defined=true;
 }
 

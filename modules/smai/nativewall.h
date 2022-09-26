@@ -6,36 +6,32 @@
 
 class GameWorld;
 
+class NativeWall : public Line2D {
+  GDCLASS(NativeWall, Line2D);
 
-  class NativeWall : public Line2D {
-    GODOT_CLASS(NativeWall, Line2D);
 
-  private:
+protected:
+  static void _bind_methods();
+  void _ready();
 
-    std::vector<Wall2D*> wall_edges;
-    bool is_automatically_generated;
+private:
 
-  public:
+  std::vector<Wall2D*> wall_edges;
+  bool is_automatically_generated;
 
-    static void _register_methods();
+public:
 
-    NativeWall(Vector2D position);
+  NativeWall(Vector2D position);
 
-    NativeWall();
-    ~NativeWall();
+  void create_world_wall(Vector2D position);
 
-    void create_world_wall(Vector2D position);
+  bool is_defined = false;
 
-    void _init();
-    void _ready();
+  bool get_is_automatically_generated() {return is_automatically_generated;}
+  void set_is_automatically_generated(const bool is_auto) {is_automatically_generated = is_auto;}
 
-    bool is_defined = false;
+  void add_wall_edge(const Vector2D from, const Vector2D to);
+  std::vector<Wall2D*> get_wall_edges() const {return wall_edges;}
 
-    bool automatically_generated() {return is_automatically_generated;}
-    void set_automatically_generated(bool is_auto) {is_automatically_generated = is_auto;}
-
-    void add_wall_edge(const Vector2D from, const Vector2D to);
-    std::vector<Wall2D*> get_wall_edges() const {return wall_edges;}
-
-}
+};
 #endif

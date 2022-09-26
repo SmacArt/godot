@@ -2,14 +2,14 @@
 
 
 void NativeObstacle::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("_ready", &NativeObstacle::_ready));
+  //  ClassDB::bind_method(D_METHOD("_ready", &NativeObstacle::_ready));
 
-  ClassDB::bind_method(D_METHOD("automatically_generated", &NativeObstacle::automatically_generated));
-  ClassDB::bind_method(D_METHOD("is_tagged", &NativeObstacle::is_tagged));
+  ClassDB::bind_method(D_METHOD("automatically_generated"), &NativeObstacle::automatically_generated);
+  ClassDB::bind_method(D_METHOD("is_tagged"), &NativeObstacle::is_tagged);
 
-  ADD_PROPERTY(PropertyInfo(double,"radius"), "set_radius", "get_radius");
-  ClassDB::bind_method(D_METHOD("get_radius", &NativeObstacle::get_radius));
-  ClassDB::bind_method(D_METHOD("set_radius", &NativeObstacle::set_radius));
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"radius"), "set_radius", "get_radius");
+  ClassDB::bind_method(D_METHOD("get_radius"), &NativeObstacle::get_radius);
+  ClassDB::bind_method(D_METHOD("set_radius"), &NativeObstacle::set_radius);
 
 }
 

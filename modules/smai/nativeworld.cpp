@@ -2,24 +2,17 @@
 #include "steeringbehaviors.h"
 #include "entityfunctiontemplates.h"
 
-using namespace godot;
-
-void NativeWorld::_register_methods()
+void NativeWorld::_bind_methods()
 {
-  register_method("_init", &NativeWorld::_init);
-  register_method("_ready", &NativeWorld::_ready);
+  ClassDB::bind_method(D_METHOD("_init"), &NativeWorld::_init);
+  ClassDB::bind_method(D_METHOD("_ready"), &NativeWorld::_ready);
 
-  register_method("set_world_cross_hair", &NativeWorld::set_world_cross_hair);
-  register_method("get_world_cross_hair", &NativeWorld::get_world_cross_hair);
-}
-
-NativeWorld::NativeWorld() {
-}
-NativeWorld::~NativeWorld() {
+  ClassDB::bind_method(D_METHOD("set_world_cross_hair"), &NativeWorld::set_world_cross_hair);
+  ClassDB::bind_method(D_METHOD("get_world_cross_hair"), &NativeWorld::get_world_cross_hair);
 }
 
 void NativeWorld::_init(){
-  godot::ResourceLoader* resourceLoader =godot:: ResourceLoader::get_singleton();
+  ResourceLoader* resourceLoader = ResourceLoader::get_singleton();
   native_vehicle_scene = resourceLoader->load("res://SteeringBehaviors/NativeVehicle.tscn");
   native_obstacle_scene = resourceLoader->load("res://SteeringBehaviors/NativeObstacle.tscn");
   native_wall_scene = resourceLoader->load("res://SteeringBehaviors/NativeWall.tscn");

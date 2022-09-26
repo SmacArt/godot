@@ -18,10 +18,11 @@ private:
 public:
 
   std::vector<Vehicle*> vehicles;
-  godot::NativeParameters* parameters;
   std::vector<BaseGameEntity*> obstacles;
   std::vector<Wall2D*> walls;
   std::vector<Path*> paths;
+
+  NativeParameters* parameters;
 
   GameWorld();
   ~GameWorld();
@@ -31,7 +32,7 @@ public:
   void add_wall(Wall2D* wall);
   void add_path(Wall2D* path);
 
-  void set_parameters(godot::NativeParameters* _params) {parameters=_params;}
+  void set_parameters(NativeParameters* _params) {parameters=_params;}
 
   Vector2D get_cross_hair() const {return cross_hair;}
   void set_cross_hair(const Vector2D new_cross_hair) {cross_hair=new_cross_hair;}

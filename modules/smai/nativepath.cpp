@@ -1,19 +1,15 @@
 #include "nativepath.h"
 
-using namespace godot;
+void NativePath::_bind_methods() {
+  ClassDB::bind_method("automatically_generated", &NativePath::automatically_generated);
 
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_looped"),"set_is_looped","get_is_looped");
+  ClassDB::bind_method(D_METHOD("set_is_looped"), &NativePath::set_is_looped);
+  ClassDB::bind_method(D_METHOD("get_is_looped"), &NativePath::get_is_looped);
 
-void NativePath::_register_methods() {
-  register_method("_ready", &NativePath::_ready);
-  register_method("automatically_generated", &NativePath::automatically_generated);
-  register_property<NativePath, bool>("is_looped",&NativePath::is_looped,false);
-  register_property<NativePath, double>("radius",&NativePath::radius,5);
-}
-
-NativePath::NativePath() {
-}
-
-NativePath::~NativePath() {
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius"),"set_radius","get_radius");
+  ClassDB::bind_method(D_METHOD("set_radius"), &NativePath::set_radius);
+  ClassDB::bind_method(D_METHOD("get_radius"), &NativePath::get_radius);
 }
 
 NativePath::NativePath(Vector2D position) {

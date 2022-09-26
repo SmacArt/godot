@@ -10,45 +10,42 @@
 #include "gameworld.h"
 
 
-  class NativeWorld : public Node2D {
+class NativeWorld : public Node2D {
 
-    GODOT_CLASS(NativeWorld, Node2D);
+  GDCLASS(NativeWorld, Node2D);
 
-  public:
+protected:
+  static void _bind_methods();
 
-    NativeParameters* parameters;
-    GameWorld* game_world;
+  void _init();
+  void _ready();
 
-    static void _register_methods();
+public:
 
-    NativeWorld();
-    ~NativeWorld();
+  NativeParameters* parameters;
+  GameWorld* game_world;
 
-    void _init();
-    void _ready();
+  void build_world();
+  void set_world_cross_hair(const Vector2 cross_hair);
+  Vector2 get_world_cross_hair() const;
 
-    void build_world();
+private:
+  Ref<PackedScene> native_vehicle_scene;
+  Ref<PackedScene> native_obstacle_scene;
+  Ref<PackedScene> native_wall_scene;
 
-    void set_world_cross_hair(const Vector2 cross_hair);
-    Vector2 get_world_cross_hair() const;
+  void build_vehicles();
+  void append_vehicles(Node* vehicles);
+  void create_vehicles(Node* vehicles);
 
-  private:
-    godot::Ref<godot::PackedScene> native_vehicle_scene;
-    godot::Ref<godot::PackedScene> native_obstacle_scene;
-    godot::Ref<godot::PackedScene> native_wall_scene;
+  void build_obstacles();
+  void append_obstacles(Node* obstacles);
+  void create_obstacles(Node* obstacles);
 
-    void build_vehicles();
-    void append_vehicles(godot::Node* vehicles);
-    void create_vehicles(godot::Node* vehicles);
+  void build_walls();
+  void append_walls(Node* walls);
 
-    void build_obstacles();
-    void append_obstacles(godot::Node* obstacles);
-    void create_obstacles(godot::Node* obstacles);
-
-    void build_walls();
-    void append_walls(godot::Node* walls);
-
-    void build_paths();
-    void append_paths(godot::Node* paths);
-}
+  void build_paths();
+  void append_paths(Node* paths);
+};
 #endif
