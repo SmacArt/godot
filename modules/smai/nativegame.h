@@ -7,9 +7,10 @@ class NativeGame : public Node {
 
    GDCLASS(NativeGame, Node);
 
-public:
+protected:
+  static void _bind_methods();
 
-  static void _register_methods();
+public:
 
   void _init();
 

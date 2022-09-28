@@ -3,14 +3,18 @@
 void NativePath::_bind_methods() {
   ClassDB::bind_method("automatically_generated", &NativePath::automatically_generated);
 
-  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_looped"),"set_is_looped","get_is_looped");
   ClassDB::bind_method(D_METHOD("set_is_looped"), &NativePath::set_is_looped);
   ClassDB::bind_method(D_METHOD("get_is_looped"), &NativePath::get_is_looped);
 
-  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius"),"set_radius","get_radius");
   ClassDB::bind_method(D_METHOD("set_radius"), &NativePath::set_radius);
   ClassDB::bind_method(D_METHOD("get_radius"), &NativePath::get_radius);
+
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_looped"),"set_is_looped","get_is_looped");
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius"),"set_radius","get_radius");
 }
+
+NativePath::NativePath() {}
+NativePath::~NativePath() {}
 
 NativePath::NativePath(Vector2D position) {
   set_position(Vector2(position.x, position.y));

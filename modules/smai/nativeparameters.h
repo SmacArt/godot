@@ -270,9 +270,14 @@ public:
   int get_toroid_height() {return toroid_height;}
   void set_toroid_height(int _toroid_height) {toroid_height = _toroid_height;}
 
+  /*
   AiLogic ai_logic;
   AiLogic get_ai_logic() const {return ai_logic;}
   void set_ai_logic(const AiLogic _ai_logic) {ai_logic = _ai_logic;}
+  */
+  int ai_logic;
+  int get_ai_logic() const {return ai_logic;}
+  void set_ai_logic(const int _ai_logic) {ai_logic = _ai_logic;}
 
 public:
   //void _init();

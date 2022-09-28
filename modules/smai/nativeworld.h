@@ -2,6 +2,7 @@
 #define NATIVE_WORLD_H
 
 #include "core/variant/variant.h"
+#include "scene/resources/packed_scene.h"
 
 #include "nativeparameters.h"
 #include "nativevehicle.h"

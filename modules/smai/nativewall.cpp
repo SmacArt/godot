@@ -5,6 +5,9 @@ void NativeWall::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_is_automatically_generated"), &NativeWall::set_is_automatically_generated);
 }
 
+NativeWall::NativeWall() {}
+NativeWall::~NativeWall() {}
+
 NativeWall::NativeWall(Vector2D position) {
   set_position(Vector2(position.x, position.y));
   is_defined = true;

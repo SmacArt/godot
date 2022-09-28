@@ -79,32 +79,25 @@ void NativeVehicle::_bind_methods(){
   ClassDB::bind_method(D_METHOD("set_path_predict_position"), &NativeVehicle::set_path_predict_position);
   ClassDB::bind_method(D_METHOD("set_follow_path_force_multiplier"), &NativeVehicle::set_follow_path_force_multiplier);
 
-  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"mass"), "set_mass", "get_mass");
   ClassDB::bind_method(D_METHOD("get_mass"), &NativeVehicle::get_mass);
   ClassDB::bind_method(D_METHOD("set_mass"), &NativeVehicle::set_mass);
 
-  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_steering_force"),"set_max_steering_force", "get_max_steering_force");
   ClassDB::bind_method(D_METHOD("get_max_steering_force"), &NativeVehicle::get_max_steering_force);
   ClassDB::bind_method(D_METHOD("set_max_steering_force"), &NativeVehicle::set_max_steering_force);
 
-  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"max_speed"), "set_max_speed", "get_max_speed");
   ClassDB::bind_method(D_METHOD("get_max_speed"), &NativeVehicle::get_max_speed);
   ClassDB::bind_method(D_METHOD("set_max_speed"), &NativeVehicle::set_max_speed);
 
-  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"max_turn_rate"), "set_max_turn_rate", "get_max_turn_rate");
   ClassDB::bind_method(D_METHOD("get_max_turn_rate"), &NativeVehicle::get_max_turn_rate);
   ClassDB::bind_method(D_METHOD("set_max_turn_rate"), &NativeVehicle::set_max_turn_rate);
 
 
-  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2,"initial_velocity"), "set_initial_velocity", "get_initial_velocity");
   ClassDB::bind_method(D_METHOD("get_initial_velocity"), &NativeVehicle::get_initial_velocity);
   ClassDB::bind_method(D_METHOD("set_initial_velocity"), &NativeVehicle::set_initial_velocity);
 
-  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2,"scale_factor"), "set_scale_factor", "get_scale_factor");
   ClassDB::bind_method(D_METHOD("get_scale_factor"), &NativeVehicle::get_scale_factor);
   ClassDB::bind_method(D_METHOD("set_scale_factor"), &NativeVehicle::set_scale_factor);
 
-  ADD_PROPERTY(PropertyInfo(Variant::INT, "ai_logic", PROPERTY_HINT_ENUM, "AI By Example,Nature_of_Code"),"set_ai_logic","get_ai_logic");
   ClassDB::bind_method(D_METHOD("get_ai_logic"), &NativeVehicle::get_ai_logic);
   ClassDB::bind_method(D_METHOD("set_ai_logic"), &NativeVehicle::set_ai_logic);
 
@@ -114,6 +107,14 @@ void NativeVehicle::_bind_methods(){
   //temp
   ClassDB::bind_method(D_METHOD("get_temp_final_target"), &NativeVehicle::get_temp_final_target);
   ClassDB::bind_method(D_METHOD("get_temp_returned_wander"), &NativeVehicle::get_temp_returned_wander);
+
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"mass"), "set_mass", "get_mass");
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_steering_force"),"set_max_steering_force", "get_max_steering_force");
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"max_speed"), "set_max_speed", "get_max_speed");
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT,"max_turn_rate"), "set_max_turn_rate", "get_max_turn_rate");
+  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2,"initial_velocity"), "set_initial_velocity", "get_initial_velocity");
+  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2,"scale_factor"), "set_scale_factor", "get_scale_factor");
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "ai_logic", PROPERTY_HINT_ENUM, "AI By Example,Nature_of_Code"),"set_ai_logic","get_ai_logic");
 }
 
 NativeVehicle::NativeVehicle(Vector2D position,
@@ -126,7 +127,7 @@ NativeVehicle::NativeVehicle(Vector2D position,
                              Vector2D scale,
                              Vector2D scale_factor,
                              GameWorld* world,
-                             NativeParameters::AiLogic ai_logic) {
+                             int ai_logic) {
 
   vehicle = new Vehicle(position,
                         rotation,
@@ -165,12 +166,12 @@ void NativeVehicle::_init() {
   max_turn_rate = 10.0;
   scale_factor = Vector2(1,1);
   initial_velocity = Vector2(0,0);
-  ai_logic = NativeParameters::AILOGIC_AI_BY_EXAMPLE;
+  ai_logic = 1;
 }
 
 void NativeVehicle::_ready() {
   if (!is_defined) {
-    create_world_vehicle(Vector2D(get_position().x,get_position().y), get_rotation(), Vector2D(get_initial_velocity().x, get_initial_velocity().y), get_mass(), get_max_steering_force(), get_max_speed(), get_max_turn_rate(), Vector2D(get_scale().x,get_scale().y), Vector2D(get_scale_factor().x,get_scale_factor().y),NULL,NativeParameters::AILOGIC_AI_BY_EXAMPLE);
+    create_world_vehicle(Vector2D(get_position().x,get_position().y), get_rotation(), Vector2D(get_initial_velocity().x, get_initial_velocity().y), get_mass(), get_max_steering_force(), get_max_speed(), get_max_turn_rate(), Vector2D(get_scale().x,get_scale().y), Vector2D(get_scale_factor().x,get_scale_factor().y),NULL,1);
   }
 }
 
@@ -193,7 +194,7 @@ void NativeVehicle::create_world_vehicle(Vector2D position,
                                          Vector2D scale,
                                          Vector2D scale_factor,
                                          GameWorld* game_world,
-                                         NativeParameters::AiLogic ai_logic){
+                                         int ai_logic){
 
   scale.x = scale.x * scale_factor.x;
   scale.y = scale.y * scale_factor.y;

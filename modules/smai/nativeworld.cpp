@@ -12,10 +12,9 @@ void NativeWorld::_bind_methods()
 }
 
 void NativeWorld::_init(){
-  ResourceLoader* resourceLoader = ResourceLoader::get_singleton();
-  native_vehicle_scene = resourceLoader->load("res://SteeringBehaviors/NativeVehicle.tscn");
-  native_obstacle_scene = resourceLoader->load("res://SteeringBehaviors/NativeObstacle.tscn");
-  native_wall_scene = resourceLoader->load("res://SteeringBehaviors/NativeWall.tscn");
+  native_vehicle_scene = ResourceLoader::load("res://SteeringBehaviors/NativeVehicle.tscn");
+  native_obstacle_scene = ResourceLoader::load("res://SteeringBehaviors/NativeObstacle.tscn");
+  native_wall_scene = ResourceLoader::load("res://SteeringBehaviors/NativeWall.tscn");
 }
 
 void NativeWorld::_ready() {
@@ -28,7 +27,7 @@ void NativeWorld::build_world() {
   game_world = new GameWorld();
 
   // grab parameters
-  Node* parameters_node = find_node("NativeParameters");
+  Node* parameters_node = find_child("NativeParameters");
   if (not parameters_node) {
     std::cout<<"unable to build world as the native parameters are not attached to the native world node!";
     return;
@@ -38,8 +37,8 @@ void NativeWorld::build_world() {
   game_world->set_parameters(parameters);
 
   // Set toroid
-  parameters->toroid_width = get_viewport()->get_visible_rect().get_size().x;
-  parameters->toroid_height = get_viewport()->get_visible_rect().get_size().y;
+  parameters->toroid_width = get_viewport_rect().get_size().x;
+  parameters->toroid_height = get_viewport_rect().get_size().y;
 
   build_vehicles();
   build_obstacles();
@@ -50,9 +49,9 @@ void NativeWorld::build_world() {
 
 void NativeWorld::build_vehicles() {
 
-  godot::Node* vehicles = Object::cast_to<Node>(find_node("vehicles"));
+  Node* vehicles = Object::cast_to<Node>(find_child("vehicles"));
   if (!vehicles) {
-    vehicles = godot::Node::_new();
+    vehicles = memnew(Node);
     vehicles->set_name("vehicles");
     add_child(vehicles);
   }
@@ -60,7 +59,7 @@ void NativeWorld::build_vehicles() {
   create_vehicles(vehicles);
 }
 
-void NativeWorld::append_vehicles(godot::Node* vehicles) {
+void NativeWorld::append_vehicles(Node* vehicles) {
   // set up existing vehicles
   for (int i = 0; i < vehicles->get_child_count(); i++) {
     NativeVehicle* native_vehicle = Object::cast_to<NativeVehicle>(vehicles->get_child(i));
@@ -75,13 +74,13 @@ void NativeWorld::append_vehicles(godot::Node* vehicles) {
                                            Vector2D(native_vehicle->get_scale().x,native_vehicle->get_scale().y),
                                            Vector2D(native_vehicle->get_scale_factor().x, native_vehicle->get_scale_factor().y),
                                            game_world,
-                                           native_vehicle->get_logic());
+                                           native_vehicle->get_ai_logic());
       native_vehicle->set_automatically_generated(false);
     }
   }
 }
 
-void NativeWorld::create_vehicles(godot::Node* vehicles) {
+void NativeWorld::create_vehicles(Node* vehicles) {
 
   for (int i = 0; i < parameters->number_of_agents; i++) {
 
@@ -92,7 +91,7 @@ void NativeWorld::create_vehicles(godot::Node* vehicles) {
     spawn_pos.x += get_position().x;
     spawn_pos.y += get_position().y;
 
-    godot::NativeVehicle* native_vehicle = Object::cast_to<godot::NativeVehicle>(native_vehicle_scene->instance());
+    NativeVehicle* native_vehicle = Object::cast_to<NativeVehicle>(native_vehicle_scene->instantiate());
 
     Vector2D scale = Vector2D(native_vehicle->get_scale().x, native_vehicle->get_scale().y);
     if (!parameters->use_scale_from_vehicle) {
@@ -111,7 +110,7 @@ void NativeWorld::create_vehicles(godot::Node* vehicles) {
                                          scale,
                                          Vector2D(native_vehicle->get_scale_factor().x, native_vehicle->get_scale_factor().y),
                                          game_world,
-                                         native_vehicle->get_logic());
+                                         native_vehicle->get_ai_logic());
     native_vehicle->set_automatically_generated(true);
 
     if (parameters->vehicle_wander_on){
@@ -145,9 +144,9 @@ void NativeWorld::create_vehicles(godot::Node* vehicles) {
 void NativeWorld::build_obstacles() {
 
   // build obstacles
-  godot::Node* obstacles = Object::cast_to<Node>(find_node("obstacles"));
+  Node* obstacles = Object::cast_to<Node>(find_child("obstacles"));
   if (!obstacles) {
-    obstacles = godot::Node::_new();
+    obstacles = memnew(Node);
     obstacles->set_name("obstacles");
     add_child(obstacles);
   }
@@ -155,7 +154,7 @@ void NativeWorld::build_obstacles() {
   create_obstacles(obstacles);
 }
 
-void NativeWorld::append_obstacles(godot::Node* obstacles) {
+void NativeWorld::append_obstacles(Node* obstacles) {
 
   for (int i = 0; i < obstacles->get_child_count(); i++) {
     NativeObstacle* native_obstacle = Object::cast_to<NativeObstacle>(obstacles->get_child(i));
@@ -169,10 +168,10 @@ void NativeWorld::append_obstacles(godot::Node* obstacles) {
   }
 }
 
-void NativeWorld::create_obstacles(godot::Node* obstacles) {
+void NativeWorld::create_obstacles(Node* obstacles) {
 
-  double world_width = get_viewport()->get_visible_rect().get_size().x;
-  double world_height = get_viewport()->get_visible_rect().get_size().y;
+  double world_width = get_viewport_rect().get_size().x;
+  double world_height = get_viewport_rect().get_size().y;
 
   //create a number of randomly sized tiddlywinks
   for (int i = 0; i < parameters->number_of_obstacles; i++)
@@ -203,7 +202,7 @@ void NativeWorld::create_obstacles(godot::Node* obstacles) {
       if (!::overlapped(ob, game_world->obstacles, minimum_gap_between_obstacles))
       {
         //its not overlapped so we can add it
-        godot::NativeObstacle* native_obstacle = Object::cast_to<godot::NativeObstacle>(native_obstacle_scene->instance());
+        NativeObstacle* native_obstacle = Object::cast_to<NativeObstacle>(native_obstacle_scene->instantiate());
 
         native_obstacle->set_position(Vector2(ob->get_position().x, ob->get_position().y));
         native_obstacle->set_radius(ob->get_bounding_radius());
@@ -226,16 +225,16 @@ void NativeWorld::create_obstacles(godot::Node* obstacles) {
 void NativeWorld::build_walls() {
 
   // build walls
-  godot::Node* walls = Object::cast_to<Node>(find_node("walls"));
+  Node* walls = Object::cast_to<Node>(find_child("walls"));
   if (!walls) {
-    walls = godot::Node::_new();
+    walls = memnew(Node);
     walls->set_name("walls");
     add_child(walls);
   }
   append_walls(walls);
 }
 
-void NativeWorld::append_walls(godot::Node* walls) {
+void NativeWorld::append_walls(Node* walls) {
   Vector2D previous_point;
   Vector2 current_point;
   for (int i = 0; i < walls->get_child_count(); i++) {
@@ -261,16 +260,16 @@ void NativeWorld::append_walls(godot::Node* walls) {
 void NativeWorld::build_paths() {
 
   // build paths
-  godot::Node* paths = Object::cast_to<Node>(find_node("paths"));
+  Node* paths = Object::cast_to<Node>(find_child("paths"));
   if (!paths) {
-    paths = godot::Node::_new();
+    paths = memnew(Node);
     paths->set_name("paths");
     add_child(paths);
   }
   append_paths(paths);
 }
 
-void NativeWorld::append_paths(godot::Node* paths) {
+void NativeWorld::append_paths(Node* paths) {
   Vector2D previous_point;
   Vector2 current_point;
   for (int i = 0; i < paths->get_child_count(); i++) {

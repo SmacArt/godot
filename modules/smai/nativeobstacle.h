@@ -8,17 +8,21 @@
 class NativeObstacle : public Node2D {
   GDCLASS(NativeObstacle, Node2D);
 
-private:
-  Obstacle* obstacle;
-  double radius;
-  bool is_automatically_generated;
+  double radius = 0;
 
 protected:
   static void _bind_methods();
   void _init();
   void _ready();
 
+private:
+  Obstacle* obstacle;
+  bool is_automatically_generated;
+
 public:
+
+  NativeObstacle();
+  ~NativeObstacle();
 
   NativeObstacle(double x, double y, double radius);
 
@@ -32,7 +36,7 @@ public:
   bool automatically_generated() {return is_automatically_generated;}
   void set_automatically_generated(bool is_auto) {is_automatically_generated = is_auto;}
 
-  void set_radius(const double _radius) {radius=_radius;}
+  void set_radius(const double p_radius) {radius = p_radius;}
   double get_radius() const {return radius;}
 
   bool is_tagged() const {if (obstacle) return obstacle->is_tagged(); else return false;}

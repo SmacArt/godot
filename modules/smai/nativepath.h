@@ -24,6 +24,8 @@ private:
 
 public:
 
+  NativePath();
+  ~NativePath();
   NativePath(Vector2D position);
 
   Path* path;

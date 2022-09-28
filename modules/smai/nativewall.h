@@ -21,6 +21,8 @@ private:
 
 public:
 
+  NativeWall();
+  ~NativeWall();
   NativeWall(Vector2D position);
 
   void create_world_wall(Vector2D position);

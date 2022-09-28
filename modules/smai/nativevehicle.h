@@ -25,15 +25,15 @@ private:
   double max_turn_rate;
   Vector2 initial_velocity;
   Vector2 scale_factor; // used to indicate the size of the vehicle based on this and the scale coming from godot
-  NativeParameters::AiLogic ai_logic;
+  int ai_logic;
 
 protected:
   static void _bind_methods();
 
   void _init();
   void _ready();
-
   void _process(float delta);
+
 public:
 
   NativeVehicle(Vector2D position,
@@ -46,7 +46,7 @@ public:
                 Vector2D scale,
                 Vector2D scale_factor,
                 GameWorld* world,
-                NativeParameters::AiLogic ai_logic);
+                int ai_logic);
 
   NativeVehicle();
   ~NativeVehicle();
@@ -61,7 +61,7 @@ public:
                             Vector2D scale,
                             Vector2D scale_factor,
                             GameWorld* world,
-                            NativeParameters::AiLogic ai_logic);
+                            int ai_logic);
 
   bool is_defined = false;
 
@@ -163,8 +163,8 @@ public:
   int get_number_of_feelers() const;
   Vector2 get_feeler(const int position) const;
 
-  void set_ai_logic(const NativeParameters::AiLogic _ai_logic) {ai_logic = _ai_logic;}
-  NativeParameters::AiLogic get_ai_logic() const {return ai_logic;}
+  void set_ai_logic(const int _ai_logic) {ai_logic = _ai_logic;}
+  int get_ai_logic() const {return ai_logic;}
 
   //temp
   Vector2 get_temp_final_target();
