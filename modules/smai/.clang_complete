@@ -1,6 +1,0 @@
--I./
--I../../
--std=c++11
--Wall
--Wno-parenthesis
--Wno-unused-parameter
