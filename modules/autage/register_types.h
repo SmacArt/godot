@@ -36,4 +36,4 @@
 void initialize_autage_module(ModuleInitializationLevel p_level);
 void uninitialize_autage_module(ModuleInitializationLevel p_level);
 
-#endif // SMAI_REGISTER_TYPES_H
+#endif // AUTAGE_REGISTER_TYPES_H

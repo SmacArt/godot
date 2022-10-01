@@ -32,10 +32,15 @@
 
 #include "core/object/class_db.h"
 
+#include "autonomous_agents_2d.h"
+
+
 void initialize_autage_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+
+  GDREGISTER_CLASS(AutonomousAgents2D);
 
 }
 

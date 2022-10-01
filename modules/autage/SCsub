@@ -1,6 +1,7 @@
-# SCsub
+#!/usr/bin/env python
 
-Import('env')
+Import("env")
+Import("env_modules")
 
-env.add_source_files(env.modules_sources, "*.cpp") # Add all cpp files to the build
-
+env_autage = env_modules.Clone()
+env_autage.add_source_files(env.modules_sources, "*.cpp")
