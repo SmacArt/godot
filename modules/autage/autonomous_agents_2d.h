@@ -29,11 +29,11 @@ public:
 		PARAM_MAX
 	};
 
-	enum ParticleFlags {
-		PARTICLE_FLAG_ALIGN_Y_TO_VELOCITY,
-		PARTICLE_FLAG_ROTATE_Y, // Unused, but exposed for consistency with 3D.
-		PARTICLE_FLAG_DISABLE_Z, // Unused, but exposed for consistency with 3D.
-		PARTICLE_FLAG_MAX
+	enum AgentFlags {
+		AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
+		AGENT_FLAG_ROTATE_Y, // Unused, but exposed for consistency with 3D.
+		AGENT_FLAG_DISABLE_Z, // Unused, but exposed for consistency with 3D.
+		AGENT_FLAG_MAX
 	};
 
 	enum EmissionShape {
@@ -69,6 +69,7 @@ private:
   };
 
   DrawOrder draw_order = DRAW_ORDER_INDEX;
+  Transform2D inv_global_transform;
 	real_t explosiveness_ratio = 0.0;
   int fixed_fps = 0;
 	bool fractional_delta = true;
@@ -88,6 +89,22 @@ private:
   Vector<float> agent_data;
   Vector<int> agent_order;
 
+	struct SortLifetime {
+		const Agent *agents = nullptr;
+
+		bool operator()(int p_a, int p_b) const {
+			return agents[p_a].time > agents[p_b].time;
+		}
+	};
+
+	struct SortAxis {
+		const Agent *agents = nullptr;
+		Vector2 axis;
+		bool operator()(int p_a, int p_b) const {
+			return axis.dot(agents[p_a].transform[2]) < axis.dot(agents[p_b].transform[2]);
+		}
+	};
+
   int cycle = 1;
   bool do_redraw = false;
   double inactive_time = 0.0;
@@ -104,7 +121,7 @@ private:
 	Color color;
 	Ref<Gradient> color_ramp;
 	Ref<Gradient> color_initial_ramp;
-	bool particle_flags[PARTICLE_FLAG_MAX];
+	bool agent_flags[AGENT_FLAG_MAX];
 
 	EmissionShape emission_shape = EMISSION_SHAPE_POINT;
 	real_t emission_sphere_radius = 1.0;
@@ -149,7 +166,7 @@ public:
   int get_fixed_fps() const;
 	bool get_fractional_delta() const;
   double get_lifetime() const;
-  double get_lifetime_randonmess() const;
+  double get_lifetime_randomness() const;
   double get_pre_process_time() const;
   bool is_running() const;
   double get_speed_scale() const;
@@ -181,8 +198,8 @@ public:
 	void set_color_initial_ramp(const Ref<Gradient> &p_ramp);
 	Ref<Gradient> get_color_initial_ramp() const;
 
-	void set_particle_flag(ParticleFlags p_particle_flag, bool p_enable);
-	bool get_particle_flag(ParticleFlags p_particle_flag) const;
+	void set_agent_flag(AgentFlags p_agent_flag, bool p_enable);
+	bool get_agent_flag(AgentFlags p_agent_flag) const;
 
 	void set_emission_shape(EmissionShape p_shape);
 	void set_emission_sphere_radius(real_t p_radius);
@@ -222,5 +239,8 @@ protected:
 };
 
 VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
+VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
+VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
+VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 
 #endif

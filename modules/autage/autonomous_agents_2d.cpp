@@ -82,8 +82,15 @@ double AutonomousAgents2D::get_lifetime() const {
 void AutonomousAgents2D::set_lifetime_randomness(double p_lifetime_randomness) {
   lifetime_randomness = p_lifetime_randomness;
 }
-double AutonomousAgents2D::get_lifetime_randonmess() const {
+double AutonomousAgents2D::get_lifetime_randomness() const {
   return lifetime_randomness;
+}
+
+void AutonomousAgents2D::set_pre_process_time(double p_pre_process_time) {
+  pre_process_time = p_pre_process_time;
+}
+double AutonomousAgents2D::get_pre_process_time() const {
+  return pre_process_time;
 }
 
 void AutonomousAgents2D::set_running(bool p_running) {
@@ -118,6 +125,9 @@ void AutonomousAgents2D::set_texture(const Ref<Texture2D> &p_texture) {
     _update_mesh_texture();
   }
 }
+Ref<Texture2D> AutonomousAgents2D::get_texture() const {
+  return texture;
+}
 
 void AutonomousAgents2D::set_time_randomness_ratio(real_t p_ratio){
   time_randomness_ratio = p_ratio;
@@ -131,6 +141,262 @@ void AutonomousAgents2D::set_use_local_coordinates(bool p_use_local) {
 }
 bool AutonomousAgents2D::is_using_local_coordinates() const {
   return use_local_coordinates;
+}
+
+void AutonomousAgents2D::set_direction(Vector2 p_direction) {
+	direction = p_direction;
+}
+
+Vector2 AutonomousAgents2D::get_direction() const {
+	return direction;
+}
+
+void AutonomousAgents2D::set_spread(real_t p_spread) {
+	spread = p_spread;
+}
+
+real_t AutonomousAgents2D::get_spread() const {
+	return spread;
+}
+
+void AutonomousAgents2D::set_param_min(Parameter p_param, real_t p_value) {
+	ERR_FAIL_INDEX(p_param, PARAM_MAX);
+
+	parameters_min[p_param] = p_value;
+	if (parameters_min[p_param] > parameters_max[p_param]) {
+		set_param_max(p_param, p_value);
+	}
+}
+
+real_t AutonomousAgents2D::get_param_min(Parameter p_param) const {
+	ERR_FAIL_INDEX_V(p_param, PARAM_MAX, 0);
+
+	return parameters_min[p_param];
+}
+
+void AutonomousAgents2D::set_param_max(Parameter p_param, real_t p_value) {
+	ERR_FAIL_INDEX(p_param, PARAM_MAX);
+
+	parameters_max[p_param] = p_value;
+	if (parameters_min[p_param] > parameters_max[p_param]) {
+		set_param_min(p_param, p_value);
+	}
+
+	update_configuration_warnings();
+}
+
+real_t AutonomousAgents2D::get_param_max(Parameter p_param) const {
+	ERR_FAIL_INDEX_V(p_param, PARAM_MAX, 0);
+
+	return parameters_max[p_param];
+}
+
+static void _adjust_curve_range(const Ref<Curve> &p_curve, real_t p_min, real_t p_max) {
+	Ref<Curve> curve = p_curve;
+	if (!curve.is_valid()) {
+		return;
+	}
+
+	curve->ensure_default_setup(p_min, p_max);
+}
+
+void AutonomousAgents2D::set_param_curve(Parameter p_param, const Ref<Curve> &p_curve) {
+	ERR_FAIL_INDEX(p_param, PARAM_MAX);
+
+	curve_parameters[p_param] = p_curve;
+
+	switch (p_param) {
+		case PARAM_INITIAL_LINEAR_VELOCITY: {
+			//do none for this one
+		} break;
+		case PARAM_ANGULAR_VELOCITY: {
+			_adjust_curve_range(p_curve, -360, 360);
+		} break;
+		case PARAM_ORBIT_VELOCITY: {
+			_adjust_curve_range(p_curve, -500, 500);
+		} break;
+		case PARAM_LINEAR_ACCEL: {
+			_adjust_curve_range(p_curve, -200, 200);
+		} break;
+		case PARAM_RADIAL_ACCEL: {
+			_adjust_curve_range(p_curve, -200, 200);
+		} break;
+		case PARAM_TANGENTIAL_ACCEL: {
+			_adjust_curve_range(p_curve, -200, 200);
+		} break;
+		case PARAM_DAMPING: {
+			_adjust_curve_range(p_curve, 0, 100);
+		} break;
+		case PARAM_ANGLE: {
+			_adjust_curve_range(p_curve, -360, 360);
+		} break;
+		case PARAM_SCALE: {
+		} break;
+		case PARAM_HUE_VARIATION: {
+			_adjust_curve_range(p_curve, -1, 1);
+		} break;
+		case PARAM_ANIM_SPEED: {
+			_adjust_curve_range(p_curve, 0, 200);
+		} break;
+		case PARAM_ANIM_OFFSET: {
+		} break;
+		default: {
+		}
+	}
+
+	update_configuration_warnings();
+}
+
+Ref<Curve> AutonomousAgents2D::get_param_curve(Parameter p_param) const {
+	ERR_FAIL_INDEX_V(p_param, PARAM_MAX, Ref<Curve>());
+
+	return curve_parameters[p_param];
+}
+
+void AutonomousAgents2D::set_color(const Color &p_color) {
+	color = p_color;
+}
+
+Color AutonomousAgents2D::get_color() const {
+	return color;
+}
+
+void AutonomousAgents2D::set_color_ramp(const Ref<Gradient> &p_ramp) {
+	color_ramp = p_ramp;
+}
+
+Ref<Gradient> AutonomousAgents2D::get_color_ramp() const {
+	return color_ramp;
+}
+
+void AutonomousAgents2D::set_color_initial_ramp(const Ref<Gradient> &p_ramp) {
+	color_initial_ramp = p_ramp;
+}
+
+Ref<Gradient> AutonomousAgents2D::get_color_initial_ramp() const {
+	return color_initial_ramp;
+}
+
+void AutonomousAgents2D::set_agent_flag(AgentFlags p_agent_flag, bool p_enable) {
+	ERR_FAIL_INDEX(p_agent_flag, AGENT_FLAG_MAX);
+	agent_flags[p_agent_flag] = p_enable;
+}
+
+bool AutonomousAgents2D::get_agent_flag(AgentFlags p_agent_flag) const {
+	ERR_FAIL_INDEX_V(p_agent_flag, AGENT_FLAG_MAX, false);
+	return agent_flags[p_agent_flag];
+}
+
+void AutonomousAgents2D::set_emission_shape(EmissionShape p_shape) {
+	ERR_FAIL_INDEX(p_shape, EMISSION_SHAPE_MAX);
+	emission_shape = p_shape;
+	notify_property_list_changed();
+}
+
+void AutonomousAgents2D::set_emission_sphere_radius(real_t p_radius) {
+	emission_sphere_radius = p_radius;
+}
+
+void AutonomousAgents2D::set_emission_rect_extents(Vector2 p_extents) {
+	emission_rect_extents = p_extents;
+}
+
+void AutonomousAgents2D::set_emission_points(const Vector<Vector2> &p_points) {
+	emission_points = p_points;
+}
+
+void AutonomousAgents2D::set_emission_normals(const Vector<Vector2> &p_normals) {
+	emission_normals = p_normals;
+}
+
+void AutonomousAgents2D::set_emission_colors(const Vector<Color> &p_colors) {
+	emission_colors = p_colors;
+}
+
+real_t AutonomousAgents2D::get_emission_sphere_radius() const {
+	return emission_sphere_radius;
+}
+
+Vector2 AutonomousAgents2D::get_emission_rect_extents() const {
+	return emission_rect_extents;
+}
+
+Vector<Vector2> AutonomousAgents2D::get_emission_points() const {
+	return emission_points;
+}
+
+Vector<Vector2> AutonomousAgents2D::get_emission_normals() const {
+	return emission_normals;
+}
+
+Vector<Color> AutonomousAgents2D::get_emission_colors() const {
+	return emission_colors;
+}
+
+AutonomousAgents2D::EmissionShape AutonomousAgents2D::get_emission_shape() const {
+	return emission_shape;
+}
+
+void AutonomousAgents2D::set_gravity(const Vector2 &p_gravity) {
+	gravity = p_gravity;
+}
+
+Vector2 AutonomousAgents2D::get_gravity() const {
+	return gravity;
+}
+
+void AutonomousAgents2D::set_scale_curve_x(Ref<Curve> p_scale_curve) {
+	scale_curve_x = p_scale_curve;
+}
+
+void AutonomousAgents2D::set_scale_curve_y(Ref<Curve> p_scale_curve) {
+	scale_curve_y = p_scale_curve;
+}
+
+void AutonomousAgents2D::set_split_scale(bool p_split_scale) {
+	split_scale = p_split_scale;
+	notify_property_list_changed();
+}
+
+Ref<Curve> AutonomousAgents2D::get_scale_curve_x() const {
+	return scale_curve_x;
+}
+
+Ref<Curve> AutonomousAgents2D::get_scale_curve_y() const {
+	return scale_curve_y;
+}
+
+bool AutonomousAgents2D::get_split_scale() {
+	return split_scale;
+}
+
+void AutonomousAgents2D::_validate_property(PropertyInfo &p_property) const {
+	if (p_property.name == "emission_sphere_radius" && (emission_shape != EMISSION_SHAPE_SPHERE && emission_shape != EMISSION_SHAPE_SPHERE_SURFACE)) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+
+	if (p_property.name == "emission_rect_extents" && emission_shape != EMISSION_SHAPE_RECTANGLE) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+
+	if ((p_property.name == "emission_point_texture" || p_property.name == "emission_color_texture") && (emission_shape < EMISSION_SHAPE_POINTS)) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+
+	if (p_property.name == "emission_normals" && emission_shape != EMISSION_SHAPE_DIRECTED_POINTS) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+
+	if (p_property.name == "emission_points" && emission_shape != EMISSION_SHAPE_POINTS && emission_shape != EMISSION_SHAPE_DIRECTED_POINTS) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+
+	if (p_property.name == "emission_colors" && emission_shape != EMISSION_SHAPE_POINTS && emission_shape != EMISSION_SHAPE_DIRECTED_POINTS) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
+	if (p_property.name.begins_with("scale_curve_") && !split_scale) {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
 }
 
 void AutonomousAgents2D::_agents_process(double p_delta) {
@@ -193,7 +459,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 		bool restart = false;
 
 		if (time > prev_time) {
-			// restart_time >= prev_time is used so particles emit in the first frame they are processed
+			// restart_time >= prev_time is used so agents emit in the first frame they are processed
 
 			if (restart_time >= prev_time && restart_time < time) {
 				restart = true;
@@ -397,7 +663,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 			real_t orbit_amount = tex_orbit_velocity * Math::lerp(parameters_min[PARAM_ORBIT_VELOCITY], parameters_max[PARAM_ORBIT_VELOCITY], rand_from_seed(alt_seed));
 			if (orbit_amount != 0.0) {
 				real_t ang = orbit_amount * local_delta * Math_TAU;
-				// Not sure why the ParticleProcessMaterial code uses a clockwise rotation matrix,
+				// Not sure why the AgentProcessMaterial code uses a clockwise rotation matrix,
 				// but we use -ang here to reproduce its behavior.
 				Transform2D rot = Transform2D(-ang, Vector2());
 				a.transform[2] -= diff;
@@ -478,7 +744,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
 		a.color *= a.base_color * a.start_color_rand;
 
-		if (particle_flags[PARTICLE_FLAG_ALIGN_Y_TO_VELOCITY]) {
+		if (agent_flags[AGENT_FLAG_ALIGN_Y_TO_VELOCITY]) {
 			if (a.velocity.length() > 0.0) {
 				a.transform.columns[1] = a.velocity.normalized();
 				a.transform.columns[0] = a.transform.columns[1].orthogonal();
@@ -534,6 +800,71 @@ void AutonomousAgents2D::_set_do_redraw(bool p_do_redraw) {
 	}
 
 	queue_redraw(); // redraw to update render list
+}
+
+void AutonomousAgents2D::_update_agent_data_buffer() {
+	MutexLock lock(update_mutex);
+
+	int ac = agents.size();
+
+	int *ow;
+	int *order = nullptr;
+
+	float *ad = agent_data.ptrw();
+	const Agent *a = agents.ptr();
+	float *ptr = ad;
+
+	if (draw_order != DRAW_ORDER_INDEX) {
+		ow = agent_order.ptrw();
+		order = ow;
+
+		for (int i = 0; i < ac; i++) {
+			order[i] = i;
+		}
+		if (draw_order == DRAW_ORDER_LIFETIME) {
+			SortArray<int, SortLifetime> sorter;
+			sorter.compare.agents = a;
+			sorter.sort(order, ac);
+		}
+	}
+
+	for (int i = 0; i < ac; i++) {
+		int idx = order ? order[i] : i;
+
+		Transform2D t = a[idx].transform;
+
+		if (!use_local_coordinates) {
+			t = inv_global_transform * t;
+		}
+
+		if (a[idx].active) {
+			ptr[0] = t.columns[0][0];
+			ptr[1] = t.columns[1][0];
+			ptr[2] = 0;
+			ptr[3] = t.columns[2][0];
+			ptr[4] = t.columns[0][1];
+			ptr[5] = t.columns[1][1];
+			ptr[6] = 0;
+			ptr[7] = t.columns[2][1];
+
+		} else {
+			memset(ptr, 0, sizeof(float) * 8);
+		}
+
+		Color c = a[idx].color;
+
+		ptr[8] = c.r;
+		ptr[9] = c.g;
+		ptr[10] = c.b;
+		ptr[11] = c.a;
+
+		ptr[12] = a[idx].custom[0];
+		ptr[13] = a[idx].custom[1];
+		ptr[14] = a[idx].custom[2];
+		ptr[15] = a[idx].custom[3];
+
+		ptr += 16;
+	}
 }
 
 void AutonomousAgents2D::_update_internal() {
@@ -697,14 +1028,14 @@ void AutonomousAgents2D::_notification(int p_what) {
 			inv_global_transform = get_global_transform().affine_inverse();
 
 			if (!use_local_coordinates) {
-				int agents_size = agents.size();
+				int agent_count = agents.size();
 
-				float *agent_data = agent_data.ptrw();
+				float *ad = agent_data.ptrw();
 				const Agent *agent = agents.ptr();
-				float *ptr = agent_data;
+				float *ptr = ad;
 
-				for (int i = 0; i < pc; i++) {
-					Transform2D t = inv_global_transform * r[i].transform;
+				for (int i = 0; i < agent_count; i++) {
+					Transform2D t = inv_global_transform * agent[i].transform;
 
 					if (agent[i].active) {
 						ptr[0] = t.columns[0][0];
@@ -755,7 +1086,7 @@ void AutonomousAgents2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_speed_scale"), &AutonomousAgents2D::get_speed_scale);
 	ClassDB::bind_method(D_METHOD("get_texture"), &AutonomousAgents2D::get_texture);
 	ClassDB::bind_method(D_METHOD("get_time_randomness_ratio"), &AutonomousAgents2D::get_time_randomness_ratio);
-	ClassDB::bind_method(D_METHOD("is_use_local_coordinates"), &AutonomousAgents2D::is_use_local_coordinates);
+	ClassDB::bind_method(D_METHOD("is_use_local_coordinates"), &AutonomousAgents2D::is_using_local_coordinates);
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "amount", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_amount", "get_amount");
@@ -770,12 +1101,168 @@ void AutonomousAgents2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "fixed_fps", PROPERTY_HINT_RANGE, "0,1000,1,suffix:FPS"), "set_fixed_fps", "get_fixed_fps");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "fract_delta"), "set_fractional_delta", "get_fractional_delta");
   ADD_GROUP("Drawing","");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_local_coordinates"), "set_use_local_coordinates", "get_use_local_coordinates");
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_local_coordinates"), "set_use_local_coordinates", "is_using_local_coordinates");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "draw_order", PROPERTY_HINT_ENUM, "Index,Lifetime"), "set_draw_order", "get_draw_order");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture");
 
 	BIND_ENUM_CONSTANT(DRAW_ORDER_INDEX);
 	BIND_ENUM_CONSTANT(DRAW_ORDER_LIFETIME);
+
+	ClassDB::bind_method(D_METHOD("set_direction", "direction"), &AutonomousAgents2D::set_direction);
+	ClassDB::bind_method(D_METHOD("get_direction"), &AutonomousAgents2D::get_direction);
+
+	ClassDB::bind_method(D_METHOD("set_spread", "spread"), &AutonomousAgents2D::set_spread);
+	ClassDB::bind_method(D_METHOD("get_spread"), &AutonomousAgents2D::get_spread);
+
+	ClassDB::bind_method(D_METHOD("set_param_min", "param", "value"), &AutonomousAgents2D::set_param_min);
+	ClassDB::bind_method(D_METHOD("get_param_min", "param"), &AutonomousAgents2D::get_param_min);
+
+	ClassDB::bind_method(D_METHOD("set_param_max", "param", "value"), &AutonomousAgents2D::set_param_max);
+	ClassDB::bind_method(D_METHOD("get_param_max", "param"), &AutonomousAgents2D::get_param_max);
+
+	ClassDB::bind_method(D_METHOD("set_param_curve", "param", "curve"), &AutonomousAgents2D::set_param_curve);
+	ClassDB::bind_method(D_METHOD("get_param_curve", "param"), &AutonomousAgents2D::get_param_curve);
+
+	ClassDB::bind_method(D_METHOD("set_color", "color"), &AutonomousAgents2D::set_color);
+	ClassDB::bind_method(D_METHOD("get_color"), &AutonomousAgents2D::get_color);
+
+	ClassDB::bind_method(D_METHOD("set_color_ramp", "ramp"), &AutonomousAgents2D::set_color_ramp);
+	ClassDB::bind_method(D_METHOD("get_color_ramp"), &AutonomousAgents2D::get_color_ramp);
+
+	ClassDB::bind_method(D_METHOD("set_color_initial_ramp", "ramp"), &AutonomousAgents2D::set_color_initial_ramp);
+	ClassDB::bind_method(D_METHOD("get_color_initial_ramp"), &AutonomousAgents2D::get_color_initial_ramp);
+
+	ClassDB::bind_method(D_METHOD("set_agent_flag", "agent_flag", "enable"), &AutonomousAgents2D::set_agent_flag);
+	ClassDB::bind_method(D_METHOD("get_agent_flag", "agent_flag"), &AutonomousAgents2D::get_agent_flag);
+
+	ClassDB::bind_method(D_METHOD("set_emission_shape", "shape"), &AutonomousAgents2D::set_emission_shape);
+	ClassDB::bind_method(D_METHOD("get_emission_shape"), &AutonomousAgents2D::get_emission_shape);
+
+	ClassDB::bind_method(D_METHOD("set_emission_sphere_radius", "radius"), &AutonomousAgents2D::set_emission_sphere_radius);
+	ClassDB::bind_method(D_METHOD("get_emission_sphere_radius"), &AutonomousAgents2D::get_emission_sphere_radius);
+
+	ClassDB::bind_method(D_METHOD("set_emission_rect_extents", "extents"), &AutonomousAgents2D::set_emission_rect_extents);
+	ClassDB::bind_method(D_METHOD("get_emission_rect_extents"), &AutonomousAgents2D::get_emission_rect_extents);
+
+	ClassDB::bind_method(D_METHOD("set_emission_points", "array"), &AutonomousAgents2D::set_emission_points);
+	ClassDB::bind_method(D_METHOD("get_emission_points"), &AutonomousAgents2D::get_emission_points);
+
+	ClassDB::bind_method(D_METHOD("set_emission_normals", "array"), &AutonomousAgents2D::set_emission_normals);
+	ClassDB::bind_method(D_METHOD("get_emission_normals"), &AutonomousAgents2D::get_emission_normals);
+
+	ClassDB::bind_method(D_METHOD("set_emission_colors", "array"), &AutonomousAgents2D::set_emission_colors);
+	ClassDB::bind_method(D_METHOD("get_emission_colors"), &AutonomousAgents2D::get_emission_colors);
+
+	ClassDB::bind_method(D_METHOD("get_gravity"), &AutonomousAgents2D::get_gravity);
+	ClassDB::bind_method(D_METHOD("set_gravity", "accel_vec"), &AutonomousAgents2D::set_gravity);
+
+	ClassDB::bind_method(D_METHOD("get_split_scale"), &AutonomousAgents2D::get_split_scale);
+	ClassDB::bind_method(D_METHOD("set_split_scale", "split_scale"), &AutonomousAgents2D::set_split_scale);
+
+	ClassDB::bind_method(D_METHOD("get_scale_curve_x"), &AutonomousAgents2D::get_scale_curve_x);
+	ClassDB::bind_method(D_METHOD("set_scale_curve_x", "scale_curve"), &AutonomousAgents2D::set_scale_curve_x);
+
+	ClassDB::bind_method(D_METHOD("get_scale_curve_y"), &AutonomousAgents2D::get_scale_curve_y);
+	ClassDB::bind_method(D_METHOD("set_scale_curve_y", "scale_curve"), &AutonomousAgents2D::set_scale_curve_y);
+
+
+	ADD_GROUP("Emission Shape", "emission_");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "emission_shape", PROPERTY_HINT_ENUM, "Point,Sphere,Sphere Surface,Rectangle,Points,Directed Points", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), "set_emission_shape", "get_emission_shape");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "emission_sphere_radius", PROPERTY_HINT_RANGE, "0.01,128,0.01,suffix:px"), "set_emission_sphere_radius", "get_emission_sphere_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "emission_rect_extents", PROPERTY_HINT_NONE, "suffix:px"), "set_emission_rect_extents", "get_emission_rect_extents");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "emission_points"), "set_emission_points", "get_emission_points");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "emission_normals"), "set_emission_normals", "get_emission_normals");
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_COLOR_ARRAY, "emission_colors"), "set_emission_colors", "get_emission_colors");
+	ADD_GROUP("Agent Flags", "agent_flag_");
+	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align_y"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
+	ADD_GROUP("Direction", "");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "direction"), "set_direction", "get_direction");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spread", PROPERTY_HINT_RANGE, "0,180,0.01"), "set_spread", "get_spread");
+	ADD_GROUP("Gravity", "");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity", PROPERTY_HINT_NONE, U"suffix:px/s\u00B2"), "set_gravity", "get_gravity");
+	ADD_GROUP("Initial Velocity", "initial_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "initial_velocity_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_INITIAL_LINEAR_VELOCITY);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "initial_velocity_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_INITIAL_LINEAR_VELOCITY);
+	ADD_GROUP("Angular Velocity", "angular_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_velocity_min", PROPERTY_HINT_RANGE, "-720,720,0.01,or_less,or_greater"), "set_param_min", "get_param_min", PARAM_ANGULAR_VELOCITY);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angular_velocity_max", PROPERTY_HINT_RANGE, "-720,720,0.01,or_less,or_greater"), "set_param_max", "get_param_max", PARAM_ANGULAR_VELOCITY);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "angular_velocity_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_ANGULAR_VELOCITY);
+	ADD_GROUP("Orbit Velocity", "orbit_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "orbit_velocity_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_less,or_greater"), "set_param_min", "get_param_min", PARAM_ORBIT_VELOCITY);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "orbit_velocity_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_less,or_greater"), "set_param_max", "get_param_max", PARAM_ORBIT_VELOCITY);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "orbit_velocity_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_ORBIT_VELOCITY);
+	ADD_GROUP("Linear Accel", "linear_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_accel_min", PROPERTY_HINT_RANGE, "-100,100,0.01,or_less,or_greater"), "set_param_min", "get_param_min", PARAM_LINEAR_ACCEL);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "linear_accel_max", PROPERTY_HINT_RANGE, "-100,100,0.01,or_less,or_greater"), "set_param_max", "get_param_max", PARAM_LINEAR_ACCEL);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "linear_accel_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_LINEAR_ACCEL);
+	ADD_GROUP("Radial Accel", "radial_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "radial_accel_min", PROPERTY_HINT_RANGE, "-100,100,0.01,or_less,or_greater"), "set_param_min", "get_param_min", PARAM_RADIAL_ACCEL);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "radial_accel_max", PROPERTY_HINT_RANGE, "-100,100,0.01,or_less,or_greater"), "set_param_max", "get_param_max", PARAM_RADIAL_ACCEL);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "radial_accel_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_RADIAL_ACCEL);
+	ADD_GROUP("Tangential Accel", "tangential_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "tangential_accel_min", PROPERTY_HINT_RANGE, "-100,100,0.01,or_less,or_greater"), "set_param_min", "get_param_min", PARAM_TANGENTIAL_ACCEL);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "tangential_accel_max", PROPERTY_HINT_RANGE, "-100,100,0.01,or_less,or_greater"), "set_param_max", "get_param_max", PARAM_TANGENTIAL_ACCEL);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "tangential_accel_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_TANGENTIAL_ACCEL);
+	ADD_GROUP("Damping", "");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "damping_min", PROPERTY_HINT_RANGE, "0,100,0.01"), "set_param_min", "get_param_min", PARAM_DAMPING);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "damping_max", PROPERTY_HINT_RANGE, "0,100,0.01"), "set_param_max", "get_param_max", PARAM_DAMPING);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "damping_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_DAMPING);
+	ADD_GROUP("Angle", "");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angle_min", PROPERTY_HINT_RANGE, "-720,720,0.1,or_less,or_greater,degrees"), "set_param_min", "get_param_min", PARAM_ANGLE);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "angle_max", PROPERTY_HINT_RANGE, "-720,720,0.1,or_less,or_greater,degrees"), "set_param_max", "get_param_max", PARAM_ANGLE);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "angle_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_ANGLE);
+	ADD_GROUP("Scale", "");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "scale_amount_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_SCALE);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "scale_amount_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_SCALE);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "scale_amount_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_SCALE);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "split_scale"), "set_split_scale", "get_split_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "scale_curve_x", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_scale_curve_x", "get_scale_curve_x");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "scale_curve_y", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_scale_curve_y", "get_scale_curve_y");
+
+	ADD_GROUP("Color", "");
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "color"), "set_color", "get_color");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "color_ramp", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_color_ramp", "get_color_ramp");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "color_initial_ramp", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_color_initial_ramp", "get_color_initial_ramp");
+
+	ADD_GROUP("Hue Variation", "hue_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "hue_variation_min", PROPERTY_HINT_RANGE, "-1,1,0.01"), "set_param_min", "get_param_min", PARAM_HUE_VARIATION);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "hue_variation_max", PROPERTY_HINT_RANGE, "-1,1,0.01"), "set_param_max", "get_param_max", PARAM_HUE_VARIATION);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "hue_variation_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_HUE_VARIATION);
+	ADD_GROUP("Animation", "anim_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "anim_speed_min", PROPERTY_HINT_RANGE, "0,128,0.01,or_greater,or_less"), "set_param_min", "get_param_min", PARAM_ANIM_SPEED);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "anim_speed_max", PROPERTY_HINT_RANGE, "0,128,0.01,or_greater,or_less"), "set_param_max", "get_param_max", PARAM_ANIM_SPEED);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "anim_speed_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_ANIM_SPEED);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "anim_offset_min", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_param_min", "get_param_min", PARAM_ANIM_OFFSET);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "anim_offset_max", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_param_max", "get_param_max", PARAM_ANIM_OFFSET);
+	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "anim_offset_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_ANIM_OFFSET);
+
+	BIND_ENUM_CONSTANT(PARAM_INITIAL_LINEAR_VELOCITY);
+	BIND_ENUM_CONSTANT(PARAM_ANGULAR_VELOCITY);
+	BIND_ENUM_CONSTANT(PARAM_ORBIT_VELOCITY);
+	BIND_ENUM_CONSTANT(PARAM_LINEAR_ACCEL);
+	BIND_ENUM_CONSTANT(PARAM_RADIAL_ACCEL);
+	BIND_ENUM_CONSTANT(PARAM_TANGENTIAL_ACCEL);
+	BIND_ENUM_CONSTANT(PARAM_DAMPING);
+	BIND_ENUM_CONSTANT(PARAM_ANGLE);
+	BIND_ENUM_CONSTANT(PARAM_SCALE);
+	BIND_ENUM_CONSTANT(PARAM_HUE_VARIATION);
+	BIND_ENUM_CONSTANT(PARAM_ANIM_SPEED);
+	BIND_ENUM_CONSTANT(PARAM_ANIM_OFFSET);
+	BIND_ENUM_CONSTANT(PARAM_MAX);
+
+	BIND_ENUM_CONSTANT(AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
+	BIND_ENUM_CONSTANT(AGENT_FLAG_ROTATE_Y); // Unused, but exposed for consistency with 3D.
+	BIND_ENUM_CONSTANT(AGENT_FLAG_DISABLE_Z); // Unused, but exposed for consistency with 3D.
+	BIND_ENUM_CONSTANT(AGENT_FLAG_MAX);
+
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_POINT);
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_SPHERE);
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_SPHERE_SURFACE);
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_RECTANGLE);
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_POINTS);
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
+	BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
+
 }
 
 AutonomousAgents2D::AutonomousAgents2D() {
@@ -786,6 +1273,36 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_running(true);
   set_amount(10);
   set_use_local_coordinates(false);
+
+	set_param_min(PARAM_INITIAL_LINEAR_VELOCITY, 0);
+	set_param_min(PARAM_ANGULAR_VELOCITY, 0);
+	set_param_min(PARAM_ORBIT_VELOCITY, 0);
+	set_param_min(PARAM_LINEAR_ACCEL, 0);
+	set_param_min(PARAM_RADIAL_ACCEL, 0);
+	set_param_min(PARAM_TANGENTIAL_ACCEL, 0);
+	set_param_min(PARAM_DAMPING, 0);
+	set_param_min(PARAM_ANGLE, 0);
+	set_param_min(PARAM_SCALE, 1);
+	set_param_min(PARAM_HUE_VARIATION, 0);
+	set_param_min(PARAM_ANIM_SPEED, 0);
+	set_param_min(PARAM_ANIM_OFFSET, 0);
+
+	set_param_max(PARAM_INITIAL_LINEAR_VELOCITY, 0);
+	set_param_max(PARAM_ANGULAR_VELOCITY, 0);
+	set_param_max(PARAM_ORBIT_VELOCITY, 0);
+	set_param_max(PARAM_LINEAR_ACCEL, 0);
+	set_param_max(PARAM_RADIAL_ACCEL, 0);
+	set_param_max(PARAM_TANGENTIAL_ACCEL, 0);
+	set_param_max(PARAM_DAMPING, 0);
+	set_param_max(PARAM_ANGLE, 0);
+	set_param_max(PARAM_SCALE, 1);
+	set_param_max(PARAM_HUE_VARIATION, 0);
+	set_param_max(PARAM_ANIM_SPEED, 0);
+	set_param_max(PARAM_ANIM_OFFSET, 0);
+
+	for (int i = 0; i < AGENT_FLAG_MAX; i++) {
+		agent_flags[i] = false;
+	}
 
   set_color(Color(1,1,1,1));
   _update_mesh_texture();
