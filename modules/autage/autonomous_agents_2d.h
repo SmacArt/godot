@@ -1,3 +1,33 @@
+/*************************************************************************/
+/*  cpu_agents_2d.h                                                   */
+/*************************************************************************/
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
+/*                                                                       */
+/* Permission is hereby granted, free of charge, to any person obtaining */
+/* a copy of this software and associated documentation files (the       */
+/* "Software"), to deal in the Software without restriction, including   */
+/* without limitation the rights to use, copy, modify, merge, publish,   */
+/* distribute, sublicense, and/or sell copies of the Software, and to    */
+/* permit persons to whom the Software is furnished to do so, subject to */
+/* the following conditions:                                             */
+/*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
+/* included in all copies or substantial portions of the Software.       */
+/*                                                                       */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/*************************************************************************/
+
 #ifndef AUTONOMOUS_AGENTS_2D_H
 #define AUTONOMOUS_AGENTS_2D_H
 
@@ -5,13 +35,13 @@
 
 class AutonomousAgents2D : public Node2D {
 private:
-  GDCLASS(AutonomousAgents2D, Node2D);
+	GDCLASS(AutonomousAgents2D, Node2D);
 
 public:
-  enum DrawOrder {
-    DRAW_ORDER_INDEX,
-    DRAW_ORDER_LIFETIME
-  };
+	enum DrawOrder {
+		DRAW_ORDER_INDEX,
+		DRAW_ORDER_LIFETIME,
+	};
 
 	enum Parameter {
 		PARAM_INITIAL_LINEAR_VELOCITY,
@@ -47,47 +77,39 @@ public:
 	};
 
 private:
+	bool running = false;
 
-
-  struct Agent {
-    Transform2D transform;
-    Color color;
-    real_t custom[4] = {};
-    real_t rotation = 0.0;
-    Vector2 velocity;
-    bool active = false;
+	struct Agent {
+		Transform2D transform;
+		Color color;
+		real_t custom[4] = {};
+		real_t rotation = 0.0;
+		Vector2 velocity;
+		bool active = false;
 		real_t angle_rand = 0.0;
 		real_t scale_rand = 0.0;
 		real_t hue_rot_rand = 0.0;
 		real_t anim_offset_rand = 0.0;
-    Color start_color_rand;
+		Color start_color_rand;
 		double time = 0.0;
 		double lifetime = 0.0;
 		Color base_color;
 
 		uint32_t seed = 0;
-  };
+	};
 
-  DrawOrder draw_order = DRAW_ORDER_INDEX;
-  Transform2D inv_global_transform;
-	real_t explosiveness_ratio = 0.0;
-  int fixed_fps = 0;
-	bool fractional_delta = true;
-  double lifetime = 1.0;
-	double lifetime_randomness = 0.0;
-  double pre_process_time = 0.0;
-  bool running = false;
-	double speed_scale = 1.0;
-  Ref<Texture2D> texture;
-	real_t time_randomness_ratio = 0.0;
-  bool use_local_coordinates = false;
+	double time = 0.0;
+	double inactive_time = 0.0;
+	double frame_remainder = 0.0;
+	int cycle = 0;
+	bool do_redraw = false;
 
-  RID mesh;
-  RID multimesh;
+	RID mesh;
+	RID multimesh;
 
-  Vector<Agent> agents;
-  Vector<float> agent_data;
-  Vector<int> agent_order;
+	Vector<Agent> agents;
+	Vector<float> agent_data;
+	Vector<int> agent_order;
 
 	struct SortLifetime {
 		const Agent *agents = nullptr;
@@ -105,22 +127,39 @@ private:
 		}
 	};
 
-  int cycle = 1;
-  bool do_redraw = false;
-  double inactive_time = 0.0;
-  double frame_remainder = 0.0;
-  double time = 0.0;
+	//
 
-  Mutex update_mutex;
+	bool one_shot = false;
+
+	double lifetime = 1.0;
+	double pre_process_time = 0.0;
+	real_t explosiveness_ratio = 0.0;
+	real_t randomness_ratio = 0.0;
+	double lifetime_randomness = 0.0;
+	double speed_scale = 1.0;
+	bool local_coords = false;
+	int fixed_fps = 0;
+	bool fractional_delta = true;
+
+	Transform2D inv_emission_transform;
+
+	DrawOrder draw_order = DRAW_ORDER_INDEX;
+
+	Ref<Texture2D> texture;
+
+	////////
 
 	Vector2 direction = Vector2(1, 0);
 	real_t spread = 45.0;
+
 	real_t parameters_min[PARAM_MAX];
 	real_t parameters_max[PARAM_MAX];
+
 	Ref<Curve> curve_parameters[PARAM_MAX];
 	Color color;
 	Ref<Gradient> color_ramp;
 	Ref<Gradient> color_initial_ramp;
+
 	bool agent_flags[AGENT_FLAG_MAX];
 
 	EmissionShape emission_shape = EMISSION_SHAPE_POINT;
@@ -137,42 +176,61 @@ private:
 
 	Vector2 gravity = Vector2(0, 980);
 
-  void _agents_process(double delta);
-  void _update_internal();
-  void _update_agent_data_buffer();
-  void _update_mesh_texture();
-  void _update_render_thread();
-  void _set_do_redraw(bool p_do_redraw);
-  void _texture_changed();
+	void _update_internal();
+	void _agents_process(double p_delta);
+	void _update_agent_data_buffer();
+
+	Mutex update_mutex;
+
+	void _update_render_thread();
+
+	void _update_mesh_texture();
+
+	void _set_do_redraw(bool p_do_redraw);
+
+	void _texture_changed();
+
+protected:
+	static void _bind_methods();
+	void _notification(int p_what);
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
-  void set_amount(int p_amount);
-  void set_draw_order(DrawOrder p_order);
+	void set_running(bool p_running);
+	void set_amount(int p_amount);
+	void set_lifetime(double p_lifetime);
+	void set_pre_process_time(double p_time);
+	void set_one_shot(bool p_one_shot);
 	void set_explosiveness_ratio(real_t p_ratio);
-  void set_fixed_fps(int p_count);
-	void set_fractional_delta(bool p_enable);
-  void set_lifetime(double p_lifetime);
-  void set_lifetime_randomness(double p_lifetime_randomness);
-  void set_pre_process_time(double p_time);
-  void set_running(bool p_emitting);
-  void set_speed_scale(double p_speed_scale);
-	void set_time_randomness_ratio(real_t p_ratio);
-  void set_texture(const Ref<Texture2D> &p_texture);
-  void set_use_local_coordinates(bool p_use_local_coordinates);
+	void set_randomness_ratio(real_t p_ratio);
+	void set_lifetime_randomness(double p_random);
+	void set_use_local_coordinates(bool p_enable);
+	void set_speed_scale(double p_scale);
 
-  int get_amount() const;
-  DrawOrder get_draw_order() const;
-  real_t get_explosiveness_ratio() const;
-  int get_fixed_fps() const;
+	bool is_running() const;
+	int get_amount() const;
+	double get_lifetime() const;
+	bool get_one_shot() const;
+	double get_pre_process_time() const;
+	real_t get_explosiveness_ratio() const;
+	real_t get_randomness_ratio() const;
+	double get_lifetime_randomness() const;
+	bool get_use_local_coordinates() const;
+	double get_speed_scale() const;
+
+	void set_fixed_fps(int p_count);
+	int get_fixed_fps() const;
+
+	void set_fractional_delta(bool p_enable);
 	bool get_fractional_delta() const;
-  double get_lifetime() const;
-  double get_lifetime_randomness() const;
-  double get_pre_process_time() const;
-  bool is_running() const;
-  double get_speed_scale() const;
-  real_t get_time_randomness_ratio() const;
-  Ref<Texture2D> get_texture() const;
-  bool is_using_local_coordinates() const;
+
+	void set_draw_order(DrawOrder p_order);
+	DrawOrder get_draw_order() const;
+
+	void set_texture(const Ref<Texture2D> &p_texture);
+	Ref<Texture2D> get_texture() const;
+
+	///////////////////
 
 	void set_direction(Vector2 p_direction);
 	Vector2 get_direction() const;
@@ -228,14 +286,8 @@ public:
 
 	void restart();
 
-protected:
-  static void _bind_methods();
-  void _notification(int p_what);
-  void _validate_property(PropertyInfo &p_property) const;
-
-  AutonomousAgents2D();
-  ~AutonomousAgents2D();
-
+	AutonomousAgents2D();
+	~AutonomousAgents2D();
 };
 
 VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
@@ -243,4 +295,4 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 
-#endif
+#endif // AUTONOMOUS_AGENTS_2D_H
