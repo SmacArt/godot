@@ -8,6 +8,10 @@ private:
   GDCLASS(AutonomousAgents2D, Node2D);
 
 public:
+  enum DrawOrder {
+    DRAW_ORDER_INDEX,
+    DRAW_ORDER_LIFETIME
+  };
 
 private:
 
@@ -28,21 +32,38 @@ private:
   Vector<float> agent_data;
   Vector<int> agent_order;
 
-public:
-  void set_running(bool p_emitting);
-  void set_amount(int p_amount);
+  bool local_coords = false;
+  DrawOrder draw_order = DRAW_ORDER_INDEX;
 
-  bool is_running() const;
+  Ref<Texture2D> texture;
+
+  void _update_mesh_texture();
+  void _texture_changed();
+
+public:
+  void set_amount(int p_amount);
+  void set_draw_order(DrawOrder p_order);
+  void set_running(bool p_emitting);
+  void set_texture(const Ref<Texture2D> &p_texture);
+
   int get_amount() const;
+  DrawOrder get_draw_order() const;
+  Ref<Texture2D> get_texture() const;
+  bool is_running() const;
+
+  void _update_mesh_texture();
 
 
 protected:
   static void _bind_methods();
+  void _notification(int p_what);
+  void _validate_property(PropertyInfo &p_property) const;
 
   AutonomousAgents2D();
   ~AutonomousAgents2D();
 
 };
 
+VARIANT_ENUM_CAST(AnonomousAgents2D::DrawOrder)
 
 #endif
