@@ -213,9 +213,12 @@ private:
 
 	void _texture_changed();
 
-  Vector2 wander(Agent *agent, int i);
+  Vector2 calculate_steering_force(Agent *agent, int i);
+  Vector2 wander(Agent *agent);
+  Vector2 seek(Agent *agent, Vector2 target);
 
   Vector2 debug_vector;
+  Vector2 debug_vector2;
 
 protected:
 	static void _bind_methods();
@@ -318,6 +321,12 @@ public:
   }
 
   Vector2 get_debug_vector() const { return debug_vector;}
+
+  void set_debug_vector2(Vector2 v) {
+    debug_vector2 = v;
+  }
+
+  Vector2 get_debug_vector2() const { return debug_vector2;}
 
 	void restart();
 

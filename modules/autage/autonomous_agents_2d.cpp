@@ -954,10 +954,8 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.rotation = Math::deg_to_rad(base_angle); //angle
       }
       else {
-        if (p.wander) {
-          wander(&p,i);
-        }
-
+        p_velocity += calculate_steering_force(&p, i);
+        p.velocity = p.velocity.limit_length(p.max_speed);
       }
       p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
     }
@@ -1045,16 +1043,29 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
   }
 }
 
-Vector2 AutonomousAgents2D::wander(Agent *agent, int pos) {
-  Vector2 force;
-  agent->wander_theta += agent->wander_params->jitter * (rand_from_seed(agent->seed) * 2.0 - 1);
+Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
 
-  Vector2 circle_position = agent->velocity.normalized() * agent->wander_params->circle_distance + agent->transform[2];
-  //  print_line(agent->transform[2],"   ", circle_position);
-  if (pos==0) {
-    set_debug_vector(circle_position);
+  Vector2 steering_force;
+
+  if (agent->wander) {
+    steering_force = wander(agent, i);
   }
-  return force;
+  steering_force = steering_force.limit_length(agent->max_steering_force);
+  return (steering_force / agent->mass).limit_length(agent->max_steering_force);
+}
+
+Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
+  Vector2 desired = (target - agent->transform[2]).normalized() * agent->max_speed;
+  return desired - agent->velocity;
+}
+
+Vector2 AutonomousAgents2D::wander(Agent *agent, int pos) {
+  agent->wander_theta += agent->wander_params->jitter * (rand_from_seed(agent->seed) * 2.0 - 1);
+  Vector2 circle_position = agent->velocity.normalized() * agent->wander_params->circle_distance + agent->transform[2];
+  double heading = agent->velocity.angle();
+  Vector2 circle_offset = Vector2(agent->wander_params->circle_radius* Math::cos(agent->wander_theta + heading),agent->wander_params->circle_radius* Math::sin(agent->wander_theta + heading));
+  Vector2 target = circle_position + circle_offset;
+  return seek(agent, target);
 }
 
 void AutonomousAgents2D::_update_agent_data_buffer() {
@@ -1340,6 +1351,8 @@ void AutonomousAgents2D::_bind_methods() {
 
   ClassDB::bind_method(D_METHOD("get_debug_vector"), &AutonomousAgents2D::get_debug_vector);
   ClassDB::bind_method(D_METHOD("set_debug_vector", "debug_vector"), &AutonomousAgents2D::set_debug_vector);
+  ClassDB::bind_method(D_METHOD("get_debug_vector2"), &AutonomousAgents2D::get_debug_vector2);
+  ClassDB::bind_method(D_METHOD("set_debug_vector2", "debug_vector2"), &AutonomousAgents2D::set_debug_vector2);
 
   ADD_GROUP("Agent", "agent_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_mass_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:kg"), "set_param_min", "get_param_min", PARAM_AGENT_MASS);
