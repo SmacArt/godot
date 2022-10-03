@@ -54,6 +54,10 @@ public:
 		PARAM_HUE_VARIATION,
 		PARAM_ANIM_SPEED,
 		PARAM_ANIM_OFFSET,
+    PARAM_AGENT_MASS,
+    PARAM_AGENT_MAX_SPEED,
+    PARAM_AGENT_MAX_STEERING_FORCE,
+    PARAM_AGENT_MAX_TURN_RATE,
     PARAM_WANDER_CIRCLE_DISTANCE,
     PARAM_WANDER_CIRCLE_RADIUS,
     PARAM_WANDER_JITTER,
@@ -62,8 +66,6 @@ public:
 
 	enum AgentFlags {
 		AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
-		AGENT_FLAG_ROTATE_Y, // Unused, but exposed for consistency with 3D.
-		AGENT_FLAG_DISABLE_Z, // Unused, but exposed for consistency with 3D.
     AGENT_FLAG_WANDER,
 		AGENT_FLAG_MAX
 	};
@@ -90,6 +92,10 @@ private:
 
 	struct Agent {
 		Transform2D transform;
+    real_t mass = 1.0;
+    real_t max_speed = 0.0;
+    real_t max_steering_force = 0.0;
+    real_t max_turn_rate = 0.0;
 		Color color;
 		real_t custom[4] = {};
 		real_t rotation = 0.0;
@@ -106,6 +112,8 @@ private:
 
     bool wander;
     const WanderParams *wander_params;
+    double wander_theta = 0.0;
+    Vector2 wander_target;
 
 		uint32_t seed = 0;
 	};
@@ -205,6 +213,10 @@ private:
 
 	void _texture_changed();
 
+  Vector2 wander(Agent *agent, int i);
+
+  Vector2 debug_vector;
+
 protected:
 	static void _bind_methods();
 	void _notification(int p_what);
@@ -300,6 +312,12 @@ public:
 	Vector2 get_gravity() const;
 
 	PackedStringArray get_configuration_warnings() const override;
+
+  void set_debug_vector(Vector2 v) {
+    debug_vector = v;
+  }
+
+  Vector2 get_debug_vector() const { return debug_vector;}
 
 	void restart();
 
