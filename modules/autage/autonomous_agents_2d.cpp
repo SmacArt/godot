@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  cpu_agents_2d.cpp                                                 */
+/*  cpu_agents_2d.cpp                                                    */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -41,6 +41,13 @@ void AutonomousAgents2D::set_running(bool p_running) {
 	if (running) {
 		set_process_internal(true);
 	}
+}
+
+void AutonomousAgents2D::set_behaviour_delay(double p_delay){
+  behaviour_delay = p_delay;
+}
+double AutonomousAgents2D::get_behaviour_delay() const {
+  return behaviour_delay;
 }
 
 void AutonomousAgents2D::set_amount(int p_amount) {
@@ -730,6 +737,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 				tex_anim_offset = curve_parameters[PARAM_ANGLE]->sample(tv);
 			}
 
+
 			p.seed = Math::rand();
 
 			p.angle_rand = Math::randf();
@@ -815,13 +823,13 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 			p.active = false;
 			tv = 1.0;
 		} else {
-			uint32_t alt_seed = p.seed;
+
+      uint32_t alt_seed = p.seed;
 
 			p.time += local_delta;
 			p.custom[1] = p.time / lifetime;
 			tv = p.time / p.lifetime;
 
-      
 			real_t tex_linear_velocity = 1.0;
 			real_t tex_orbit_velocity = 1.0;
 			real_t tex_angular_velocity = 1.0;
@@ -885,6 +893,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 			Vector2 force = gravity;
 			Vector2 pos = p.transform[2];
 
+      if (p.time < behaviour_delay) {
 			//apply linear acceleration
 			force += p.velocity.length() > 0.0 ? p.velocity.normalized() * tex_linear_accel * Math::lerp(parameters_min[PARAM_LINEAR_ACCEL], parameters_max[PARAM_LINEAR_ACCEL], rand_from_seed(alt_seed)) : Vector2();
       /*
@@ -927,6 +936,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 			real_t base_angle = (tex_angle)*Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
 			base_angle += p.custom[1] * lifetime * tex_angular_velocity * Math::lerp(parameters_min[PARAM_ANGULAR_VELOCITY], parameters_max[PARAM_ANGULAR_VELOCITY], rand_from_seed(alt_seed));
 			p.rotation = Math::deg_to_rad(base_angle); //angle
+      }
 			p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
 		}
 		//apply color
@@ -984,6 +994,19 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 		p.color.b = color_rgb.z;
 
 		p.color *= p.base_color * p.start_color_rand;
+
+		if (agent_flags[AGENT_FLAG_WANDER]) {
+      p.wander = true;
+
+      if (!global_wander_params.is_set) {
+        print_line("setting wander up");
+        global_wander_params.is_set = true;
+        global_wander_params.circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
+        global_wander_params.circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
+        global_wander_params.jitter = Math::lerp(parameters_min[PARAM_WANDER_JITTER], parameters_max[PARAM_WANDER_JITTER], rand_from_seed(p.seed));
+        p.wander_params = &global_wander_params;
+      }
+    }
 
 		if (agent_flags[AGENT_FLAG_ALIGN_Y_TO_VELOCITY]) {
 			if (p.velocity.length() > 0.0) {
@@ -1178,6 +1201,7 @@ void AutonomousAgents2D::_notification(int p_what) {
 void AutonomousAgents2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_running", "running"), &AutonomousAgents2D::set_running);
 	ClassDB::bind_method(D_METHOD("set_amount", "amount"), &AutonomousAgents2D::set_amount);
+	ClassDB::bind_method(D_METHOD("set_behaviour_delay", "behaviour_delay"), &AutonomousAgents2D::set_behaviour_delay);
 	ClassDB::bind_method(D_METHOD("set_lifetime", "secs"), &AutonomousAgents2D::set_lifetime);
 	ClassDB::bind_method(D_METHOD("set_one_shot", "enable"), &AutonomousAgents2D::set_one_shot);
 	ClassDB::bind_method(D_METHOD("set_pre_process_time", "secs"), &AutonomousAgents2D::set_pre_process_time);
@@ -1191,6 +1215,7 @@ void AutonomousAgents2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("is_running"), &AutonomousAgents2D::is_running);
 	ClassDB::bind_method(D_METHOD("get_amount"), &AutonomousAgents2D::get_amount);
+	ClassDB::bind_method(D_METHOD("get_behaviour_delay"), &AutonomousAgents2D::get_behaviour_delay);
 	ClassDB::bind_method(D_METHOD("get_lifetime"), &AutonomousAgents2D::get_lifetime);
 	ClassDB::bind_method(D_METHOD("get_one_shot"), &AutonomousAgents2D::get_one_shot);
 	ClassDB::bind_method(D_METHOD("get_pre_process_time"), &AutonomousAgents2D::get_pre_process_time);
@@ -1214,6 +1239,7 @@ void AutonomousAgents2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "amount", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_amount", "get_amount");
 	ADD_GROUP("Time", "");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "behaviour_delay", PROPERTY_HINT_RANGE, "0.00,100.0,0.01,or_greater,suffix:s"), "set_behaviour_delay", "get_behaviour_delay");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lifetime", PROPERTY_HINT_RANGE, "0.01,600.0,0.01,or_greater,suffix:s"), "set_lifetime", "get_lifetime");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "one_shot"), "set_one_shot", "get_one_shot");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preprocess", PROPERTY_HINT_RANGE, "0.00,600.0,0.01,suffix:s"), "set_pre_process_time", "get_pre_process_time");
@@ -1229,8 +1255,6 @@ void AutonomousAgents2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "draw_order", PROPERTY_HINT_ENUM, "Index,Lifetime"), "set_draw_order", "get_draw_order");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture");
 
-	BIND_ENUM_CONSTANT(DRAW_ORDER_INDEX);
-	BIND_ENUM_CONSTANT(DRAW_ORDER_LIFETIME);
 
 	////////////////////////////////
 
@@ -1290,6 +1314,16 @@ void AutonomousAgents2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_scale_curve_y"), &AutonomousAgents2D::get_scale_curve_y);
 	ClassDB::bind_method(D_METHOD("set_scale_curve_y", "scale_curve"), &AutonomousAgents2D::set_scale_curve_y);
+
+	ADD_GROUP("Behaviour", "agent_flag_");
+	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
+	ADD_GROUP("Wander", "wander_");
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_DISTANCE);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_CIRCLE_DISTANCE);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_radius_min", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_RADIUS);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_radius_max", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_CIRCLE_RADIUS);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_jitter_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_JITTER);
+	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_jitter_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_JITTER);
 
 	ADD_GROUP("Emission Shape", "emission_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "emission_shape", PROPERTY_HINT_ENUM, "Point,Sphere,Sphere Surface,Rectangle,Points,Directed Points", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), "set_emission_shape", "get_emission_shape");
@@ -1361,6 +1395,13 @@ void AutonomousAgents2D::_bind_methods() {
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "anim_offset_max", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_param_max", "get_param_max", PARAM_ANIM_OFFSET);
 	ADD_PROPERTYI(PropertyInfo(Variant::OBJECT, "anim_offset_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), "set_param_curve", "get_param_curve", PARAM_ANIM_OFFSET);
 
+	BIND_ENUM_CONSTANT(DRAW_ORDER_INDEX);
+	BIND_ENUM_CONSTANT(DRAW_ORDER_LIFETIME);
+
+	BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_DISTANCE);
+	BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_RADIUS);
+	BIND_ENUM_CONSTANT(PARAM_WANDER_JITTER);
+
 	BIND_ENUM_CONSTANT(PARAM_INITIAL_LINEAR_VELOCITY);
 	BIND_ENUM_CONSTANT(PARAM_ANGULAR_VELOCITY);
 	BIND_ENUM_CONSTANT(PARAM_ORBIT_VELOCITY);
@@ -1378,6 +1419,7 @@ void AutonomousAgents2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
 	BIND_ENUM_CONSTANT(AGENT_FLAG_ROTATE_Y); // Unused, but exposed for consistency with 3D.
 	BIND_ENUM_CONSTANT(AGENT_FLAG_DISABLE_Z); // Unused, but exposed for consistency with 3D.
+	BIND_ENUM_CONSTANT(AGENT_FLAG_WANDER);
 	BIND_ENUM_CONSTANT(AGENT_FLAG_MAX);
 
 	BIND_ENUM_CONSTANT(EMISSION_SHAPE_POINT);
@@ -1395,8 +1437,17 @@ AutonomousAgents2D::AutonomousAgents2D() {
 	RenderingServer::get_singleton()->multimesh_set_mesh(multimesh, mesh);
 
 	set_running(true);
+  set_behaviour_delay(0);
 	set_amount(8);
 	set_use_local_coordinates(false);
+
+	set_param_min(PARAM_WANDER_CIRCLE_DISTANCE, 20);
+	set_param_min(PARAM_WANDER_CIRCLE_RADIUS, 40);
+	set_param_min(PARAM_WANDER_JITTER, 1);
+
+	set_param_max(PARAM_WANDER_CIRCLE_DISTANCE, 20);
+	set_param_max(PARAM_WANDER_CIRCLE_RADIUS, 40);
+	set_param_max(PARAM_WANDER_JITTER, 1);
 
 	set_param_min(PARAM_INITIAL_LINEAR_VELOCITY, 0);
 	set_param_min(PARAM_ANGULAR_VELOCITY, 0);
@@ -1427,6 +1478,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
 	for (int i = 0; i < AGENT_FLAG_MAX; i++) {
 		agent_flags[i] = false;
 	}
+  agent_flags[AGENT_FLAG_WANDER] = true;
 
 	set_color(Color(1, 1, 1, 1));
 

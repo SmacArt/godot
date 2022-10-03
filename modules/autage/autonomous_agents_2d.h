@@ -1,6 +1,4 @@
 /*************************************************************************/
-/*  cpu_agents_2d.h                                                   */
-/*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
@@ -56,13 +54,17 @@ public:
 		PARAM_HUE_VARIATION,
 		PARAM_ANIM_SPEED,
 		PARAM_ANIM_OFFSET,
-		PARAM_MAX
+    PARAM_WANDER_CIRCLE_DISTANCE,
+    PARAM_WANDER_CIRCLE_RADIUS,
+    PARAM_WANDER_JITTER,
+		PARAM_MAX,
 	};
 
 	enum AgentFlags {
 		AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
 		AGENT_FLAG_ROTATE_Y, // Unused, but exposed for consistency with 3D.
 		AGENT_FLAG_DISABLE_Z, // Unused, but exposed for consistency with 3D.
+    AGENT_FLAG_WANDER,
 		AGENT_FLAG_MAX
 	};
 
@@ -78,6 +80,13 @@ public:
 
 private:
 	bool running = false;
+
+  struct WanderParams {
+    bool is_set = false;
+    real_t circle_distance = 0.0;
+    real_t circle_radius = 0.0;
+    real_t jitter = 0;
+  };
 
 	struct Agent {
 		Transform2D transform;
@@ -95,6 +104,9 @@ private:
 		double lifetime = 0.0;
 		Color base_color;
 
+    bool wander;
+    const WanderParams *wander_params;
+
 		uint32_t seed = 0;
 	};
 
@@ -110,6 +122,8 @@ private:
 	Vector<Agent> agents;
 	Vector<float> agent_data;
 	Vector<int> agent_order;
+
+  WanderParams global_wander_params;
 
 	struct SortLifetime {
 		const Agent *agents = nullptr;
@@ -140,6 +154,7 @@ private:
 	bool local_coords = false;
 	int fixed_fps = 0;
 	bool fractional_delta = true;
+  double behaviour_delay = 0.0;
 
 	Transform2D inv_emission_transform;
 
@@ -206,6 +221,7 @@ public:
 	void set_lifetime_randomness(double p_random);
 	void set_use_local_coordinates(bool p_enable);
 	void set_speed_scale(double p_scale);
+  void set_behaviour_delay(double p_delay);
 
 	bool is_running() const;
 	int get_amount() const;
@@ -217,6 +233,7 @@ public:
 	double get_lifetime_randomness() const;
 	bool get_use_local_coordinates() const;
 	double get_speed_scale() const;
+  double get_behaviour_delay() const;
 
 	void set_fixed_fps(int p_count);
 	int get_fixed_fps() const;
