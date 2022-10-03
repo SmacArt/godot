@@ -954,7 +954,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.rotation = Math::deg_to_rad(base_angle); //angle
       }
       else {
-        p_velocity += calculate_steering_force(&p, i);
+        p.velocity += calculate_steering_force(&p, i);
         p.velocity = p.velocity.limit_length(p.max_speed);
       }
       p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
@@ -1040,26 +1040,38 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
     p.transform.columns[1] *= base_scale.y;
 
     p.transform[2] += p.velocity * local_delta;
+
+    if (p.transform[2].x > 1152) {
+      p.transform[2].x = 0;
+    }
+    if (p.transform[2].x < 0) {
+      p.transform[2].x = 1152;
+    }
+    if (p.transform[2].y > 648) {
+      p.transform[2].y = 0;
+    }
+    if (p.transform[2].y < 0) {
+      p.transform[2].y = 648;
+    }
   }
 }
 
 Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
 
-  Vector2 steering_force;
+  Vector2 steering_force = Vector2(0,0);
 
   if (agent->wander) {
-    steering_force = wander(agent, i);
+    steering_force = wander(agent);
   }
   steering_force = steering_force.limit_length(agent->max_steering_force);
   return (steering_force / agent->mass).limit_length(agent->max_steering_force);
 }
 
 Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
-  Vector2 desired = (target - agent->transform[2]).normalized() * agent->max_speed;
-  return desired - agent->velocity;
+  return ((target - agent->transform[2]).normalized() * agent->max_speed) - agent->velocity;
 }
 
-Vector2 AutonomousAgents2D::wander(Agent *agent, int pos) {
+Vector2 AutonomousAgents2D::wander(Agent *agent) {
   agent->wander_theta += agent->wander_params->jitter * (rand_from_seed(agent->seed) * 2.0 - 1);
   Vector2 circle_position = agent->velocity.normalized() * agent->wander_params->circle_distance + agent->transform[2];
   double heading = agent->velocity.angle();
