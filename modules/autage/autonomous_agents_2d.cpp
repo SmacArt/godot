@@ -715,7 +715,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
     float tv = 0.0;
 
-    if (restart) {
+    if (restart && !p.steering) {
       if (!running) {
         p.active = false;
         continue;
@@ -835,7 +835,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
     } else if (!p.active) {
       continue;
-    } else if (p.time > p.lifetime) {
+    } else if (!p.steering && p.time > p.lifetime) {
       p.active = false;
       tv = 1.0;
     } else {
@@ -954,6 +954,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.rotation = Math::deg_to_rad(base_angle); //angle
       }
       else {
+        p.steering = true;
         p.velocity += calculate_steering_force(&p, i);
         p.velocity = p.velocity.limit_length(p.max_speed);
       }
@@ -1041,17 +1042,19 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
     p.transform[2] += p.velocity * local_delta;
 
-    if (p.transform[2].x > 1152) {
-      p.transform[2].x = 0;
-    }
-    if (p.transform[2].x < 0) {
-      p.transform[2].x = 1152;
-    }
-    if (p.transform[2].y > 648) {
-      p.transform[2].y = 0;
-    }
-    if (p.transform[2].y < 0) {
-      p.transform[2].y = 648;
+    if (p.steering) {
+      if (p.transform[2].x > 1280) {
+        p.transform[2].x = 0;
+      }
+      if (p.transform[2].x < 0) {
+        p.transform[2].x = 1280;
+      }
+      if (p.transform[2].y > 720) {
+        p.transform[2].y = 0;
+      }
+      if (p.transform[2].y < 0) {
+        p.transform[2].y = 720;
+      }
     }
   }
 }
