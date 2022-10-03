@@ -58,9 +58,9 @@ public:
     PARAM_AGENT_MAX_SPEED,
     PARAM_AGENT_MAX_STEERING_FORCE,
     PARAM_AGENT_MAX_TURN_RATE,
-    PARAM_WANDER_CIRCLE_DISTANCE,
-    PARAM_WANDER_CIRCLE_RADIUS,
-    PARAM_WANDER_JITTER,
+    PARAM_WANDER_TARGET_DISTANCE,
+    PARAM_WANDER_TARGET_RADIUS,
+    PARAM_WANDER_RATE_OF_CHANGE,
 		PARAM_MAX,
 	};
 
@@ -82,13 +82,6 @@ public:
 
 private:
 	bool running = false;
-
-  struct WanderParams {
-    bool is_set = false;
-    real_t circle_distance = 0.0;
-    real_t circle_radius = 0.0;
-    real_t jitter = 0;
-  };
 
 	struct Agent {
 		Transform2D transform;
@@ -112,9 +105,11 @@ private:
 		Color base_color;
 
     bool wander;
-    const WanderParams *wander_params;
-    double wander_theta = 0.0;
+    real_t wander_param_target_distance = 0.0;
+    real_t wander_param_target_radius = 0.0;
+    real_t wander_param_rate_of_change = 0.0;
     Vector2 wander_target;
+    real_t wander_target_theta = 0.0;
 
 		uint32_t seed = 0;
 	};
@@ -131,8 +126,6 @@ private:
 	Vector<Agent> agents;
 	Vector<float> agent_data;
 	Vector<int> agent_order;
-
-  WanderParams global_wander_params;
 
 	struct SortLifetime {
 		const Agent *agents = nullptr;
@@ -217,9 +210,6 @@ private:
   Vector2 calculate_steering_force(Agent *agent, int i);
   Vector2 wander(Agent *agent);
   Vector2 seek(Agent *agent, Vector2 target);
-
-  Vector2 debug_vector;
-  Vector2 debug_vector2;
 
 protected:
 	static void _bind_methods();
@@ -317,17 +307,12 @@ public:
 
 	PackedStringArray get_configuration_warnings() const override;
 
-  void set_debug_vector(Vector2 v) {
-    debug_vector = v;
-  }
-
-  Vector2 get_debug_vector() const { return debug_vector;}
-
-  void set_debug_vector2(Vector2 v) {
-    debug_vector2 = v;
-  }
-
-  Vector2 get_debug_vector2() const { return debug_vector2;}
+  // debug helpers
+  Vector2 agent_position(int index);
+  bool agent_wandering(int index);
+  real_t agent_wander_target_distance(int index);
+  real_t agent_wander_target_radius(int index);
+  Vector2 agent_wander_target(int index);
 
 	void restart();
 
