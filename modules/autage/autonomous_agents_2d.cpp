@@ -722,11 +722,6 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       p.active = true;
 
-      /*real_t tex_linear_velocity = 0;
-        if (curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY].is_valid()) {
-        tex_linear_velocity = curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY]->sample(0);
-        }*/
-
       real_t tex_angle = 0.0;
       if (curve_parameters[PARAM_ANGLE].is_valid()) {
         tex_angle = curve_parameters[PARAM_ANGLE]->sample(tv);
@@ -736,7 +731,6 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       if (curve_parameters[PARAM_ANGLE].is_valid()) {
         tex_anim_offset = curve_parameters[PARAM_ANGLE]->sample(tv);
       }
-
 
       p.seed = Math::rand();
 
@@ -842,73 +836,63 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.custom[1] = p.time / lifetime;
       tv = p.time / p.lifetime;
 
-      real_t tex_linear_velocity = 1.0;
-      real_t tex_orbit_velocity = 1.0;
-      real_t tex_angular_velocity = 1.0;
-      real_t tex_linear_accel = 1.0;
-      real_t tex_tangential_accel = 1.0;
-      real_t tex_radial_accel = 1.0;
-      real_t tex_damping = 1.0;
-      real_t tex_angle = 1.0;
-      real_t tex_anim_speed = 1.0;
-      real_t tex_anim_offset = 1.0;
-      /*
-        if (curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY].is_valid()) {
-        tex_linear_velocity = curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY]->sample(tv);
-        }
-
-        real_t tex_orbit_velocity = 1.0;
-        if (curve_parameters[PARAM_ORBIT_VELOCITY].is_valid()) {
-        tex_orbit_velocity = curve_parameters[PARAM_ORBIT_VELOCITY]->sample(tv);
-        }
-
-        real_t tex_angular_velocity = 1.0;
-        if (curve_parameters[PARAM_ANGULAR_VELOCITY].is_valid()) {
-        tex_angular_velocity = curve_parameters[PARAM_ANGULAR_VELOCITY]->sample(tv);
-        }
-
-        real_t tex_linear_accel = 1.0;
-        if (curve_parameters[PARAM_LINEAR_ACCEL].is_valid()) {
-        tex_linear_accel = curve_parameters[PARAM_LINEAR_ACCEL]->sample(tv);
-        }
-
-        real_t tex_tangential_accel = 1.0;
-        if (curve_parameters[PARAM_TANGENTIAL_ACCEL].is_valid()) {
-        tex_tangential_accel = curve_parameters[PARAM_TANGENTIAL_ACCEL]->sample(tv);
-        }
-
-        real_t tex_radial_accel = 1.0;
-        if (curve_parameters[PARAM_RADIAL_ACCEL].is_valid()) {
-        tex_radial_accel = curve_parameters[PARAM_RADIAL_ACCEL]->sample(tv);
-        }
-
-        real_t tex_damping = 1.0;
-        if (curve_parameters[PARAM_DAMPING].is_valid()) {
-        tex_damping = curve_parameters[PARAM_DAMPING]->sample(tv);
-        }
-
-        real_t tex_angle = 1.0;
-        if (curve_parameters[PARAM_ANGLE].is_valid()) {
-        tex_angle = curve_parameters[PARAM_ANGLE]->sample(tv);
-        }
-        real_t tex_anim_speed = 1.0;
-        if (curve_parameters[PARAM_ANIM_SPEED].is_valid()) {
-        tex_anim_speed = curve_parameters[PARAM_ANIM_SPEED]->sample(tv);
-        }
-
-        real_t tex_anim_offset = 1.0;
-        if (curve_parameters[PARAM_ANIM_OFFSET].is_valid()) {
-        tex_anim_offset = curve_parameters[PARAM_ANIM_OFFSET]->sample(tv);
-        }
-      */
-
       Vector2 force = gravity;
       Vector2 pos = p.transform[2];
 
       if (p.time < behaviour_delay) {
+
+        real_t tex_linear_velocity = 1.0;
+        if (curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY].is_valid()) {
+          tex_linear_velocity = curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY]->sample(tv);
+        }
+
+        real_t tex_orbit_velocity = 1.0;
+        if (curve_parameters[PARAM_ORBIT_VELOCITY].is_valid()) {
+          tex_orbit_velocity = curve_parameters[PARAM_ORBIT_VELOCITY]->sample(tv);
+        }
+
+        real_t tex_angular_velocity = 1.0;
+        if (curve_parameters[PARAM_ANGULAR_VELOCITY].is_valid()) {
+          tex_angular_velocity = curve_parameters[PARAM_ANGULAR_VELOCITY]->sample(tv);
+        }
+
+        real_t tex_linear_accel = 1.0;
+        if (curve_parameters[PARAM_LINEAR_ACCEL].is_valid()) {
+          tex_linear_accel = curve_parameters[PARAM_LINEAR_ACCEL]->sample(tv);
+        }
+
+        real_t tex_tangential_accel = 1.0;
+        if (curve_parameters[PARAM_TANGENTIAL_ACCEL].is_valid()) {
+          tex_tangential_accel = curve_parameters[PARAM_TANGENTIAL_ACCEL]->sample(tv);
+        }
+
+        real_t tex_radial_accel = 1.0;
+        if (curve_parameters[PARAM_RADIAL_ACCEL].is_valid()) {
+          tex_radial_accel = curve_parameters[PARAM_RADIAL_ACCEL]->sample(tv);
+        }
+
+        real_t tex_damping = 1.0;
+        if (curve_parameters[PARAM_DAMPING].is_valid()) {
+          tex_damping = curve_parameters[PARAM_DAMPING]->sample(tv);
+        }
+
+        real_t tex_angle = 1.0;
+        if (curve_parameters[PARAM_ANGLE].is_valid()) {
+          tex_angle = curve_parameters[PARAM_ANGLE]->sample(tv);
+        }
+        real_t tex_anim_speed = 1.0;
+        if (curve_parameters[PARAM_ANIM_SPEED].is_valid()) {
+          tex_anim_speed = curve_parameters[PARAM_ANIM_SPEED]->sample(tv);
+        }
+
+        real_t tex_anim_offset = 1.0;
+        if (curve_parameters[PARAM_ANIM_OFFSET].is_valid()) {
+          tex_anim_offset = curve_parameters[PARAM_ANIM_OFFSET]->sample(tv);
+        }
+
         //apply linear acceleration
         force += p.velocity.length() > 0.0 ? p.velocity.normalized() * tex_linear_accel * Math::lerp(parameters_min[PARAM_LINEAR_ACCEL], parameters_max[PARAM_LINEAR_ACCEL], rand_from_seed(alt_seed)) : Vector2();
-        /*
+
         //apply radial acceleration
         Vector2 org = emission_xform[2];
         Vector2 diff = pos - org;
@@ -921,40 +905,40 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         //orbit velocity
         real_t orbit_amount = tex_orbit_velocity * Math::lerp(parameters_min[PARAM_ORBIT_VELOCITY], parameters_max[PARAM_ORBIT_VELOCITY], rand_from_seed(alt_seed));
         if (orbit_amount != 0.0) {
-        real_t ang = orbit_amount * local_delta * Math_TAU;
-        // Not sure why the AgentProcessMaterial code uses a clockwise rotation matrix,
-        // but we use -ang here to reproduce its behavior.
-        Transform2D rot = Transform2D(-ang, Vector2());
-        p.transform[2] -= diff;
-        p.transform[2] += rot.basis_xform(diff);
+          real_t ang = orbit_amount * local_delta * Math_TAU;
+          // Not sure why the AgentProcessMaterial code uses a clockwise rotation matrix,
+          // but we use -ang here to reproduce its behavior.
+          Transform2D rot = Transform2D(-ang, Vector2());
+          p.transform[2] -= diff;
+          p.transform[2] += rot.basis_xform(diff);
         }
-        */
+
         if (curve_parameters[PARAM_INITIAL_LINEAR_VELOCITY].is_valid()) {
           p.velocity = p.velocity.normalized() * tex_linear_velocity;
         }
 
-        /*
-          if (parameters_max[PARAM_DAMPING] + tex_damping > 0.0) {
+        if (parameters_max[PARAM_DAMPING] + tex_damping > 0.0) {
           real_t v = p.velocity.length();
           real_t damp = tex_damping * Math::lerp(parameters_min[PARAM_DAMPING], parameters_max[PARAM_DAMPING], rand_from_seed(alt_seed));
           v -= damp * local_delta;
           if (v < 0.0) {
-          p.velocity = Vector2();
+            p.velocity = Vector2();
           } else {
-          p.velocity = p.velocity.normalized() * v;
+            p.velocity = p.velocity.normalized() * v;
           }
-          }
-        */
+        }
+
         real_t base_angle = (tex_angle)*Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
         base_angle += p.custom[1] * lifetime * tex_angular_velocity * Math::lerp(parameters_min[PARAM_ANGULAR_VELOCITY], parameters_max[PARAM_ANGULAR_VELOCITY], rand_from_seed(alt_seed));
         p.rotation = Math::deg_to_rad(base_angle); //angle
+
+        p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
       }
       else {
         p.steering = true;
         p.velocity += calculate_steering_force(&p, i);
         p.velocity = p.velocity.limit_length(p.max_speed);
       }
-      p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
     }
     //apply color
     //apply hue rotation
@@ -1019,8 +1003,6 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
 
     } else {
-      //p.rotation = p.velocity.angle();
-      //print_line(p.rotation);
       p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
       p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
     }
@@ -1076,12 +1058,12 @@ Vector2 AutonomousAgents2D::wander(Agent *agent) {
   double heading = agent->velocity.angle();
   Vector2 circle_offset = Vector2(agent->wander_param_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_param_circle_radius * Math::sin(agent->wander_target_theta + heading));
 
-  #ifdef TOOLS_ENABLED
+#ifdef TOOLS_ENABLED
   if (is_debug) {
     agent->wander_circle_position = circle_position;
     agent->wander_target = circle_position + circle_offset;
   }
-  #endif
+#endif
 
   return seek(agent, circle_position + circle_offset);
 }
@@ -1529,7 +1511,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
 
-  #ifdef TOOLS_ENABLED
+#ifdef TOOLS_ENABLED
   ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);
   ClassDB::bind_method(D_METHOD("is_steering"), &AutonomousAgents2D::is_agent_steering);
   ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
@@ -1538,7 +1520,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_radius"), &AutonomousAgents2D::get_agent_wander_circle_radius);
   ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
-  #endif
+#endif
 }
 
 AutonomousAgents2D::AutonomousAgents2D() {
