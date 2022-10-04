@@ -58,8 +58,8 @@ public:
     PARAM_AGENT_MAX_SPEED,
     PARAM_AGENT_MAX_STEERING_FORCE,
     PARAM_AGENT_MAX_TURN_RATE,
-    PARAM_WANDER_TARGET_DISTANCE,
-    PARAM_WANDER_TARGET_RADIUS,
+    PARAM_WANDER_CIRCLE_DISTANCE,
+    PARAM_WANDER_CIRCLE_RADIUS,
     PARAM_WANDER_RATE_OF_CHANGE,
 		PARAM_MAX,
 	};
@@ -81,9 +81,11 @@ public:
 	};
 
 private:
-	bool running = false;
 
 	struct Agent {
+
+		uint32_t seed = 0;
+
 		Transform2D transform;
     real_t mass = 1.0;
     real_t max_speed = 0.0;
@@ -105,14 +107,19 @@ private:
 		Color base_color;
 
     bool wander;
-    real_t wander_param_target_distance = 0.0;
-    real_t wander_param_target_radius = 0.0;
+    real_t wander_param_circle_distance = 0.0;
+    real_t wander_param_circle_radius = 0.0;
     real_t wander_param_rate_of_change = 0.0;
-    Vector2 wander_target;
     real_t wander_target_theta = 0.0;
 
-		uint32_t seed = 0;
+    #ifdef TOOLS_ENABLED
+    Vector2 wander_circle_position;
+    Vector2 wander_target;
+    #endif
+
 	};
+
+	bool running = false;
 
 	double time = 0.0;
 	double inactive_time = 0.0;
@@ -211,6 +218,10 @@ private:
   Vector2 wander(Agent *agent);
   Vector2 seek(Agent *agent, Vector2 target);
 
+  #ifdef TOOLS_ENABLED
+  bool is_debug;
+  #endif
+
 protected:
 	static void _bind_methods();
 	void _notification(int p_what);
@@ -307,12 +318,16 @@ public:
 
 	PackedStringArray get_configuration_warnings() const override;
 
-  // debug helpers
-  Vector2 agent_position(int index);
-  bool agent_wandering(int index);
-  real_t agent_wander_target_distance(int index);
-  real_t agent_wander_target_radius(int index);
-  Vector2 agent_wander_target(int index);
+  #ifdef TOOLS_ENABLED
+  bool is_debugging() {return is_debug;};
+  void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
+  bool is_agent_steering(int index);
+  Vector2 get_agent_position(int index);
+  bool is_agent_wandering(int index);
+  Vector2 get_agent_wander_circle_position(int index);
+  real_t get_agent_wander_circle_radius(int index);
+  Vector2 get_agent_wander_target(int index);
+  #endif
 
 	void restart();
 

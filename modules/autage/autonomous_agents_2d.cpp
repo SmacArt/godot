@@ -66,6 +66,7 @@ void AutonomousAgents2D::set_amount(int p_amount) {
   RS::get_singleton()->multimesh_allocate_data(multimesh, p_amount, RS::MULTIMESH_TRANSFORM_2D, true, true);
 
   agent_order.resize(p_amount);
+
 }
 
 void AutonomousAgents2D::set_lifetime(double p_lifetime) {
@@ -631,7 +632,6 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
   int pcount = agents.size();
   Agent *w = agents.ptrw();
-
   Agent *parray = w;
 
   double prev_time = time;
@@ -748,8 +748,8 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       if (agent_flags[AGENT_FLAG_WANDER]) {
         p.wander = true;
         p.wander_param_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(p.seed));
-        p.wander_param_target_distance = Math::lerp(parameters_min[PARAM_WANDER_TARGET_DISTANCE], parameters_max[PARAM_WANDER_TARGET_DISTANCE], rand_from_seed(p.seed));
-        p.wander_param_target_radius = Math::lerp(parameters_min[PARAM_WANDER_TARGET_RADIUS], parameters_max[PARAM_WANDER_TARGET_RADIUS], rand_from_seed(p.seed));
+        p.wander_param_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
+        p.wander_param_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
       }
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
@@ -1072,10 +1072,17 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 
 Vector2 AutonomousAgents2D::wander(Agent *agent) {
   agent->wander_target_theta += agent->wander_param_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1);
-  Vector2 circle_position = agent->velocity.normalized() * agent->wander_param_target_distance + agent->transform[2];
+  Vector2 circle_position = agent->velocity.normalized() * agent->wander_param_circle_distance + agent->transform[2];
   double heading = agent->velocity.angle();
-  Vector2 circle_offset = Vector2(agent->wander_param_target_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_param_target_radius * Math::sin(agent->wander_target_theta + heading));
-  agent->wander_target =circle_position + circle_offset; // this is only a debug this -- dont keep here
+  Vector2 circle_offset = Vector2(agent->wander_param_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_param_circle_radius * Math::sin(agent->wander_target_theta + heading));
+
+  #ifdef TOOLS_ENABLED
+  if (is_debug) {
+    agent->wander_circle_position = circle_position;
+    agent->wander_target = circle_position + circle_offset;
+  }
+  #endif
+
   return seek(agent, circle_position + circle_offset);
 }
 
@@ -1243,32 +1250,38 @@ void AutonomousAgents2D::_notification(int p_what) {
   }
 }
 
-// debug helpers
-Vector2 AutonomousAgents2D::agent_position(int index){
+#ifdef TOOLS_ENABLED
+Vector2 AutonomousAgents2D::get_agent_position(int index){
   Agent *w = agents.ptrw();
   Agent *parray = w;
   return parray[index].transform[2];
 }
-bool AutonomousAgents2D::agent_wandering(int index) {
+bool AutonomousAgents2D::is_agent_wandering(int index) {
   Agent *w = agents.ptrw();
   Agent *parray = w;
   return parray[index].wander;
 }
-real_t AutonomousAgents2D::agent_wander_target_distance(int index){
+bool AutonomousAgents2D::is_agent_steering(int index) {
   Agent *w = agents.ptrw();
   Agent *parray = w;
-  return parray[index].wander_param_target_distance;
+  return parray[index].steering;
 }
-real_t AutonomousAgents2D::agent_wander_target_radius(int index){
+Vector2 AutonomousAgents2D::get_agent_wander_circle_position(int index){
   Agent *w = agents.ptrw();
   Agent *parray = w;
-  return parray[index].wander_param_target_radius;
+  return parray[index].wander_circle_position;
 }
-Vector2 AutonomousAgents2D::agent_wander_target(int index){
+real_t AutonomousAgents2D::get_agent_wander_circle_radius(int index){
+  Agent *w = agents.ptrw();
+  Agent *parray = w;
+  return parray[index].wander_param_circle_radius;
+}
+Vector2 AutonomousAgents2D::get_agent_wander_target(int index){
   Agent *w = agents.ptrw();
   Agent *parray = w;
   return parray[index].wander_target;
 }
+#endif
 
 void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_running", "running"), &AutonomousAgents2D::set_running);
@@ -1387,11 +1400,6 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_scale_curve_y"), &AutonomousAgents2D::get_scale_curve_y);
   ClassDB::bind_method(D_METHOD("set_scale_curve_y", "scale_curve"), &AutonomousAgents2D::set_scale_curve_y);
 
-  ClassDB::bind_method(D_METHOD("agent_position"), &AutonomousAgents2D::agent_position);
-  ClassDB::bind_method(D_METHOD("agent_wandering"), &AutonomousAgents2D::agent_wandering);
-  ClassDB::bind_method(D_METHOD("agent_wander_target"), &AutonomousAgents2D::agent_wander_target);
-  ClassDB::bind_method(D_METHOD("agent_wander_target_distance"), &AutonomousAgents2D::agent_wander_target_distance);
-  ClassDB::bind_method(D_METHOD("agent_wander_target_radius"), &AutonomousAgents2D::agent_wander_target_radius);
 
   ADD_GROUP("Agent", "agent_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_mass_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:kg"), "set_param_min", "get_param_min", PARAM_AGENT_MASS);
@@ -1406,10 +1414,10 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
   ADD_GROUP("Wander", "wander_");
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_target_distance_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_TARGET_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_target_distance_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_TARGET_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_target_radius_min", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_TARGET_RADIUS);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_target_radius_max", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_TARGET_RADIUS);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_CIRCLE_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_radius_min", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_RADIUS);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_radius_max", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_CIRCLE_RADIUS);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_rate_of_change_min", PROPERTY_HINT_RANGE, "0,1000,0.0001,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_RATE_OF_CHANGE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_rate_of_change_max", PROPERTY_HINT_RANGE, "0,1000,0.0001,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_RATE_OF_CHANGE);
 
@@ -1491,8 +1499,8 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_STEERING_FORCE);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
 
-  BIND_ENUM_CONSTANT(PARAM_WANDER_TARGET_DISTANCE);
-  BIND_ENUM_CONSTANT(PARAM_WANDER_TARGET_RADIUS);
+  BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_DISTANCE);
+  BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_RADIUS);
   BIND_ENUM_CONSTANT(PARAM_WANDER_RATE_OF_CHANGE);
 
   BIND_ENUM_CONSTANT(PARAM_INITIAL_LINEAR_VELOCITY);
@@ -1520,6 +1528,17 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
+
+  #ifdef TOOLS_ENABLED
+  ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);
+  ClassDB::bind_method(D_METHOD("is_steering"), &AutonomousAgents2D::is_agent_steering);
+  ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
+  ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
+  ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
+  ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
+  ClassDB::bind_method(D_METHOD("get_agent_wander_circle_radius"), &AutonomousAgents2D::get_agent_wander_circle_radius);
+  ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
+  #endif
 }
 
 AutonomousAgents2D::AutonomousAgents2D() {
@@ -1541,11 +1560,11 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_max(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_max(PARAM_AGENT_MAX_TURN_RATE, 1);
 
-  set_param_min(PARAM_WANDER_TARGET_DISTANCE, 20);
-  set_param_min(PARAM_WANDER_TARGET_RADIUS, 40);
+  set_param_min(PARAM_WANDER_CIRCLE_DISTANCE, 20);
+  set_param_min(PARAM_WANDER_CIRCLE_RADIUS, 40);
   set_param_min(PARAM_WANDER_RATE_OF_CHANGE, 1);
-  set_param_max(PARAM_WANDER_TARGET_DISTANCE, 20);
-  set_param_max(PARAM_WANDER_TARGET_RADIUS, 40);
+  set_param_max(PARAM_WANDER_CIRCLE_DISTANCE, 20);
+  set_param_max(PARAM_WANDER_CIRCLE_RADIUS, 40);
   set_param_max(PARAM_WANDER_RATE_OF_CHANGE, 1);
 
   set_param_min(PARAM_INITIAL_LINEAR_VELOCITY, 0);
