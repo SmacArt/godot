@@ -565,7 +565,7 @@ bool DisplayServerWindows::screen_is_touchscreen(int p_screen) const {
 #ifndef _MSC_VER
 #warning touchscreen not working
 #endif
-	return false;
+	return DisplayServer::screen_is_touchscreen(p_screen);
 }
 
 void DisplayServerWindows::screen_set_orientation(ScreenOrientation p_orientation, int p_screen) {
@@ -1361,7 +1361,8 @@ void DisplayServerWindows::window_set_flag(WindowFlags p_flag, bool p_enabled, W
 			if (p_enabled) {
 				//enable per-pixel alpha
 
-				DWM_BLURBEHIND bb = { 0 };
+				DWM_BLURBEHIND bb;
+				ZeroMemory(&bb, sizeof(bb));
 				HRGN hRgn = CreateRectRgn(0, 0, -1, -1);
 				bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
 				bb.hRgnBlur = hRgn;
@@ -1373,7 +1374,8 @@ void DisplayServerWindows::window_set_flag(WindowFlags p_flag, bool p_enabled, W
 				//disable per-pixel alpha
 				wd.layered_window = false;
 
-				DWM_BLURBEHIND bb = { 0 };
+				DWM_BLURBEHIND bb;
+				ZeroMemory(&bb, sizeof(bb));
 				HRGN hRgn = CreateRectRgn(0, 0, -1, -1);
 				bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
 				bb.hRgnBlur = hRgn;
@@ -1390,7 +1392,7 @@ void DisplayServerWindows::window_set_flag(WindowFlags p_flag, bool p_enabled, W
 			ERR_FAIL_COND_MSG(IsWindowVisible(wd.hWnd) && (wd.is_popup != p_enabled), "Popup flag can't changed while window is opened.");
 			wd.is_popup = p_enabled;
 		} break;
-		case WINDOW_FLAG_MAX:
+		default:
 			break;
 	}
 }
@@ -1419,7 +1421,7 @@ bool DisplayServerWindows::window_get_flag(WindowFlags p_flag, WindowID p_window
 		case WINDOW_FLAG_POPUP: {
 			return wd.is_popup;
 		} break;
-		case WINDOW_FLAG_MAX:
+		default:
 			break;
 	}
 
@@ -3553,7 +3555,7 @@ DisplayServer::WindowID DisplayServerWindows::_create_window(WindowMode p_mode, 
 
 #ifdef VULKAN_ENABLED
 		if (context_vulkan) {
-			if (context_vulkan->window_create(id, p_vsync_mode, wd.hWnd, hInstance, WindowRect.right - WindowRect.left, WindowRect.bottom - WindowRect.top) == -1) {
+			if (context_vulkan->window_create(id, p_vsync_mode, wd.hWnd, hInstance, WindowRect.right - WindowRect.left, WindowRect.bottom - WindowRect.top) != OK) {
 				memdelete(context_vulkan);
 				context_vulkan = nullptr;
 				windows.erase(id);
@@ -3564,10 +3566,7 @@ DisplayServer::WindowID DisplayServerWindows::_create_window(WindowMode p_mode, 
 
 #ifdef GLES3_ENABLED
 		if (gl_manager) {
-			Error err = gl_manager->window_create(id, wd.hWnd, hInstance, WindowRect.right - WindowRect.left, WindowRect.bottom - WindowRect.top);
-
-			// shut down OpenGL, to mirror behavior of Vulkan code
-			if (err != OK) {
+			if (gl_manager->window_create(id, wd.hWnd, hInstance, WindowRect.right - WindowRect.left, WindowRect.bottom - WindowRect.top) != OK) {
 				memdelete(gl_manager);
 				gl_manager = nullptr;
 				windows.erase(id);

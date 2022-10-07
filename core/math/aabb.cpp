@@ -30,7 +30,7 @@
 
 #include "aabb.h"
 
-#include "core/string/print_string.h"
+#include "core/string/ustring.h"
 #include "core/variant/variant.h"
 
 real_t AABB::get_volume() const {
@@ -403,6 +403,7 @@ Variant AABB::intersects_segment_bind(const Vector3 &p_from, const Vector3 &p_to
 	}
 	return Variant();
 }
+
 Variant AABB::intersects_ray_bind(const Vector3 &p_from, const Vector3 &p_dir) const {
 	Vector3 inters;
 	if (intersects_ray(p_from, p_dir, &inters)) {

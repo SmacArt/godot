@@ -31,10 +31,10 @@
 #ifndef QUATERNION_H
 #define QUATERNION_H
 
-#include "core/math/math_defs.h"
 #include "core/math/math_funcs.h"
 #include "core/math/vector3.h"
-#include "core/string/ustring.h"
+
+class String;
 
 struct _NO_DISCARD_ Quaternion {
 	union {
@@ -143,8 +143,7 @@ struct _NO_DISCARD_ Quaternion {
 		w = p_q.w;
 	}
 
-	Quaternion(const Vector3 &v0, const Vector3 &v1) // shortest arc
-	{
+	Quaternion(const Vector3 &v0, const Vector3 &v1) { // Shortest arc.
 		Vector3 c = v0.cross(v1);
 		real_t d = v0.dot(v1);
 

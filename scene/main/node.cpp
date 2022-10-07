@@ -1411,14 +1411,14 @@ TypedArray<Node> Node::find_children(const String &p_pattern, const String &p_ty
 		if (cptr[i]->is_class(p_type)) {
 			ret.append(cptr[i]);
 		} else if (cptr[i]->get_script_instance()) {
-			Ref<Script> script = cptr[i]->get_script_instance()->get_script();
-			while (script.is_valid()) {
-				if ((ScriptServer::is_global_class(p_type) && ScriptServer::get_global_class_path(p_type) == script->get_path()) || p_type == script->get_path()) {
+			Ref<Script> scr = cptr[i]->get_script_instance()->get_script();
+			while (scr.is_valid()) {
+				if ((ScriptServer::is_global_class(p_type) && ScriptServer::get_global_class_path(p_type) == scr->get_path()) || p_type == scr->get_path()) {
 					ret.append(cptr[i]);
 					break;
 				}
 
-				script = script->get_base_script();
+				scr = scr->get_base_script();
 			}
 		}
 
@@ -1466,19 +1466,9 @@ bool Node::is_greater_than(const Node *p_node) const {
 
 	ERR_FAIL_COND_V(data.depth < 0, false);
 	ERR_FAIL_COND_V(p_node->data.depth < 0, false);
-#ifdef NO_ALLOCA
-
-	Vector<int> this_stack;
-	Vector<int> that_stack;
-	this_stack.resize(data.depth);
-	that_stack.resize(p_node->data.depth);
-
-#else
 
 	int *this_stack = (int *)alloca(sizeof(int) * data.depth);
 	int *that_stack = (int *)alloca(sizeof(int) * p_node->data.depth);
-
-#endif
 
 	const Node *n = this;
 
@@ -2131,9 +2121,9 @@ Node *Node::_duplicate(int p_flags, HashMap<const Node *, Node *> *r_duplimap) c
 
 		if (p_flags & DUPLICATE_SCRIPTS) {
 			bool is_valid = false;
-			Variant script = N->get()->get(script_property_name, &is_valid);
+			Variant scr = N->get()->get(script_property_name, &is_valid);
 			if (is_valid) {
-				current_node->set(script_property_name, script);
+				current_node->set(script_property_name, scr);
 			}
 		}
 
