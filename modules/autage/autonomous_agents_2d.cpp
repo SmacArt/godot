@@ -40,7 +40,14 @@ void AutonomousAgents2D::set_running(bool p_running) {
   running = p_running;
   if (running) {
     set_process_internal(true);
-  } 
+  }
+}
+
+void AutonomousAgents2D::set_use_bvh(bool p_use_bvh) {
+  use_bvh = p_use_bvh;
+}
+bool AutonomousAgents2D::is_using_bvh() const {
+  return use_bvh;
 }
 
 void AutonomousAgents2D::set_behaviour_delay(double p_delay){
@@ -1040,15 +1047,14 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
     }
 
-    /**
-    if (p.is_new) {
-      p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(20.0,20,20)); // todo -- use proper leaf size based on scale etc
-      p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
-    } else {
-      p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(20.0,20,20)); // todo -- use proper leaf size based on scale etc
-      agent_bvh.update(p.bvh_leaf, p.aabb);
+    p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(2000.0,2000,1.0)); // todo -- use proper leaf size based on scale etc   -- seem to need 1.0 on the z to make to intersect
+    if (use_bvh) {
+      if (p.is_new) {
+        p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
+      } else {
+        agent_bvh.update(p.bvh_leaf, p.aabb);
+      }
     }
-    */
 
     p.is_new=false;
   }
@@ -1079,27 +1085,40 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
+  print_line(agent->base_color);
   bvh_result.clear();
 
-  struct CullAABB {
-    PagedArray<Agent *> * result;
-    _FORCE_INLINE_ bool operator()(void *p_data) {
-      Agent *p_agent = (Agent *) p_data;
-      result->push_back(p_agent);
-      return false;
+  if (use_bvh) {
+    struct CullAABBBVH {
+      PagedArray<Agent *> * result;
+      _FORCE_INLINE_ bool operator()(void *p_data) {
+        Agent *p_agent = (Agent *) p_data;
+        result->push_back(p_agent);
+        return false;
+      }
+    };
+    CullAABBBVH cull_aabb;
+    cull_aabb.result=&bvh_result;
+    agent_bvh.aabb_query(agent->aabb, cull_aabb);
+  } else {
+    int pcount = agents.size();
+    Agent *w = agents.ptrw();
+    Agent *parray = w;
+
+    for (int i = 0; i < pcount; i++) {
+      Agent &p = parray[i];
+      if (p.aabb.intersects(agent->aabb)) {
+        bvh_result.push_back(&p);
+        // todo - logic not to continue after the first one found -maybe
+        // this will give it similar behavior to bvh
+      }
     }
-  };
-
-  CullAABB cull_aabb;
-  cull_aabb.result=&bvh_result;
-
-  agent_bvh.aabb_query(agent->aabb, cull_aabb);
+  }
 
   for (int i = 0; i < (int)bvh_result.size(); i++) {
     Agent *result_agent = bvh_result[i];
-    if (result_agent != agent) {
-      result_agent->color = Color(1,0,0,1);
-    }
+    result_agent->color = Color(1,0,0,1);
+    agent->color = Color(1,0,0,1);
   }
 
   return Vector2(0,0);
@@ -1111,7 +1130,7 @@ Vector2 AutonomousAgents2D::wander(Agent *agent) {
   double heading = agent->velocity.angle();
   Vector2 circle_offset = Vector2(agent->wander_param_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_param_circle_radius * Math::sin(agent->wander_target_theta + heading));
 
-#ifdef DEV_ENABLED
+#ifdef DEBUG_ENABLED
   if (is_debug) {
     agent->wander_circle_position = circle_position;
     agent->wander_target = circle_position + circle_offset;
@@ -1285,7 +1304,7 @@ void AutonomousAgents2D::_notification(int p_what) {
   }
 }
 
-#ifdef DEV_ENABLED
+#ifdef DEBUG_ENABLED
 Vector2 AutonomousAgents2D::get_agent_position(int index){
   Agent *w = agents.ptrw();
   Agent *parray = w;
@@ -1337,6 +1356,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_fixed_fps", "fps"), &AutonomousAgents2D::set_fixed_fps);
   ClassDB::bind_method(D_METHOD("set_fractional_delta", "enable"), &AutonomousAgents2D::set_fractional_delta);
   ClassDB::bind_method(D_METHOD("set_speed_scale", "scale"), &AutonomousAgents2D::set_speed_scale);
+  ClassDB::bind_method(D_METHOD("set_use_bvh", "use_bvh"), &AutonomousAgents2D::set_use_bvh);
 
   ClassDB::bind_method(D_METHOD("is_running"), &AutonomousAgents2D::is_running);
   ClassDB::bind_method(D_METHOD("get_amount"), &AutonomousAgents2D::get_amount);
@@ -1351,6 +1371,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_fixed_fps"), &AutonomousAgents2D::get_fixed_fps);
   ClassDB::bind_method(D_METHOD("get_fractional_delta"), &AutonomousAgents2D::get_fractional_delta);
   ClassDB::bind_method(D_METHOD("get_speed_scale"), &AutonomousAgents2D::get_speed_scale);
+  ClassDB::bind_method(D_METHOD("is_using_bvh"), &AutonomousAgents2D::is_using_bvh);
 
   ClassDB::bind_method(D_METHOD("set_draw_order", "order"), &AutonomousAgents2D::set_draw_order);
 
@@ -1363,6 +1384,8 @@ void AutonomousAgents2D::_bind_methods() {
 
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "amount", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_amount", "get_amount");
+  ADD_GROUP("Optimizations", "");
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_bvh"), "set_use_bvh", "is_using_bvh");
   ADD_GROUP("Time", "");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "behaviour_delay", PROPERTY_HINT_RANGE, "0.00,100.0,0.01,or_greater,suffix:s"), "set_behaviour_delay", "get_behaviour_delay");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lifetime", PROPERTY_HINT_RANGE, "0.01,600.0,0.01,or_greater,suffix:s"), "set_lifetime", "get_lifetime");
@@ -1571,7 +1594,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
 
-#ifdef DEV_ENABLED
+#ifdef DEBUG_ENABLED
   ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);
   ClassDB::bind_method(D_METHOD("is_steering"), &AutonomousAgents2D::is_agent_steering);
   ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
@@ -1593,6 +1616,8 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_behaviour_delay(0);
   set_amount(8);
   set_use_local_coordinates(false);
+
+  set_use_bvh(false);
 
   set_param_min(PARAM_AGENT_MASS, 1);
   set_param_min(PARAM_AGENT_MAX_SPEED, 1);
