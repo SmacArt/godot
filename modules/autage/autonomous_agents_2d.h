@@ -30,6 +30,8 @@
 #define AUTONOMOUS_AGENTS_2D_H
 
 #include "scene/2d/node_2d.h"
+#include "core/math/dynamic_bvh.h"
+#include "core/templates/paged_array.h"
 
 class AutonomousAgents2D : public Node2D {
 private:
@@ -67,6 +69,7 @@ public:
 	enum AgentFlags {
 		AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
     AGENT_FLAG_WANDER,
+    AGENT_FLAG_SEPARATE,
 		AGENT_FLAG_MAX
 	};
 
@@ -85,6 +88,8 @@ private:
 	struct Agent {
 
 		uint32_t seed = 0;
+
+    bool is_new = true;
 
 		Transform2D transform;
     real_t mass = 1.0;
@@ -106,13 +111,17 @@ private:
 		double lifetime = 0.0;
 		Color base_color;
 
-    bool wander;
+    DynamicBVH::ID bvh_leaf;
+    AABB aabb;
+
+    bool wander;  // todo - could these bools bit flags
+    bool separate;
     real_t wander_param_circle_distance = 0.0;
     real_t wander_param_circle_radius = 0.0;
     real_t wander_param_rate_of_change = 0.0;
     real_t wander_target_theta = 0.0;
 
-    #ifdef TOOLS_ENABLED
+    #ifdef DEV_ENABLED
     Vector2 wander_circle_position;
     Vector2 wander_target;
     #endif
@@ -215,10 +224,14 @@ private:
 	void _texture_changed();
 
   Vector2 calculate_steering_force(Agent *agent, int i);
-  Vector2 wander(Agent *agent);
-  Vector2 seek(Agent *agent, Vector2 target);
 
-  #ifdef TOOLS_ENABLED
+  Vector2 separate(Agent *agent);
+  Vector2 seek(Agent *agent, Vector2 target);
+  Vector2 wander(Agent *agent);
+
+  DynamicBVH agent_bvh;
+
+  #ifdef DEV_ENABLED
   bool is_debug;
   #endif
 
@@ -318,12 +331,16 @@ public:
 
 	PackedStringArray get_configuration_warnings() const override;
 
-  #ifdef TOOLS_ENABLED
+  PagedArrayPool<Agent *> bvh_page_pool;
+  PagedArray<Agent *> bvh_result;
+
+  #ifdef DEV_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
   bool is_agent_steering(int index);
   Vector2 get_agent_position(int index);
   bool is_agent_wandering(int index);
+  bool is_agent_separating(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_circle_radius(int index);
   Vector2 get_agent_wander_target(int index);

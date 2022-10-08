@@ -40,7 +40,7 @@ void AutonomousAgents2D::set_running(bool p_running) {
   running = p_running;
   if (running) {
     set_process_internal(true);
-  }
+  } 
 }
 
 void AutonomousAgents2D::set_behaviour_delay(double p_delay){
@@ -52,6 +52,8 @@ double AutonomousAgents2D::get_behaviour_delay() const {
 
 void AutonomousAgents2D::set_amount(int p_amount) {
   ERR_FAIL_COND_MSG(p_amount < 1, "Amount of agents must be greater than 0.");
+
+  agent_bvh.clear();
 
   agents.resize(p_amount);
   {
@@ -745,6 +747,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.wander_param_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
         p.wander_param_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
       }
+      if (agent_flags[AGENT_FLAG_SEPARATE]) {
+        p.separate=true;
+      }
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
       p.max_speed = Math::lerp(parameters_min[PARAM_AGENT_MAX_SPEED], parameters_max[PARAM_AGENT_MAX_SPEED], rand_from_seed(p.seed));
@@ -1034,15 +1039,33 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform[2].y = 720;
       }
     }
+
+    if (p.is_new) {
+      p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(20.0,20,20)); // todo -- use proper leaf size based on scale etc
+      p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
+    } else {
+      p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(20.0,20,20)); // todo -- use proper leaf size based on scale etc
+      agent_bvh.update(p.bvh_leaf, p.aabb);
+    }
+
+    p.is_new=false;
   }
 }
+struct AABBQueryResult {
+  _FORCE_INLINE_ bool operator() (void *p_data) {
+    return true;
+  }
+};
 
 Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
 
   Vector2 steering_force = Vector2(0,0);
 
   if (agent->wander) {
-    steering_force = wander(agent);
+    steering_force += wander(agent);
+  }
+  if (agent->wander) {
+    steering_force += separate(agent);
   }
   steering_force = steering_force.limit_length(agent->max_steering_force);
   return (steering_force / agent->mass).limit_length(agent->max_steering_force);
@@ -1052,13 +1075,41 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
   return ((target - agent->transform[2]).normalized() * agent->max_speed) - agent->velocity;
 }
 
+Vector2 AutonomousAgents2D::separate(Agent *agent) {
+
+  bvh_result.clear();
+
+  struct CullAABB {
+    PagedArray<Agent *> * result;
+    _FORCE_INLINE_ bool operator()(void *p_data) {
+      Agent *p_agent = (Agent *) p_data;
+      result->push_back(p_agent);
+      return false;
+    }
+  };
+
+  CullAABB cull_aabb;
+  cull_aabb.result=&bvh_result;
+
+  agent_bvh.aabb_query(agent->aabb, cull_aabb);
+
+  for (int i = 0; i < (int)bvh_result.size(); i++) {
+    Agent *result_agent = bvh_result[i];
+    if (result_agent != agent) {
+      result_agent->color = Color(1,0,0,1);
+    }
+  }
+
+  return Vector2(0,0);
+}
+
 Vector2 AutonomousAgents2D::wander(Agent *agent) {
   agent->wander_target_theta += agent->wander_param_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1);
   Vector2 circle_position = agent->velocity.normalized() * agent->wander_param_circle_distance + agent->transform[2];
   double heading = agent->velocity.angle();
   Vector2 circle_offset = Vector2(agent->wander_param_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_param_circle_radius * Math::sin(agent->wander_target_theta + heading));
 
-#ifdef TOOLS_ENABLED
+#ifdef DEV_ENABLED
   if (is_debug) {
     agent->wander_circle_position = circle_position;
     agent->wander_target = circle_position + circle_offset;
@@ -1232,11 +1283,16 @@ void AutonomousAgents2D::_notification(int p_what) {
   }
 }
 
-#ifdef TOOLS_ENABLED
+#ifdef DEV_ENABLED
 Vector2 AutonomousAgents2D::get_agent_position(int index){
   Agent *w = agents.ptrw();
   Agent *parray = w;
   return parray[index].transform[2];
+}
+bool AutonomousAgents2D::is_agent_separating(int index) {
+  Agent *w = agents.ptrw();
+  Agent *parray = w;
+  return parray[index].separate;
 }
 bool AutonomousAgents2D::is_agent_wandering(int index) {
   Agent *w = agents.ptrw();
@@ -1394,6 +1450,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_turn_rate", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_TURN_RATE);
 
   ADD_GROUP("Behaviour", "agent_flag_");
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
   ADD_GROUP("Wander", "wander_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_DISTANCE);
@@ -1500,6 +1557,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_MAX);
 
   BIND_ENUM_CONSTANT(AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_SEPARATE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_WANDER);
   BIND_ENUM_CONSTANT(AGENT_FLAG_MAX);
 
@@ -1511,11 +1569,12 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
 
-#ifdef TOOLS_ENABLED
+#ifdef DEV_ENABLED
   ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);
   ClassDB::bind_method(D_METHOD("is_steering"), &AutonomousAgents2D::is_agent_steering);
   ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
   ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
+  ClassDB::bind_method(D_METHOD("is_agent_separating"), &AutonomousAgents2D::is_agent_separating);
   ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_radius"), &AutonomousAgents2D::get_agent_wander_circle_radius);
@@ -1579,8 +1638,11 @@ AutonomousAgents2D::AutonomousAgents2D() {
     agent_flags[i] = false;
   }
   agent_flags[AGENT_FLAG_WANDER] = true;
+  agent_flags[AGENT_FLAG_SEPARATE] = false;
 
   set_color(Color(1, 1, 1, 1));
+
+  bvh_result.set_page_pool(&bvh_page_pool);
 
   _update_mesh_texture();
 }
