@@ -1040,6 +1040,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
     }
 
+    /**
     if (p.is_new) {
       p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(20.0,20,20)); // todo -- use proper leaf size based on scale etc
       p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
@@ -1047,6 +1048,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(20.0,20,20)); // todo -- use proper leaf size based on scale etc
       agent_bvh.update(p.bvh_leaf, p.aabb);
     }
+    */
 
     p.is_new=false;
   }
@@ -1064,7 +1066,7 @@ Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
   if (agent->wander) {
     steering_force += wander(agent);
   }
-  if (agent->wander) {
+  if (agent->separate) {
     steering_force += separate(agent);
   }
   steering_force = steering_force.limit_length(agent->max_steering_force);
