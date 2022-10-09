@@ -131,6 +131,7 @@ private:
     Vector2 wander_circle_position;
     Vector2 wander_target;
     bool aabb_culled;
+    AABB separation_aabb;
 #endif
 
   };
@@ -366,6 +367,7 @@ public:
   bool is_agent_steering(int index);
   Vector2 get_agent_position(int index);
   AABB get_agent_aabb(int index);
+  AABB get_agent_separation_aabb(int index);
   bool is_agent_wandering(int index);
   bool is_agent_separating(int index);
   Vector2 get_agent_wander_circle_position(int index);

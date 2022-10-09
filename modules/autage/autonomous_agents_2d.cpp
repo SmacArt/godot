@@ -1130,8 +1130,14 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
-  // TODO - this will only need to be called once for all the behaviors if the same aabb is to be used
-  agent_cull_aabb_query(agent->aabb);  // get neighbours
+  AABB aabb = agent->aabb.grow(agent->separate_param_neighbourhood_ratio);
+  agent_cull_aabb_query(aabb);  // get neighbours
+
+  #ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->separation_aabb = aabb;
+  }
+  #endif
 
   Vector2 steering_force = Vector2(0,0);
 
@@ -1378,6 +1384,10 @@ Vector2 AutonomousAgents2D::get_agent_position(int index){
 AABB AutonomousAgents2D::get_agent_aabb(int index){
   Agent *parray = agents.ptrw();
   return parray[index].aabb;
+}
+AABB AutonomousAgents2D::get_agent_separation_aabb(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].separation_aabb;
 }
 bool AutonomousAgents2D::is_agent_aabb_culled(int index){
   Agent *parray = agents.ptrw();
@@ -1689,6 +1699,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
   ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
   ClassDB::bind_method(D_METHOD("get_agent_aabb"), &AutonomousAgents2D::get_agent_aabb);
+  ClassDB::bind_method(D_METHOD("get_agent_separation_aabb"), &AutonomousAgents2D::get_agent_separation_aabb);
   ClassDB::bind_method(D_METHOD("is_agent_separating"), &AutonomousAgents2D::is_agent_separating);
   ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
