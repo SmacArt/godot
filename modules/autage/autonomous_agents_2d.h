@@ -210,6 +210,8 @@ private:
   bool split_scale = false;
 
   Vector2 gravity = Vector2(0, 980);
+  Size2 agent_base_size = Size2(10, 10);
+  double agent_aabb_expansion_ratio = 1.2;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -336,6 +338,12 @@ public:
 
   void set_gravity(const Vector2 &p_gravity);
   Vector2 get_gravity() const;
+
+  void set_agent_base_size(const Size2 &p_size);
+  Size2 get_agent_base_size() const;
+
+  void set_agent_aabb_expansion_ratio(const double p_ratio);
+  double get_agent_aabb_expansion_ratio() const;
 
   PackedStringArray get_configuration_warnings() const override;
 

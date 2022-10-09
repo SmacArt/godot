@@ -493,6 +493,22 @@ Vector2 AutonomousAgents2D::get_gravity() const {
   return gravity;
 }
 
+void AutonomousAgents2D::set_agent_base_size(const Size2 &p_size) {
+  agent_base_size = p_size;
+}
+
+Size2 AutonomousAgents2D::get_agent_base_size() const {
+  return agent_base_size;
+}
+
+void AutonomousAgents2D::set_agent_aabb_expansion_ratio(const double p_ratio) {
+  agent_aabb_expansion_ratio = p_ratio;
+}
+
+double AutonomousAgents2D::get_agent_aabb_expansion_ratio() const {
+  return agent_aabb_expansion_ratio;
+}
+
 void AutonomousAgents2D::set_scale_curve_x(Ref<Curve> p_scale_curve) {
   scale_curve_x = p_scale_curve;
 }
@@ -1056,8 +1072,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
     }
 
-
-    p.aabb = AABB(Vector3(p.transform[2].x-100,p.transform[2].y-100,0), Vector3(200.0,200,1.0)); // todo -- use proper leaf size based on scale etc   -- seem to need 1.0 on the z to make to intersect
+    double x = get_agent_base_size().x * base_scale.x * agent_aabb_expansion_ratio;
+    double y = get_agent_base_size().y * base_scale.y * agent_aabb_expansion_ratio;
+    p.aabb = AABB(Vector3(p.transform[2].x-x*0.5,p.transform[2].y-y*0.5,0), Vector3(x,y,1.0)); // todo -- use proper leaf size based on scale etc   -- seem to need 1.0 on the z to make to intersect
     if (use_bvh) {
       if (p.is_new) {
         p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
@@ -1471,7 +1488,12 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_emission_colors"), &AutonomousAgents2D::get_emission_colors);
 
   ClassDB::bind_method(D_METHOD("get_gravity"), &AutonomousAgents2D::get_gravity);
-  ClassDB::bind_method(D_METHOD("set_gravity", "accel_vec"), &AutonomousAgents2D::set_gravity);
+  ClassDB::bind_method(D_METHOD("set_gravity", "gravity"), &AutonomousAgents2D::set_gravity);
+
+  ClassDB::bind_method(D_METHOD("get_agent_base_size"), &AutonomousAgents2D::get_agent_base_size);
+  ClassDB::bind_method(D_METHOD("set_agent_base_size", "agent_base_size"), &AutonomousAgents2D::set_agent_base_size);
+  ClassDB::bind_method(D_METHOD("get_agent_aabb_expansion_ratio"), &AutonomousAgents2D::get_agent_aabb_expansion_ratio);
+  ClassDB::bind_method(D_METHOD("set_agent_aabb_expansion_ratio", "agent_aabb_expansion_ratio"), &AutonomousAgents2D::set_agent_aabb_expansion_ratio);
 
   ClassDB::bind_method(D_METHOD("get_split_scale"), &AutonomousAgents2D::get_split_scale);
   ClassDB::bind_method(D_METHOD("set_split_scale", "split_scale"), &AutonomousAgents2D::set_split_scale);
@@ -1484,6 +1506,8 @@ void AutonomousAgents2D::_bind_methods() {
 
 
   ADD_GROUP("Agent", "agent_");
+  ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "agent_base_size", PROPERTY_HINT_RANGE, "0,10000,0.01,or_greater,suffix:px"), "set_agent_base_size", "get_agent_base_size");
+  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "agent_aabb_expansion_ratio", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:px"), "set_agent_aabb_expansion_ratio", "get_agent_aabb_expansion_ratio");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_mass_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:kg"), "set_param_min", "get_param_min", PARAM_AGENT_MASS);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_mass_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:kg"), "set_param_max", "get_param_max", PARAM_AGENT_MASS);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_speed_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_SPEED);
@@ -1637,6 +1661,9 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_behaviour_delay(0);
   set_amount(8);
   set_use_local_coordinates(false);
+
+  set_agent_base_size(Size2(10,10));
+  set_agent_aabb_expansion_ratio(1.2);
 
   set_use_bvh(false);
 
