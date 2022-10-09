@@ -789,6 +789,8 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       if (agent_flags[AGENT_FLAG_SEPARATE]) {
         p.separate=true;
+        p.separate_param_neighbourhood_ratio = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_RATIO], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_RATIO], rand_from_seed(p.seed));
+        p.separate_param_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
@@ -981,8 +983,10 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       else {
         p.steering = true;
-        p.velocity += calculate_steering_force(&p, i);
-        p.velocity = p.velocity.limit_length(p.max_speed);
+        if (ai_phase == p.ai_phase) {
+          p.velocity += calculate_steering_force(&p, i);
+          p.velocity = p.velocity.limit_length(p.max_speed);
+        }
       }
     }
     //apply color
@@ -1129,18 +1133,31 @@ Vector2 AutonomousAgents2D::separate(Agent *agent) {
   // TODO - this will only need to be called once for all the behaviors if the same aabb is to be used
   agent_cull_aabb_query(agent->aabb);  // get neighbours
 
+  Vector2 steering_force = Vector2(0,0);
+
   for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
-    Agent *result_agent = agent_cull_aabb_result[i];
-    if (result_agent != agent) {
+    Agent *other_agent = agent_cull_aabb_result[i];
+    if (other_agent != agent) {
+
+      Vector2 dir = other_agent->transform[2] - agent->transform[2];
+      double dist = dir.length();
+      double strength = agent->separate_param_decay_coefficient / (dist * dist);
+      if (strength > agent->max_steering_force) {
+        strength = agent->max_steering_force;
+      }
+      dir.normalize();
+      steering_force += strength * dir * -1;
+
 #ifdef DEBUG_ENABLED
       if (is_debug) {
-        result_agent->aabb_culled = false;
+        other_agent->aabb_culled = false;
       }
 #endif
     }
   }
 
-  return Vector2();
+  steering_force = (steering_force / agent->mass).limit_length(agent->max_steering_force);
+  return steering_force;
 }
 
 void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
@@ -1541,6 +1558,11 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
+
+  ADD_GROUP("Separate", "separate_");
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_ratio", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_RATIO);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_decay_coefficient", PROPERTY_HINT_RANGE, "0,100,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_DECAY_COEFFICIENT);
+
   ADD_GROUP("Wander", "wander_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_DISTANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_CIRCLE_DISTANCE);
@@ -1627,6 +1649,9 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_STEERING_FORCE);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
 
+  BIND_ENUM_CONSTANT(PARAM_SEPARATE_NEIGHBOURHOOD_RATIO);
+  BIND_ENUM_CONSTANT(PARAM_SEPARATE_DECAY_COEFFICIENT);
+
   BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_DISTANCE);
   BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_RADIUS);
   BIND_ENUM_CONSTANT(PARAM_WANDER_RATE_OF_CHANGE);
@@ -1698,6 +1723,11 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_max(PARAM_AGENT_MAX_SPEED, 1);
   set_param_max(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_max(PARAM_AGENT_MAX_TURN_RATE, 1);
+
+  set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_RATIO, 0.1);
+  set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 0.01);
+  set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_RATIO, 100.0);
+  set_param_max(PARAM_SEPARATE_DECAY_COEFFICIENT, 100.0);
 
   set_param_min(PARAM_WANDER_CIRCLE_DISTANCE, 20);
   set_param_min(PARAM_WANDER_CIRCLE_RADIUS, 40);

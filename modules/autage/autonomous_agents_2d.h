@@ -63,6 +63,8 @@ public:
     PARAM_WANDER_CIRCLE_DISTANCE,
     PARAM_WANDER_CIRCLE_RADIUS,
     PARAM_WANDER_RATE_OF_CHANGE,
+    PARAM_SEPARATE_NEIGHBOURHOOD_RATIO,
+    PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_MAX,
   };
 
@@ -116,11 +118,14 @@ private:
     AABB aabb;
 
     bool wander;  // todo - could these bools bit flags
-    bool separate;
     real_t wander_param_circle_distance = 0.0;
     real_t wander_param_circle_radius = 0.0;
     real_t wander_param_rate_of_change = 0.0;
     real_t wander_target_theta = 0.0;
+
+    bool separate;
+    real_t separate_param_neighbourhood_ratio = 0.0;
+    real_t separate_param_decay_coefficient = 0.0;
 
 #ifdef DEBUG_ENABLED
     Vector2 wander_circle_position;
