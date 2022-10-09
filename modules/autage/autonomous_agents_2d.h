@@ -90,6 +90,7 @@ private:
     uint32_t seed = 0;
 
     bool is_new = true;
+    uint32_t ai_phase = 0;
 
     Transform2D transform;
     real_t mass = 1.0;
@@ -137,6 +138,7 @@ private:
   double frame_remainder = 0.0;
   int cycle = 0;
   bool do_redraw = false;
+  int ai_phase = 1;
 
   RID mesh;
   RID multimesh;
@@ -175,6 +177,7 @@ private:
   int fixed_fps = 0;
   bool fractional_delta = true;
   double behaviour_delay = 0.0;
+  int number_of_ai_phases = 1;
 
   Transform2D inv_emission_transform;
 
@@ -260,6 +263,7 @@ public:
   void set_use_local_coordinates(bool p_enable);
   void set_speed_scale(double p_scale);
   void set_behaviour_delay(double p_delay);
+  void set_number_of_ai_phases(int p_number_of_phases);
   void set_use_bvh(bool p_use_bvh);
 
   bool is_running() const;
@@ -273,6 +277,7 @@ public:
   bool get_use_local_coordinates() const;
   double get_speed_scale() const;
   double get_behaviour_delay() const;
+  int get_number_of_ai_phases() const;
   bool is_using_bvh() const;
 
   void set_fixed_fps(int p_count);
@@ -362,6 +367,7 @@ public:
   real_t get_agent_wander_circle_radius(int index);
   Vector2 get_agent_wander_target(int index);
   bool is_agent_aabb_culled(int index);
+  int get_agent_ai_phase(int index);
 #endif
 
   void restart();

@@ -57,6 +57,13 @@ double AutonomousAgents2D::get_behaviour_delay() const {
   return behaviour_delay;
 }
 
+void AutonomousAgents2D::set_number_of_ai_phases(int p_number_of_ai_phases){
+  number_of_ai_phases = p_number_of_ai_phases;
+}
+int AutonomousAgents2D::get_number_of_ai_phases() const {
+  return number_of_ai_phases;
+}
+
 void AutonomousAgents2D::set_amount(int p_amount) {
   ERR_FAIL_COND_MSG(p_amount < 1, "Amount of agents must be greater than 0.");
 
@@ -767,6 +774,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
 
       p.seed = Math::rand();
+      p.ai_phase = i % number_of_ai_phases + 1;
 
       p.angle_rand = Math::randf();
       p.scale_rand = Math::randf();
@@ -1072,18 +1080,24 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
     }
 
-    double x = get_agent_base_size().x * base_scale.x * agent_aabb_expansion_ratio;
-    double y = get_agent_base_size().y * base_scale.y * agent_aabb_expansion_ratio;
-    p.aabb = AABB(Vector3(p.transform[2].x-x*0.5,p.transform[2].y-y*0.5,0), Vector3(x,y,1.0)); // todo -- use proper leaf size based on scale etc   -- seem to need 1.0 on the z to make to intersect
-    if (use_bvh) {
-      if (p.is_new) {
-        p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
-      } else {
-        agent_bvh.update(p.bvh_leaf, p.aabb);
+    if (ai_phase == p.ai_phase || p.is_new) {
+      double x = get_agent_base_size().x * base_scale.x * agent_aabb_expansion_ratio;
+      double y = get_agent_base_size().y * base_scale.y * agent_aabb_expansion_ratio;
+      p.aabb = AABB(Vector3(p.transform[2].x-x*0.5,p.transform[2].y-y*0.5,0), Vector3(x,y,1.0));
+      if (use_bvh) {
+        if (p.is_new) {
+          p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
+        } else {
+          agent_bvh.update(p.bvh_leaf, p.aabb);
+        }
       }
     }
+    p.is_new = false;
+  }
 
-    p.is_new=false;
+  ai_phase++;
+  if (ai_phase > number_of_ai_phases) {
+    ai_phase = 1;
   }
 }
 struct AABBQueryResult {
@@ -1376,12 +1390,17 @@ Vector2 AutonomousAgents2D::get_agent_wander_target(int index){
   Agent *parray = agents.ptrw();
   return parray[index].wander_target;
 }
+int AutonomousAgents2D::get_agent_ai_phase(int index) {
+  Agent *parray = agents.ptrw();
+  return parray[index].ai_phase;
+}
 #endif
 
 void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_running", "running"), &AutonomousAgents2D::set_running);
   ClassDB::bind_method(D_METHOD("set_amount", "amount"), &AutonomousAgents2D::set_amount);
   ClassDB::bind_method(D_METHOD("set_behaviour_delay", "behaviour_delay"), &AutonomousAgents2D::set_behaviour_delay);
+  ClassDB::bind_method(D_METHOD("set_number_of_ai_phases", "number_of_ai_phases"), &AutonomousAgents2D::set_number_of_ai_phases);
   ClassDB::bind_method(D_METHOD("set_lifetime", "secs"), &AutonomousAgents2D::set_lifetime);
   ClassDB::bind_method(D_METHOD("set_one_shot", "enable"), &AutonomousAgents2D::set_one_shot);
   ClassDB::bind_method(D_METHOD("set_pre_process_time", "secs"), &AutonomousAgents2D::set_pre_process_time);
@@ -1397,6 +1416,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("is_running"), &AutonomousAgents2D::is_running);
   ClassDB::bind_method(D_METHOD("get_amount"), &AutonomousAgents2D::get_amount);
   ClassDB::bind_method(D_METHOD("get_behaviour_delay"), &AutonomousAgents2D::get_behaviour_delay);
+  ClassDB::bind_method(D_METHOD("get_number_of_ai_phases"), &AutonomousAgents2D::get_number_of_ai_phases);
   ClassDB::bind_method(D_METHOD("get_lifetime"), &AutonomousAgents2D::get_lifetime);
   ClassDB::bind_method(D_METHOD("get_one_shot"), &AutonomousAgents2D::get_one_shot);
   ClassDB::bind_method(D_METHOD("get_pre_process_time"), &AutonomousAgents2D::get_pre_process_time);
@@ -1422,6 +1442,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTY(PropertyInfo(Variant::INT, "amount", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_amount", "get_amount");
   ADD_GROUP("Optimizations", "");
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_bvh"), "set_use_bvh", "is_using_bvh");
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "number_of_ai_phases", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"), "set_number_of_ai_phases", "get_number_of_ai_phases");
   ADD_GROUP("Time", "");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "behaviour_delay", PROPERTY_HINT_RANGE, "0.00,100.0,0.01,or_greater,suffix:s"), "set_behaviour_delay", "get_behaviour_delay");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lifetime", PROPERTY_HINT_RANGE, "0.01,600.0,0.01,or_greater,suffix:s"), "set_lifetime", "get_lifetime");
@@ -1649,6 +1670,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_radius"), &AutonomousAgents2D::get_agent_wander_circle_radius);
   ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
   ClassDB::bind_method(D_METHOD("is_agent_aabb_culled"), &AutonomousAgents2D::is_agent_aabb_culled);
+  ClassDB::bind_method(D_METHOD("get_agent_ai_phase"), &AutonomousAgents2D::get_agent_ai_phase);
 #endif
 }
 
@@ -1666,6 +1688,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_agent_aabb_expansion_ratio(1.2);
 
   set_use_bvh(false);
+  set_number_of_ai_phases(1);
 
   set_param_min(PARAM_AGENT_MASS, 1);
   set_param_min(PARAM_AGENT_MAX_SPEED, 1);
