@@ -124,6 +124,7 @@ private:
 #ifdef DEBUG_ENABLED
     Vector2 wander_circle_position;
     Vector2 wander_target;
+    bool aabb_culled;
 #endif
 
   };
@@ -231,6 +232,7 @@ private:
   Vector2 wander(Agent *agent);
 
   DynamicBVH agent_bvh;
+  void agent_cull_aabb_query(const AABB &p_aabb);
 
   template <class QueryResult>
   _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
@@ -337,19 +339,21 @@ public:
 
   PackedStringArray get_configuration_warnings() const override;
 
-  PagedArrayPool<Agent *> bvh_page_pool;
-  PagedArray<Agent *> bvh_result;
+  PagedArrayPool<Agent *> agent_cull_aabb_page_pool;
+  PagedArray<Agent *> agent_cull_aabb_result;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
   bool is_agent_steering(int index);
   Vector2 get_agent_position(int index);
+  AABB get_agent_aabb(int index);
   bool is_agent_wandering(int index);
   bool is_agent_separating(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_circle_radius(int index);
   Vector2 get_agent_wander_target(int index);
+  bool is_agent_aabb_culled(int index);
 #endif
 
   void restart();
@@ -363,22 +367,5 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
 VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
-/*
-template <class QueryResult>
-void AutonomousAgents2D::aabb_query(const AABB &p_box, QueryResult &r_result) {
-  if (agents.size() <= 1) {
-    bvh_result->push_back
-    return;
-  }
-
-  for (int i = 0; i < agents.size(); i++) {
-    if (agents[i].aabb.intersects(p_box)) {
-      if (r_result(agents[i])) {
-        return;
-      }
-    }
-  }
-}
-*/
 
 #endif // AUTONOMOUS_AGENTS_2D_H

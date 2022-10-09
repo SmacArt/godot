@@ -664,6 +664,15 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
   double system_phase = time / lifetime;
 
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    for (int i = 0; i < pcount; i++) {
+      Agent &p = parray[i];
+      p.aabb_culled = true;
+    }
+  }
+#endif
+
   for (int i = 0; i < pcount; i++) {
     Agent &p = parray[i];
 
@@ -1047,7 +1056,8 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
     }
 
-    p.aabb = AABB(Vector3(p.transform[2].x,p.transform[2].y,0), Vector3(2000.0,2000,1.0)); // todo -- use proper leaf size based on scale etc   -- seem to need 1.0 on the z to make to intersect
+
+    p.aabb = AABB(Vector3(p.transform[2].x-100,p.transform[2].y-100,0), Vector3(200.0,200,1.0)); // todo -- use proper leaf size based on scale etc   -- seem to need 1.0 on the z to make to intersect
     if (use_bvh) {
       if (p.is_new) {
         p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
@@ -1085,8 +1095,26 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
-  print_line(agent->base_color);
-  bvh_result.clear();
+  // TODO - this will only need to be called once for all the behaviors if the same aabb is to be used
+  agent_cull_aabb_query(agent->aabb);  // get neighbours
+
+  for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
+    Agent *result_agent = agent_cull_aabb_result[i];
+    if (result_agent != agent) {
+#ifdef DEBUG_ENABLED
+      if (is_debug) {
+        result_agent->aabb_culled = false;
+      }
+#endif
+    }
+  }
+
+  return Vector2();
+}
+
+void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
+
+  agent_cull_aabb_result.clear();
 
   if (use_bvh) {
     struct CullAABBBVH {
@@ -1098,30 +1126,20 @@ Vector2 AutonomousAgents2D::separate(Agent *agent) {
       }
     };
     CullAABBBVH cull_aabb;
-    cull_aabb.result=&bvh_result;
-    agent_bvh.aabb_query(agent->aabb, cull_aabb);
+    cull_aabb.result = &agent_cull_aabb_result;
+    agent_bvh.aabb_query(p_aabb, cull_aabb);
   } else {
-    int pcount = agents.size();
-    Agent *w = agents.ptrw();
-    Agent *parray = w;
-
-    for (int i = 0; i < pcount; i++) {
+    Agent *parray = agents.ptrw();
+    for (int i = 0; i < agents.size(); i++) {
       Agent &p = parray[i];
-      if (p.aabb.intersects(agent->aabb)) {
-        bvh_result.push_back(&p);
+      if (p.aabb.intersects(p_aabb)) {
+        agent_cull_aabb_result.push_back(&p);
         // todo - logic not to continue after the first one found -maybe
         // this will give it similar behavior to bvh
       }
     }
   }
 
-  for (int i = 0; i < (int)bvh_result.size(); i++) {
-    Agent *result_agent = bvh_result[i];
-    result_agent->color = Color(1,0,0,1);
-    agent->color = Color(1,0,0,1);
-  }
-
-  return Vector2(0,0);
 }
 
 Vector2 AutonomousAgents2D::wander(Agent *agent) {
@@ -1306,38 +1324,39 @@ void AutonomousAgents2D::_notification(int p_what) {
 
 #ifdef DEBUG_ENABLED
 Vector2 AutonomousAgents2D::get_agent_position(int index){
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].transform[2];
 }
+AABB AutonomousAgents2D::get_agent_aabb(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].aabb;
+}
+bool AutonomousAgents2D::is_agent_aabb_culled(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].aabb_culled;
+}
 bool AutonomousAgents2D::is_agent_separating(int index) {
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].separate;
 }
 bool AutonomousAgents2D::is_agent_wandering(int index) {
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].wander;
 }
 bool AutonomousAgents2D::is_agent_steering(int index) {
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].steering;
 }
 Vector2 AutonomousAgents2D::get_agent_wander_circle_position(int index){
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].wander_circle_position;
 }
 real_t AutonomousAgents2D::get_agent_wander_circle_radius(int index){
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].wander_param_circle_radius;
 }
 Vector2 AutonomousAgents2D::get_agent_wander_target(int index){
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
+  Agent *parray = agents.ptrw();
   return parray[index].wander_target;
 }
 #endif
@@ -1599,11 +1618,13 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("is_steering"), &AutonomousAgents2D::is_agent_steering);
   ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
   ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
+  ClassDB::bind_method(D_METHOD("get_agent_aabb"), &AutonomousAgents2D::get_agent_aabb);
   ClassDB::bind_method(D_METHOD("is_agent_separating"), &AutonomousAgents2D::is_agent_separating);
   ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_radius"), &AutonomousAgents2D::get_agent_wander_circle_radius);
   ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
+  ClassDB::bind_method(D_METHOD("is_agent_aabb_culled"), &AutonomousAgents2D::is_agent_aabb_culled);
 #endif
 }
 
@@ -1669,7 +1690,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_color(Color(1, 1, 1, 1));
 
-  bvh_result.set_page_pool(&bvh_page_pool);
+  agent_cull_aabb_result.set_page_pool(&agent_cull_aabb_page_pool);
 
   _update_mesh_texture();
 }
