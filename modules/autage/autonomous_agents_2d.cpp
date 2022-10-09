@@ -789,7 +789,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       if (agent_flags[AGENT_FLAG_SEPARATE]) {
         p.separate=true;
-        p.separate_param_neighbourhood_ratio = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_RATIO], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_RATIO], rand_from_seed(p.seed));
+        p.separate_param_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(p.seed));
         p.separate_param_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
@@ -1085,9 +1085,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
     }
 
     if (ai_phase == p.ai_phase || p.is_new) {
-      double x = get_agent_base_size().x * base_scale.x * agent_aabb_expansion_ratio;
-      double y = get_agent_base_size().y * base_scale.y * agent_aabb_expansion_ratio;
-      p.aabb = AABB(Vector3(p.transform[2].x-x*0.5,p.transform[2].y-y*0.5,0), Vector3(x,y,1.0));
+      double width = get_agent_base_size().x * base_scale.x * agent_aabb_expansion_ratio;
+      double height = get_agent_base_size().y * base_scale.y * agent_aabb_expansion_ratio;
+      p.aabb = AABB(Vector3(p.transform[2].x-width*0.5,p.transform[2].y-height*0.5,0), Vector3(width,height,1.0));
       if (use_bvh) {
         if (p.is_new) {
           p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
@@ -1130,8 +1130,8 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
-  AABB aabb = agent->aabb.grow(agent->separate_param_neighbourhood_ratio);
-  agent_cull_aabb_query(aabb);  // get neighbours
+  AABB aabb = agent->aabb.grow(agent->separate_param_neighbourhood_expansion * (agent->scale_rand + 1));
+  agent_cull_aabb_query(aabb);
 
   #ifdef DEBUG_ENABLED
   if (is_debug) {
@@ -1481,12 +1481,6 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lifetime_randomness", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_lifetime_randomness", "get_lifetime_randomness");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "fixed_fps", PROPERTY_HINT_RANGE, "0,1000,1,suffix:FPS"), "set_fixed_fps", "get_fixed_fps");
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "fract_delta"), "set_fractional_delta", "get_fractional_delta");
-  ADD_GROUP("Drawing", "");
-  // No visibility_rect property contrarily to Agents2D, it's updated automatically.
-  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "local_coords"), "set_use_local_coordinates", "get_use_local_coordinates");
-  ADD_PROPERTY(PropertyInfo(Variant::INT, "draw_order", PROPERTY_HINT_ENUM, "Index,Lifetime"), "set_draw_order", "get_draw_order");
-  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture");
-
 
   ////////////////////////////////
 
@@ -1570,8 +1564,11 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
 
   ADD_GROUP("Separate", "separate_");
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_ratio", PROPERTY_HINT_RANGE, "0.1,100,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_RATIO);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_decay_coefficient", PROPERTY_HINT_RANGE, "0,100,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_DECAY_COEFFICIENT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION
+                );
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_max", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_SEPARATE_DECAY_COEFFICIENT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_SEPARATE_DECAY_COEFFICIENT);
 
   ADD_GROUP("Wander", "wander_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_distance_min", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_CIRCLE_DISTANCE);
@@ -1580,6 +1577,11 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_circle_radius_max", PROPERTY_HINT_RANGE, "1,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_CIRCLE_RADIUS);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_rate_of_change_min", PROPERTY_HINT_RANGE, "0,1000,0.0001,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_WANDER_RATE_OF_CHANGE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "wander_rate_of_change_max", PROPERTY_HINT_RANGE, "0,1000,0.0001,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_WANDER_RATE_OF_CHANGE);
+
+  ADD_GROUP("Drawing", "");
+  ADD_PROPERTY(PropertyInfo(Variant::BOOL, "local_coords"), "set_use_local_coordinates", "get_use_local_coordinates");
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "draw_order", PROPERTY_HINT_ENUM, "Index,Lifetime"), "set_draw_order", "get_draw_order");
+  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture");
 
   ADD_GROUP("Emission Shape", "emission_");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "emission_shape", PROPERTY_HINT_ENUM, "Point,Sphere,Sphere Surface,Rectangle,Points,Directed Points", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), "set_emission_shape", "get_emission_shape");
@@ -1659,7 +1661,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_STEERING_FORCE);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
 
-  BIND_ENUM_CONSTANT(PARAM_SEPARATE_NEIGHBOURHOOD_RATIO);
+  BIND_ENUM_CONSTANT(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_DECAY_COEFFICIENT);
 
   BIND_ENUM_CONSTANT(PARAM_WANDER_CIRCLE_DISTANCE);
@@ -1735,10 +1737,10 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_max(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_max(PARAM_AGENT_MAX_TURN_RATE, 1);
 
-  set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_RATIO, 0.1);
-  set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 0.01);
-  set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_RATIO, 100.0);
-  set_param_max(PARAM_SEPARATE_DECAY_COEFFICIENT, 100.0);
+  set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
+  set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);
+  set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
+  set_param_max(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);
 
   set_param_min(PARAM_WANDER_CIRCLE_DISTANCE, 20);
   set_param_min(PARAM_WANDER_CIRCLE_RADIUS, 40);

@@ -63,7 +63,7 @@ public:
     PARAM_WANDER_CIRCLE_DISTANCE,
     PARAM_WANDER_CIRCLE_RADIUS,
     PARAM_WANDER_RATE_OF_CHANGE,
-    PARAM_SEPARATE_NEIGHBOURHOOD_RATIO,
+    PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
     PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_MAX,
   };
@@ -124,7 +124,7 @@ private:
     real_t wander_target_theta = 0.0;
 
     bool separate;
-    real_t separate_param_neighbourhood_ratio = 0.0;
+    real_t separate_param_neighbourhood_expansion = 0.0;
     real_t separate_param_decay_coefficient = 0.0;
 
 #ifdef DEBUG_ENABLED
