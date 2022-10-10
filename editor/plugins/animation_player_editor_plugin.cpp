@@ -302,6 +302,8 @@ void AnimationPlayerEditor::_animation_selected(int p_which) {
 
 	AnimationPlayerEditor::get_singleton()->get_track_editor()->update_keying();
 	_animation_key_editor_seek(timeline_position, false);
+
+	emit_signal("animation_selected", current);
 }
 
 void AnimationPlayerEditor::_animation_new() {
@@ -720,7 +722,18 @@ void AnimationPlayerEditor::set_state(const Dictionary &p_state) {
 	if (p_state.has("player")) {
 		Node *n = EditorNode::get_singleton()->get_edited_scene()->get_node(p_state["player"]);
 		if (Object::cast_to<AnimationPlayer>(n) && EditorNode::get_singleton()->get_editor_selection()->is_selected(n)) {
+			if (player) {
+				if (player->is_connected("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated))) {
+					player->disconnect("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated));
+				}
+			}
 			player = Object::cast_to<AnimationPlayer>(n);
+			if (player) {
+				if (!player->is_connected("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated))) {
+					player->connect("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated));
+				}
+			}
+
 			_update_player();
 			EditorNode::get_singleton()->make_bottom_panel_item_visible(this);
 			set_process(true);
@@ -982,9 +995,18 @@ void AnimationPlayerEditor::edit(AnimationPlayer *p_player) {
 	if (player && pin->is_pressed()) {
 		return; // Ignore, pinned.
 	}
+
+	if (player) {
+		if (player->is_connected("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated))) {
+			player->disconnect("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated));
+		}
+	}
 	player = p_player;
 
 	if (player) {
+		if (!player->is_connected("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated))) {
+			player->connect("animation_libraries_updated", callable_mp(this, &AnimationPlayerEditor::_animation_libraries_updated));
+		}
 		_update_player();
 
 		if (onion.enabled) {
@@ -1149,6 +1171,10 @@ void AnimationPlayerEditor::_animation_player_changed(Object *p_pl) {
 			library_editor->update_tree();
 		}
 	}
+}
+
+void AnimationPlayerEditor::_animation_libraries_updated() {
+	_animation_player_changed(player);
 }
 
 void AnimationPlayerEditor::_list_changed() {
@@ -1545,6 +1571,7 @@ void AnimationPlayerEditor::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_animation_edit"), &AnimationPlayerEditor::_animation_edit);
 	ClassDB::bind_method(D_METHOD("_animation_resource_edit"), &AnimationPlayerEditor::_animation_resource_edit);
 	ClassDB::bind_method(D_METHOD("_animation_player_changed"), &AnimationPlayerEditor::_animation_player_changed);
+	ClassDB::bind_method(D_METHOD("_animation_libraries_updated"), &AnimationPlayerEditor::_animation_libraries_updated);
 	ClassDB::bind_method(D_METHOD("_list_changed"), &AnimationPlayerEditor::_list_changed);
 	ClassDB::bind_method(D_METHOD("_animation_duplicate"), &AnimationPlayerEditor::_animation_duplicate);
 
@@ -1552,6 +1579,8 @@ void AnimationPlayerEditor::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_prepare_onion_layers_2"), &AnimationPlayerEditor::_prepare_onion_layers_2);
 	ClassDB::bind_method(D_METHOD("_start_onion_skinning"), &AnimationPlayerEditor::_start_onion_skinning);
 	ClassDB::bind_method(D_METHOD("_stop_onion_skinning"), &AnimationPlayerEditor::_stop_onion_skinning);
+
+	ADD_SIGNAL(MethodInfo("animation_selected", PropertyInfo(Variant::STRING, "name")));
 }
 
 AnimationPlayerEditor *AnimationPlayerEditor::singleton = nullptr;
