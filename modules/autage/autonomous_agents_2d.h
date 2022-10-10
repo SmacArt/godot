@@ -132,6 +132,7 @@ private:
     Vector2 wander_target;
     bool aabb_culled;
     AABB separation_aabb;
+    bool did_wander;
 #endif
 
   };
@@ -145,6 +146,7 @@ private:
   int cycle = 0;
   bool do_redraw = false;
   int ai_phase = 1;
+  Transform2D old_transform;
 
   RID mesh;
   RID multimesh;
@@ -375,6 +377,7 @@ public:
   Vector2 get_agent_wander_target(int index);
   bool is_agent_aabb_culled(int index);
   int get_agent_ai_phase(int index);
+  bool get_did_agent_wander(int index);
 #endif
 
   void restart();

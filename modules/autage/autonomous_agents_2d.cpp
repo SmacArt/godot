@@ -811,6 +811,10 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       real_t base_angle = tex_angle * Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
       p.rotation = Math::deg_to_rad(base_angle);
 
+      if (agent_flags[AGENT_FLAG_ALIGN_Y_TO_VELOCITY]) {
+        old_transform = Transform2D(p.transform);
+      }
+
       p.custom[0] = 0.0; // unused
       p.custom[1] = 0.0; // phase [0..1]
       p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand);
@@ -1050,7 +1054,10 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform.columns[1] = p.velocity.normalized();
         p.transform.columns[0] = p.transform.columns[1].orthogonal();
       }
-
+      else {
+        p.transform.columns[0] = old_transform.columns[0];
+        p.transform.columns[1] = old_transform.columns[1];
+      }
     } else {
       p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
       p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
@@ -1114,11 +1121,21 @@ Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
 
   Vector2 steering_force = Vector2(0,0);
 
-  if (agent->wander) {
-    steering_force += wander(agent);
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->did_wander=false;
   }
+#endif
   if (agent->separate) {
     steering_force += separate(agent);
+  }
+  if (agent->wander && steering_force.length_squared() == 0) {
+#ifdef DEBUG_ENABLED
+    if (is_debug) {
+      agent->did_wander=true;
+    }
+#endif
+    steering_force += wander(agent);
   }
   steering_force = steering_force.limit_length(agent->max_steering_force);
   return (steering_force / agent->mass).limit_length(agent->max_steering_force);
@@ -1133,11 +1150,11 @@ Vector2 AutonomousAgents2D::separate(Agent *agent) {
   AABB aabb = agent->aabb.grow(agent->separate_param_neighbourhood_expansion * (agent->scale_rand + 1));
   agent_cull_aabb_query(aabb);
 
-  #ifdef DEBUG_ENABLED
+#ifdef DEBUG_ENABLED
   if (is_debug) {
     agent->separation_aabb = aabb;
   }
-  #endif
+#endif
 
   Vector2 steering_force = Vector2(0,0);
 
@@ -1421,6 +1438,10 @@ int AutonomousAgents2D::get_agent_ai_phase(int index) {
   Agent *parray = agents.ptrw();
   return parray[index].ai_phase;
 }
+bool AutonomousAgents2D::get_did_agent_wander(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].did_wander;
+}
 #endif
 
 void AutonomousAgents2D::_bind_methods() {
@@ -1558,6 +1579,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_steering_force_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:N"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_STEERING_FORCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_turn_rate_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_TURN_RATE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_turn_rate", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_TURN_RATE);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align_y"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
 
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
@@ -1590,8 +1612,6 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "emission_points"), "set_emission_points", "get_emission_points");
   ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "emission_normals"), "set_emission_normals", "get_emission_normals");
   ADD_PROPERTY(PropertyInfo(Variant::PACKED_COLOR_ARRAY, "emission_colors"), "set_emission_colors", "get_emission_colors");
-  ADD_GROUP("Agent Flags", "agent_flag_");
-  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align_y"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
   ADD_GROUP("Direction", "");
   ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "direction"), "set_direction", "get_direction");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spread", PROPERTY_HINT_RANGE, "0,180,0.01"), "set_spread", "get_spread");
@@ -1709,6 +1729,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
   ClassDB::bind_method(D_METHOD("is_agent_aabb_culled"), &AutonomousAgents2D::is_agent_aabb_culled);
   ClassDB::bind_method(D_METHOD("get_agent_ai_phase"), &AutonomousAgents2D::get_agent_ai_phase);
+  ClassDB::bind_method(D_METHOD("get_did_agent_wander"), &AutonomousAgents2D::get_did_agent_wander);
 #endif
 }
 
