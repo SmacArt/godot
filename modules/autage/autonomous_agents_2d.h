@@ -70,8 +70,9 @@ public:
 
   enum AgentFlags {
     AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
-    AGENT_FLAG_WANDER,
+    AGENT_FLAG_AVOID_OBSTACLES,
     AGENT_FLAG_SEPARATE,
+    AGENT_FLAG_WANDER,
     AGENT_FLAG_MAX
   };
 
@@ -117,21 +118,25 @@ private:
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
 
+
+    bool avoid_obstacles;
+
+    bool separate;
+    real_t separate_param_neighbourhood_expansion = 0.0;
+    real_t separate_param_decay_coefficient = 0.0;
+
     bool wander;  // todo - could these bools bit flags
     real_t wander_param_circle_distance = 0.0;
     real_t wander_param_circle_radius = 0.0;
     real_t wander_param_rate_of_change = 0.0;
     real_t wander_target_theta = 0.0;
 
-    bool separate;
-    real_t separate_param_neighbourhood_expansion = 0.0;
-    real_t separate_param_decay_coefficient = 0.0;
-
 #ifdef DEBUG_ENABLED
     Vector2 wander_circle_position;
     Vector2 wander_target;
     bool aabb_culled;
     AABB separation_aabb;
+    AABB forward_aabb;
     bool did_wander;
 #endif
 
@@ -240,12 +245,14 @@ private:
 
   Vector2 calculate_steering_force(Agent *agent, int i);
 
-  Vector2 separate(Agent *agent);
+  Vector2 avoid_obstacles(Agent *agent);
   Vector2 seek(Agent *agent, Vector2 target);
+  Vector2 separate(Agent *agent);
   Vector2 wander(Agent *agent);
 
   DynamicBVH agent_bvh;
   void agent_cull_aabb_query(const AABB &p_aabb);
+  AABB create_forward_aabb_for_agent(Agent *agent, double length);
 
   template <class QueryResult>
   _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
@@ -370,7 +377,9 @@ public:
   Vector2 get_agent_position(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
+  AABB get_agent_forward_aabb(int index);
   bool is_agent_wandering(int index);
+  bool is_agent_avoiding_obstacles(int index);
   bool is_agent_separating(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_circle_radius(int index);

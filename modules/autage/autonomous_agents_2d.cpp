@@ -793,6 +793,12 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.separate_param_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
+      if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
+        p.avoid_obstacles = true;
+        // todo - should have its own decay
+        p.separate_param_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
+      }
+
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
       p.max_speed = Math::lerp(parameters_min[PARAM_AGENT_MAX_SPEED], parameters_max[PARAM_AGENT_MAX_SPEED], rand_from_seed(p.seed));
       p.max_steering_force = Math::lerp(parameters_min[PARAM_AGENT_MAX_STEERING_FORCE], parameters_max[PARAM_AGENT_MAX_STEERING_FORCE], rand_from_seed(p.seed));
@@ -1129,6 +1135,9 @@ Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
   if (agent->separate) {
     steering_force += separate(agent);
   }
+  if (agent->avoid_obstacles) {
+    steering_force += avoid_obstacles(agent);
+  }
   if (agent->wander && steering_force.length_squared() == 0) {
 #ifdef DEBUG_ENABLED
     if (is_debug) {
@@ -1143,6 +1152,42 @@ Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
 
 Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
   return ((target - agent->transform[2]).normalized() * agent->max_speed) - agent->velocity;
+}
+
+Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
+  AABB aabb = create_forward_aabb_for_agent(agent, 50.0);
+  agent_cull_aabb_query(aabb);
+
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->forward_aabb = aabb;
+  }
+#endif
+
+  Vector2 steering_force = Vector2(0,0);
+
+  for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
+    Agent *other_agent = agent_cull_aabb_result[i];
+    if (other_agent != agent) {
+
+      Vector2 dir = other_agent->transform[2] - agent->transform[2];
+      double dist = dir.length();
+      double strength = agent->separate_param_decay_coefficient / (dist * dist);
+      if (strength > agent->max_steering_force) {
+        strength = agent->max_steering_force;
+      }
+      dir.normalize();
+      steering_force += strength * dir * -1;
+
+#ifdef DEBUG_ENABLED
+      if (is_debug) {
+        other_agent->aabb_culled = false;
+      }
+#endif
+    }
+  }
+  steering_force = (steering_force / agent->mass).limit_length(agent->max_steering_force);
+  return steering_force;
 }
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
@@ -1211,6 +1256,15 @@ void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
     }
   }
 
+}
+
+AABB AutonomousAgents2D::create_forward_aabb_for_agent(Agent *agent, double length) {
+  AABB aabb = agent->aabb;
+  aabb.grow_by(length * 0.5);
+  Vector2 dir = agent->velocity.normalized() * length;
+  aabb.position.x += dir.x;
+  aabb.position.y += dir.y;
+  return aabb;
 }
 
 Vector2 AutonomousAgents2D::wander(Agent *agent) {
@@ -1406,9 +1460,17 @@ AABB AutonomousAgents2D::get_agent_separation_aabb(int index){
   Agent *parray = agents.ptrw();
   return parray[index].separation_aabb;
 }
+AABB AutonomousAgents2D::get_agent_forward_aabb(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].forward_aabb;
+}
 bool AutonomousAgents2D::is_agent_aabb_culled(int index){
   Agent *parray = agents.ptrw();
   return parray[index].aabb_culled;
+}
+bool AutonomousAgents2D::is_agent_avoiding_obstacles(int index) {
+  Agent *parray = agents.ptrw();
+  return parray[index].avoid_obstacles;
 }
 bool AutonomousAgents2D::is_agent_separating(int index) {
   Agent *parray = agents.ptrw();
@@ -1582,6 +1644,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align_y"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
 
   ADD_GROUP("Behaviour", "agent_flag_");
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_avoid_obstacles"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_AVOID_OBSTACLES);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
 
@@ -1703,6 +1766,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_MAX);
 
   BIND_ENUM_CONSTANT(AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_AVOID_OBSTACLES);
   BIND_ENUM_CONSTANT(AGENT_FLAG_SEPARATE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_WANDER);
   BIND_ENUM_CONSTANT(AGENT_FLAG_MAX);
@@ -1722,6 +1786,8 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
   ClassDB::bind_method(D_METHOD("get_agent_aabb"), &AutonomousAgents2D::get_agent_aabb);
   ClassDB::bind_method(D_METHOD("get_agent_separation_aabb"), &AutonomousAgents2D::get_agent_separation_aabb);
+  ClassDB::bind_method(D_METHOD("get_agent_forward_aabb"), &AutonomousAgents2D::get_agent_forward_aabb);
+  ClassDB::bind_method(D_METHOD("is_agent_avoiding_obstacles"), &AutonomousAgents2D::is_agent_avoiding_obstacles);
   ClassDB::bind_method(D_METHOD("is_agent_separating"), &AutonomousAgents2D::is_agent_separating);
   ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
@@ -1801,6 +1867,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
   }
   agent_flags[AGENT_FLAG_WANDER] = true;
   agent_flags[AGENT_FLAG_SEPARATE] = false;
+  agent_flags[AGENT_FLAG_AVOID_OBSTACLES] = false;
 
   set_color(Color(1, 1, 1, 1));
 
