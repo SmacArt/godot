@@ -783,20 +783,22 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       if (agent_flags[AGENT_FLAG_WANDER]) {
         p.wander = true;
-        p.wander_param_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(p.seed));
-        p.wander_param_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
-        p.wander_param_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
+        p.wander_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(p.seed));
+        p.wander_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
+        p.wander_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
       }
       if (agent_flags[AGENT_FLAG_SEPARATE]) {
         p.separate=true;
-        p.separate_param_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(p.seed));
-        p.separate_param_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
+        p.separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(p.seed));
+        p.separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
         p.avoid_obstacles = true;
-        // todo - should have its own decay
-        p.separate_param_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
+        // TODO -- steve from here
+        p.avoid_obstacles_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_DISTANCE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW], rand_from_seed(p.seed));
+        p.avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], parameters_max[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
@@ -1155,7 +1157,7 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 }
 
 Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
-  AABB aabb = create_forward_aabb_for_agent(agent, 50.0);
+  AABB aabb = create_forward_aabb_for_agent(agent);
   agent_cull_aabb_query(aabb);
 
 #ifdef DEBUG_ENABLED
@@ -1172,7 +1174,7 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
 
       Vector2 dir = other_agent->transform[2] - agent->transform[2];
       double dist = dir.length();
-      double strength = agent->separate_param_decay_coefficient / (dist * dist);
+      double strength = agent->avoid_obstacles_decay_coefficient / (dist * dist);
       if (strength > agent->max_steering_force) {
         strength = agent->max_steering_force;
       }
@@ -1190,9 +1192,22 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   return steering_force;
 }
 
+AABB AutonomousAgents2D::create_forward_aabb_for_agent(Agent *agent) {
+  // todo - grow by velocity (if param defined?)
+  AABB aabb = agent->aabb.grow(10 * agent->scale_rand + 1);
+  Vector2 normalized_velocity = agent->velocity.normalized();
+  Vector2 far_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_distance * (agent->scale_rand + 1);
+  Vector2 near_point = agent->transform[2] + normalized_velocity * 10.0 * (agent->scale_rand + 1);
+  Vector3 fpv3 = Vector3(far_point.x, far_point.y, 1.0);
+  aabb.position.x = near_point.x - aabb.size.x * 0.5;
+  aabb.position.y = near_point.y - aabb.size.y * 0.5;
+  aabb.expand_to(fpv3);
+  return aabb;
+}
+
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
-  AABB aabb = agent->aabb.grow(agent->separate_param_neighbourhood_expansion * (agent->scale_rand + 1));
+  AABB aabb = agent->aabb.grow(agent->separate_neighbourhood_expansion * (agent->scale_rand + 1));
   agent_cull_aabb_query(aabb);
 
 #ifdef DEBUG_ENABLED
@@ -1209,7 +1224,7 @@ Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
       Vector2 dir = other_agent->transform[2] - agent->transform[2];
       double dist = dir.length();
-      double strength = agent->separate_param_decay_coefficient / (dist * dist);
+      double strength = agent->separate_decay_coefficient / (dist * dist);
       if (strength > agent->max_steering_force) {
         strength = agent->max_steering_force;
       }
@@ -1258,20 +1273,12 @@ void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
 
 }
 
-AABB AutonomousAgents2D::create_forward_aabb_for_agent(Agent *agent, double length) {
-  AABB aabb = agent->aabb;
-  aabb.grow_by(length * 0.5);
-  Vector2 dir = agent->velocity.normalized() * length;
-  aabb.position.x += dir.x;
-  aabb.position.y += dir.y;
-  return aabb;
-}
 
 Vector2 AutonomousAgents2D::wander(Agent *agent) {
-  agent->wander_target_theta += agent->wander_param_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1);
-  Vector2 circle_position = agent->velocity.normalized() * agent->wander_param_circle_distance + agent->transform[2];
+  agent->wander_target_theta += agent->wander_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1);
+  Vector2 circle_position = agent->velocity.normalized() * agent->wander_circle_distance + agent->transform[2];
   double heading = agent->velocity.angle();
-  Vector2 circle_offset = Vector2(agent->wander_param_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_param_circle_radius * Math::sin(agent->wander_target_theta + heading));
+  Vector2 circle_offset = Vector2(agent->wander_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_circle_radius * Math::sin(agent->wander_target_theta + heading));
 
 #ifdef DEBUG_ENABLED
   if (is_debug) {
@@ -1490,7 +1497,7 @@ Vector2 AutonomousAgents2D::get_agent_wander_circle_position(int index){
 }
 real_t AutonomousAgents2D::get_agent_wander_circle_radius(int index){
   Agent *parray = agents.ptrw();
-  return parray[index].wander_param_circle_radius;
+  return parray[index].wander_circle_radius;
 }
 Vector2 AutonomousAgents2D::get_agent_wander_target(int index){
   Agent *parray = agents.ptrw();
@@ -1648,9 +1655,18 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
 
+  ADD_GROUP("Avoid Obstacles", "avoid_obstacles_");
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_far_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_far_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_view_width_ratio_min", PROPERTY_HINT_RANGE, "0.1,1000,0.1,or_greater"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_view_width_ratio_max", PROPERTY_HINT_RANGE, "0.1,1000,0.1,or_greater"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
+
   ADD_GROUP("Separate", "separate_");
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION
-                );
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_max", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_SEPARATE_DECAY_COEFFICIENT);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_SEPARATE_DECAY_COEFFICIENT);
@@ -1744,6 +1760,11 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_STEERING_FORCE);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
 
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
+
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_DECAY_COEFFICIENT);
 
@@ -1824,16 +1845,25 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_max(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_max(PARAM_AGENT_MAX_TURN_RATE, 1);
 
+  set_param_min(PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT, 5000);
+  set_param_max(PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT, 5000);
+  set_param_min(PARAM_AVOID_OBSTACLES_FAR_DISTANCE, 50);
+  set_param_max(PARAM_AVOID_OBSTACLES_FAR_DISTANCE, 50);
+  set_param_min(PARAM_AVOID_OBSTACLES_NEAR_DISTANCE, 0);
+  set_param_max(PARAM_AVOID_OBSTACLES_NEAR_DISTANCE, 0);
+  set_param_min(PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO, 1.1);
+  set_param_max(PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO, 1.0);
+
   set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
-  set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);
   set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
+  set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);
   set_param_max(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);
 
   set_param_min(PARAM_WANDER_CIRCLE_DISTANCE, 20);
-  set_param_min(PARAM_WANDER_CIRCLE_RADIUS, 40);
-  set_param_min(PARAM_WANDER_RATE_OF_CHANGE, 1);
   set_param_max(PARAM_WANDER_CIRCLE_DISTANCE, 20);
+  set_param_min(PARAM_WANDER_CIRCLE_RADIUS, 40);
   set_param_max(PARAM_WANDER_CIRCLE_RADIUS, 40);
+  set_param_min(PARAM_WANDER_RATE_OF_CHANGE, 1);
   set_param_max(PARAM_WANDER_RATE_OF_CHANGE, 1);
 
   set_param_min(PARAM_INITIAL_LINEAR_VELOCITY, 0);

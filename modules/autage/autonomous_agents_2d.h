@@ -44,27 +44,31 @@ public:
   };
 
   enum Parameter {
-    PARAM_INITIAL_LINEAR_VELOCITY,
-    PARAM_ANGULAR_VELOCITY,
-    PARAM_ORBIT_VELOCITY,
-    PARAM_LINEAR_ACCEL,
-    PARAM_RADIAL_ACCEL,
-    PARAM_TANGENTIAL_ACCEL,
-    PARAM_DAMPING,
-    PARAM_ANGLE,
-    PARAM_SCALE,
-    PARAM_HUE_VARIATION,
-    PARAM_ANIM_SPEED,
-    PARAM_ANIM_OFFSET,
     PARAM_AGENT_MASS,
     PARAM_AGENT_MAX_SPEED,
     PARAM_AGENT_MAX_STEERING_FORCE,
     PARAM_AGENT_MAX_TURN_RATE,
+    PARAM_ANGLE,
+    PARAM_ANGULAR_VELOCITY,
+    PARAM_ANIM_OFFSET,
+    PARAM_ANIM_SPEED,
+    PARAM_DAMPING,
+    PARAM_HUE_VARIATION,
+    PARAM_INITIAL_LINEAR_VELOCITY,
+    PARAM_LINEAR_ACCEL,
+    PARAM_ORBIT_VELOCITY,
+    PARAM_RADIAL_ACCEL,
+    PARAM_SCALE,
+    PARAM_TANGENTIAL_ACCEL,
+    PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT,
+    PARAM_AVOID_OBSTACLES_FAR_DISTANCE,
+    PARAM_AVOID_OBSTACLES_NEAR_DISTANCE,
+    PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO,
+    PARAM_SEPARATE_DECAY_COEFFICIENT,
+    PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
     PARAM_WANDER_CIRCLE_DISTANCE,
     PARAM_WANDER_CIRCLE_RADIUS,
     PARAM_WANDER_RATE_OF_CHANGE,
-    PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
-    PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_MAX,
   };
 
@@ -118,17 +122,20 @@ private:
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
 
+    bool avoid_obstacles = false;
+    real_t avoid_obstacles_decay_coefficient = 0.0;
+    real_t avoid_obstacles_far_distance = 0.0;
+    real_t avoid_obstacles_near_distance = 0.0;
+    real_t avoid_obstacles_view_width_ratio = 0.0; 
 
-    bool avoid_obstacles;
+    bool separate = false;
+    real_t separate_neighbourhood_expansion = 0.0;
+    real_t separate_decay_coefficient = 0.0;
 
-    bool separate;
-    real_t separate_param_neighbourhood_expansion = 0.0;
-    real_t separate_param_decay_coefficient = 0.0;
-
-    bool wander;  // todo - could these bools bit flags
-    real_t wander_param_circle_distance = 0.0;
-    real_t wander_param_circle_radius = 0.0;
-    real_t wander_param_rate_of_change = 0.0;
+    bool wander = false;  // todo - could these bools bit flags
+    real_t wander_circle_distance = 0.0;
+    real_t wander_circle_radius = 0.0;
+    real_t wander_rate_of_change = 0.0;
     real_t wander_target_theta = 0.0;
 
 #ifdef DEBUG_ENABLED
@@ -252,7 +259,7 @@ private:
 
   DynamicBVH agent_bvh;
   void agent_cull_aabb_query(const AABB &p_aabb);
-  AABB create_forward_aabb_for_agent(Agent *agent, double length);
+  AABB create_forward_aabb_for_agent(Agent *agent);
 
   template <class QueryResult>
   _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
