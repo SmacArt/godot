@@ -61,9 +61,9 @@ public:
     PARAM_SCALE,
     PARAM_TANGENTIAL_ACCEL,
     PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT,
-    PARAM_AVOID_OBSTACLES_FAR_DISTANCE,
-    PARAM_AVOID_OBSTACLES_NEAR_DISTANCE,
-    PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO,
+    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE,
+    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE,
+    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET,
     PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
     PARAM_WANDER_CIRCLE_DISTANCE,
@@ -124,9 +124,9 @@ private:
 
     bool avoid_obstacles = false;
     real_t avoid_obstacles_decay_coefficient = 0.0;
-    real_t avoid_obstacles_far_distance = 0.0;
-    real_t avoid_obstacles_near_distance = 0.0;
-    real_t avoid_obstacles_view_width_ratio = 0.0; 
+    real_t avoid_obstacles_field_of_view_angle = 0.0;
+    real_t avoid_obstacles_field_of_view_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_offset;
 
     bool separate = false;
     real_t separate_neighbourhood_expansion = 0.0;

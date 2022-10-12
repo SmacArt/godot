@@ -795,9 +795,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
         p.avoid_obstacles = true;
-        p.avoid_obstacles_far_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FAR_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FAR_DISTANCE], rand_from_seed(p.seed));
-        p.avoid_obstacles_near_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_NEAR_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_NEAR_DISTANCE], rand_from_seed(p.seed));
-        p.avoid_obstacles_view_width_ratio = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO], parameters_max[PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_angle = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_offset = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET], rand_from_seed(p.seed));
         p.avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], parameters_max[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
@@ -1193,38 +1193,40 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
 }
 
 AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
-  // todo - grow by velocity (if param defined?)
-  //AABB aabb = agent->aabb.grow(agent->avoid_obstacles_view_width_ratio * (agent->aabb.size.x)); // todo - maybe should be y  --- should not be gor both dimensions
   AABB aabb = agent->aabb;
-  /*******/
-  /*
-    aabb.position.x -= 50.0;
-    aabb.size.x += 2.0f * 50.0;
-    position.y -= p_amount;
-    position.z -= p_amount;
-    size.y += 2.0f * p_amount;
-    size.z += 2.0f * p_amount;
-  */
-  /*******/
+  // TODO - clean this up and optimize it
+  // TODO - the rest of the obstacle avoidance code (e.g check if in fov, only avoid closest, increase the distance if going fast, and also narrow the fov,  etc)
+  // TODO - remove the degrees to rad - replace with only rads
+  double fov_angle = agent->avoid_obstacles_field_of_view_angle;
+  if (fov_angle > 180.0) {
+    fov_angle = 180.0;
+  }
+  double axis_unit = fov_angle / 180.0;
+  double x_offset = agent->avoid_obstacles_field_of_view_offset;
+  if (agent->avoid_obstacles_field_of_view_angle > 180.0) {
+    double extra_fov = agent->avoid_obstacles_field_of_view_angle - 180.0;
+    if (extra_fov > 180.0) {
+      extra_fov = 180.0;
+    }
+    x_offset -= extra_fov * axis_unit;
+  }
 
-  double fov = agent->avoid_obstacles_view_width_ratio;
-  double left_and_right_length = (agent->avoid_obstacles_far_distance - agent->avoid_obstacles_near_distance) * 2.0;
-  double unit = left_and_right_length / 180.0;
-  double lr_dist = fov * unit;
+
+  double lr_dist = agent->avoid_obstacles_field_of_view_distance * axis_unit;
 
   Vector2 normalized_velocity = agent->velocity.normalized();
-  Vector2 far_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_far_distance * (agent->scale_rand + 1);
-  Vector2 near_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_near_distance * (agent->scale_rand + 1);
-  Vector3 fpv3 = Vector3(far_point.x, far_point.y, 1.0);
-  aabb.position.x = near_point.x - aabb.size.x * 0.5;
-  aabb.position.y = near_point.y - aabb.size.y * 0.5;
+  Vector2 distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance * (agent->scale_rand + 1);
+  Vector2 offset_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_offset * (agent->scale_rand + 1);
+  Vector3 fpv3 = Vector3(distance_point.x, distance_point.y, 1.0);
+  aabb.position.x = offset_point.x - aabb.size.x * 0.5;
+  aabb.position.y = offset_point.y - aabb.size.y * 0.5;
   aabb.expand_to(fpv3);
 
   Vector2 right_point = normalized_velocity.rotated(Math::deg_to_rad(90.0)) * lr_dist * (agent->scale_rand + 1);
-  right_point += agent->transform[2];
+  right_point += agent->transform[2] + (normalized_velocity * x_offset);
   Vector3 rp3 = Vector3(right_point.x,right_point.y,1.0);
   Vector2 left_point = normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * lr_dist * (agent->scale_rand + 1);
-  left_point += agent->transform[2];
+  left_point += agent->transform[2] + (normalized_velocity * x_offset);
   Vector3 lp3 = Vector3(left_point.x,left_point.y,1.0);
   aabb.expand_to(rp3);
   aabb.expand_to(lp3);
@@ -1683,12 +1685,12 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
 
   ADD_GROUP("Avoid Obstacles", "avoid_obstacles_");
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_max", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_far_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_far_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_view_width_ratio_min", PROPERTY_HINT_RANGE, "0.1,1000,0.1,or_greater"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_view_width_ratio_max", PROPERTY_HINT_RANGE, "0.1,1000,0.1,or_greater"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_angle_min", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_angle_max", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_offset_min", PROPERTY_HINT_NONE, U"suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_offset_max", PROPERTY_HINT_NONE, U"suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
 
@@ -1788,9 +1790,9 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
 
   BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
-  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
-  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
-  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
+  BIND_ENUM_CONSTANT(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
 
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_DECAY_COEFFICIENT);
@@ -1874,12 +1876,12 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_param_min(PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT, 5000);
   set_param_max(PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT, 5000);
-  set_param_min(PARAM_AVOID_OBSTACLES_FAR_DISTANCE, 50);
-  set_param_max(PARAM_AVOID_OBSTACLES_FAR_DISTANCE, 50);
-  set_param_min(PARAM_AVOID_OBSTACLES_NEAR_DISTANCE, 0);
-  set_param_max(PARAM_AVOID_OBSTACLES_NEAR_DISTANCE, 0);
-  set_param_min(PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO, 1.1);
-  set_param_max(PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO, 1.0);
+  set_param_min(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE, 90);
+  set_param_max(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE, 90);
+  set_param_min(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE, 50);
+  set_param_max(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE, 50);
+  set_param_min(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET, 0);
+  set_param_max(PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET, 0);
 
   set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
   set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
