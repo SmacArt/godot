@@ -143,7 +143,7 @@ private:
     Vector2 wander_target;
     bool aabb_culled;
     AABB separation_aabb;
-    AABB forward_aabb;
+    AABB avoidance_aabb;
     bool did_wander;
 #endif
 
@@ -259,7 +259,7 @@ private:
 
   DynamicBVH agent_bvh;
   void agent_cull_aabb_query(const AABB &p_aabb);
-  AABB create_forward_aabb_for_agent(Agent *agent);
+  AABB create_avoidance_aabb_for_agent(Agent *agent);
 
   template <class QueryResult>
   _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
@@ -384,7 +384,7 @@ public:
   Vector2 get_agent_position(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
-  AABB get_agent_forward_aabb(int index);
+  AABB get_agent_avoidance_aabb(int index);
   bool is_agent_wandering(int index);
   bool is_agent_avoiding_obstacles(int index);
   bool is_agent_separating(int index);

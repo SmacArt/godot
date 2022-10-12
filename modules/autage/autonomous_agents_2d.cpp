@@ -795,9 +795,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
         p.avoid_obstacles = true;
-        // TODO -- steve from here
-        p.avoid_obstacles_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_DISTANCE], rand_from_seed(p.seed));
-        p.avoid_obstacles_field_of_view = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW], rand_from_seed(p.seed));
+        p.avoid_obstacles_far_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FAR_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FAR_DISTANCE], rand_from_seed(p.seed));
+        p.avoid_obstacles_near_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_NEAR_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_NEAR_DISTANCE], rand_from_seed(p.seed));
+        p.avoid_obstacles_view_width_ratio = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO], parameters_max[PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO], rand_from_seed(p.seed));
         p.avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], parameters_max[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
@@ -1157,12 +1157,12 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 }
 
 Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
-  AABB aabb = create_forward_aabb_for_agent(agent);
+  AABB aabb = create_avoidance_aabb_for_agent(agent);
   agent_cull_aabb_query(aabb);
 
 #ifdef DEBUG_ENABLED
   if (is_debug) {
-    agent->forward_aabb = aabb;
+    agent->avoidance_aabb = aabb;
   }
 #endif
 
@@ -1192,16 +1192,43 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   return steering_force;
 }
 
-AABB AutonomousAgents2D::create_forward_aabb_for_agent(Agent *agent) {
+AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   // todo - grow by velocity (if param defined?)
-  AABB aabb = agent->aabb.grow(10 * agent->scale_rand + 1);
+  //AABB aabb = agent->aabb.grow(agent->avoid_obstacles_view_width_ratio * (agent->aabb.size.x)); // todo - maybe should be y  --- should not be gor both dimensions
+  AABB aabb = agent->aabb;
+  /*******/
+  /*
+    aabb.position.x -= 50.0;
+    aabb.size.x += 2.0f * 50.0;
+    position.y -= p_amount;
+    position.z -= p_amount;
+    size.y += 2.0f * p_amount;
+    size.z += 2.0f * p_amount;
+  */
+  /*******/
+
+  double fov = agent->avoid_obstacles_view_width_ratio;
+  double left_and_right_length = (agent->avoid_obstacles_far_distance - agent->avoid_obstacles_near_distance) * 2.0;
+  double unit = left_and_right_length / 180.0;
+  double lr_dist = fov * unit;
+
   Vector2 normalized_velocity = agent->velocity.normalized();
-  Vector2 far_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_distance * (agent->scale_rand + 1);
-  Vector2 near_point = agent->transform[2] + normalized_velocity * 10.0 * (agent->scale_rand + 1);
+  Vector2 far_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_far_distance * (agent->scale_rand + 1);
+  Vector2 near_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_near_distance * (agent->scale_rand + 1);
   Vector3 fpv3 = Vector3(far_point.x, far_point.y, 1.0);
   aabb.position.x = near_point.x - aabb.size.x * 0.5;
   aabb.position.y = near_point.y - aabb.size.y * 0.5;
   aabb.expand_to(fpv3);
+
+  Vector2 right_point = normalized_velocity.rotated(Math::deg_to_rad(90.0)) * lr_dist * (agent->scale_rand + 1);
+  right_point += agent->transform[2];
+  Vector3 rp3 = Vector3(right_point.x,right_point.y,1.0);
+  Vector2 left_point = normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * lr_dist * (agent->scale_rand + 1);
+  left_point += agent->transform[2];
+  Vector3 lp3 = Vector3(left_point.x,left_point.y,1.0);
+  aabb.expand_to(rp3);
+  aabb.expand_to(lp3);
+
   return aabb;
 }
 
@@ -1467,9 +1494,9 @@ AABB AutonomousAgents2D::get_agent_separation_aabb(int index){
   Agent *parray = agents.ptrw();
   return parray[index].separation_aabb;
 }
-AABB AutonomousAgents2D::get_agent_forward_aabb(int index){
+AABB AutonomousAgents2D::get_agent_avoidance_aabb(int index){
   Agent *parray = agents.ptrw();
-  return parray[index].forward_aabb;
+  return parray[index].avoidance_aabb;
 }
 bool AutonomousAgents2D::is_agent_aabb_culled(int index){
   Agent *parray = agents.ptrw();
@@ -1656,8 +1683,8 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
 
   ADD_GROUP("Avoid Obstacles", "avoid_obstacles_");
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_near_distance_max", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_NEAR_DISTANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_far_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_far_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FAR_DISTANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_view_width_ratio_min", PROPERTY_HINT_RANGE, "0.1,1000,0.1,or_greater"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_VIEW_WIDTH_RATIO);
@@ -1807,7 +1834,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
   ClassDB::bind_method(D_METHOD("get_agent_aabb"), &AutonomousAgents2D::get_agent_aabb);
   ClassDB::bind_method(D_METHOD("get_agent_separation_aabb"), &AutonomousAgents2D::get_agent_separation_aabb);
-  ClassDB::bind_method(D_METHOD("get_agent_forward_aabb"), &AutonomousAgents2D::get_agent_forward_aabb);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_aabb"), &AutonomousAgents2D::get_agent_avoidance_aabb);
   ClassDB::bind_method(D_METHOD("is_agent_avoiding_obstacles"), &AutonomousAgents2D::is_agent_avoiding_obstacles);
   ClassDB::bind_method(D_METHOD("is_agent_separating"), &AutonomousAgents2D::is_agent_separating);
   ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
