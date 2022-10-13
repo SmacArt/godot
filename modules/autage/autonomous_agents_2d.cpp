@@ -1164,22 +1164,26 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
   Vector2 far_distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance;
 
-  //  TODO - from here .... this adjustent is wrong ... think about it!
-  // adjust if > 180.  the left and right positions will need to be place to the rear
-  if (agent->avoid_obstacles_field_of_view_angle > 180) {
-    double remaining_fov = fmin(180.0, agent->avoid_obstacles_field_of_view_angle - 180);
-    fov_left_position.x += remaining_fov * axis_ratio;
-    fov_right_position.x += remaining_fov * axis_ratio;
-  }
-
   AABB aabb = agent->aabb;
 
   Vector3 fpv3 = Vector3(far_distance_point.x, far_distance_point.y, 1.0);
-  Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
-  Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
   aabb.expand_to(fpv3);
-  aabb.expand_to(lpv3);
-  aabb.expand_to(rpv3);
+
+  if (agent->avoid_obstacles_field_of_view_angle > 180) {
+    double remaining_fov = fmin(180.0, agent->avoid_obstacles_field_of_view_angle - 180) * 0.5;
+    Vector2 fov_left_back_position = fov_left_position + (normalized_velocity.rotated(Math::deg_to_rad(-180.0))).normalized() * remaining_fov * axis_ratio;
+    Vector3 lbpv3 = Vector3(fov_left_back_position.x, fov_left_back_position.y, 1.0);
+    aabb.expand_to(lbpv3);
+
+    Vector2 fov_right_back_position = fov_right_position + (normalized_velocity.rotated(Math::deg_to_rad(180.0))).normalized() * remaining_fov * axis_ratio;
+    Vector3 rbpv3 = Vector3(fov_right_back_position.x, fov_right_back_position.y, 1.0);
+    aabb.expand_to(rbpv3);
+  } else {
+    Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
+    Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
+    aabb.expand_to(lpv3);
+    aabb.expand_to(rpv3);
+  }
 
   /*
   // TODO - clean this up and optimize it
