@@ -143,8 +143,13 @@ private:
     Vector2 wander_target;
     bool aabb_culled;
     AABB separation_aabb;
-    AABB avoidance_aabb;
     bool did_wander;
+    AABB avoidance_fov_aabb;
+    Vector2 avoidance_fov_start_position;
+    Vector2 avoidance_fov_left_position;
+    Vector2 avoidance_fov_right_position;
+    Vector2 avoidance_fov_left_end_position;
+    Vector2 avoidance_fov_right_end_position;
 #endif
 
   };
@@ -384,7 +389,12 @@ public:
   Vector2 get_agent_position(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
-  AABB get_agent_avoidance_aabb(int index);
+  AABB get_agent_avoidance_fov_aabb(int index);
+  Vector2 get_agent_avoidance_fov_start_position(int index);
+  Vector2 get_agent_avoidance_fov_left_position(int index);
+  Vector2 get_agent_avoidance_fov_right_position(int index);
+  Vector2 get_agent_avoidance_fov_left_end_position(int index);
+  Vector2 get_agent_avoidance_fov_right_end_position(int index);
   bool is_agent_wandering(int index);
   bool is_agent_avoiding_obstacles(int index);
   bool is_agent_separating(int index);

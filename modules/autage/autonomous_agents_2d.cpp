@@ -1156,13 +1156,91 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
   return ((target - agent->transform[2]).normalized() * agent->max_speed) - agent->velocity;
 }
 
+AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
+  Vector2 normalized_velocity = agent->velocity.normalized();
+  Vector2 fov_start_position = agent->transform[2];
+  double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
+  Vector2 fov_left_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
+  Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
+  Vector2 far_distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance;
+
+  //  TODO - from here .... this adjustent is wrong ... think about it!
+  // adjust if > 180.  the left and right positions will need to be place to the rear
+  if (agent->avoid_obstacles_field_of_view_angle > 180) {
+    double remaining_fov = fmin(180.0, agent->avoid_obstacles_field_of_view_angle - 180);
+    fov_left_position.x += remaining_fov * axis_ratio;
+    fov_right_position.x += remaining_fov * axis_ratio;
+  }
+
+  AABB aabb = agent->aabb;
+
+  Vector3 fpv3 = Vector3(far_distance_point.x, far_distance_point.y, 1.0);
+  Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
+  Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
+  aabb.expand_to(fpv3);
+  aabb.expand_to(lpv3);
+  aabb.expand_to(rpv3);
+
+  /*
+  // TODO - clean this up and optimize it
+  // TODO - the rest of the obstacle avoidance code (e.g check if in fov, only avoid closest, increase the distance if going fast, and also narrow the fov,  etc)
+  // TODO - remove the degrees to rad - replace with only rads
+  double fov_angle = agent->avoid_obstacles_field_of_view_angle;
+  if (fov_angle > 180.0) {
+  fov_angle = 180.0;
+  }
+  // for now only do for less 180
+  double x_offset = agent->avoid_obstacles_field_of_view_offset;
+  if (agent->avoid_obstacles_field_of_view_angle > 180.0) {
+  double extra_fov = agent->avoid_obstacles_field_of_view_angle - 180.0;
+  if (extra_fov > 180.0) {
+  extra_fov = 180.0;
+  }
+  x_offset -= extra_fov * axis_unit;
+  }
+
+
+  double lr_dist = agent->avoid_obstacles_field_of_view_distance * axis_unit;
+
+  Vector2 normalized_velocity = agent->velocity.normalized();
+  Vector2 distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance * (agent->scale_rand + 1);
+  Vector2 offset_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_offset * (agent->scale_rand + 1);
+
+  Vector3 fpv3 = Vector3(distance_point.x, distance_point.y, 1.0);
+  aabb.position.x = offset_point.x - aabb.size.x * 0.5;
+  aabb.position.y = offset_point.y - aabb.size.y * 0.5;
+  aabb.expand_to(fpv3);
+
+  //  CONTINUE FORM HERE ---- the side points are too far backwards ... not in a line with the offset
+  Vector2 right_point = normalized_velocity.rotated(Math::deg_to_rad(90.0)) * lr_dist * (agent->scale_rand + 1);
+  right_point += agent->transform[2] + (normalized_velocity * x_offset);
+  Vector3 rp3 = Vector3(right_point.x,right_point.y,1.0);
+  Vector2 left_point = normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * lr_dist * (agent->scale_rand + 1);
+  left_point += agent->transform[2] + (normalized_velocity * x_offset);
+  Vector3 lp3 = Vector3(left_point.x,left_point.y,1.0);
+  aabb.expand_to(rp3);
+  aabb.expand_to(lp3);
+  */
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->avoidance_fov_start_position = fov_start_position;
+    agent->avoidance_fov_left_position = fov_left_position;
+    agent->avoidance_fov_right_position = fov_right_position;
+
+    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * 100.0;
+    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * 100.0;
+  }
+#endif
+  return aabb;
+}
+
 Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   AABB aabb = create_avoidance_aabb_for_agent(agent);
   agent_cull_aabb_query(aabb);
 
 #ifdef DEBUG_ENABLED
   if (is_debug) {
-    agent->avoidance_aabb = aabb;
+    agent->avoidance_fov_aabb = aabb;
   }
 #endif
 
@@ -1192,6 +1270,7 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   return steering_force;
 }
 
+/*
 AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   AABB aabb = agent->aabb;
   // TODO - clean this up and optimize it
@@ -1217,11 +1296,13 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   Vector2 normalized_velocity = agent->velocity.normalized();
   Vector2 distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance * (agent->scale_rand + 1);
   Vector2 offset_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_offset * (agent->scale_rand + 1);
+
   Vector3 fpv3 = Vector3(distance_point.x, distance_point.y, 1.0);
   aabb.position.x = offset_point.x - aabb.size.x * 0.5;
   aabb.position.y = offset_point.y - aabb.size.y * 0.5;
   aabb.expand_to(fpv3);
 
+  //  CONTINUE FORM HERE ---- the side points are too far backwards ... not in a line with the offset
   Vector2 right_point = normalized_velocity.rotated(Math::deg_to_rad(90.0)) * lr_dist * (agent->scale_rand + 1);
   right_point += agent->transform[2] + (normalized_velocity * x_offset);
   Vector3 rp3 = Vector3(right_point.x,right_point.y,1.0);
@@ -1231,8 +1312,16 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   aabb.expand_to(rp3);
   aabb.expand_to(lp3);
 
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->avoidance_fov_position = offset_point;
+    agent->avoidance_fov_left_arc = left_point;
+    agent->avoidance_fov_right_arc = right_point;
+  }
+#endif
   return aabb;
 }
+*/
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
@@ -1496,13 +1585,33 @@ AABB AutonomousAgents2D::get_agent_separation_aabb(int index){
   Agent *parray = agents.ptrw();
   return parray[index].separation_aabb;
 }
-AABB AutonomousAgents2D::get_agent_avoidance_aabb(int index){
+AABB AutonomousAgents2D::get_agent_avoidance_fov_aabb(int index){
   Agent *parray = agents.ptrw();
-  return parray[index].avoidance_aabb;
+  return parray[index].avoidance_fov_aabb;
 }
 bool AutonomousAgents2D::is_agent_aabb_culled(int index){
   Agent *parray = agents.ptrw();
   return parray[index].aabb_culled;
+}
+Vector2 AutonomousAgents2D::get_agent_avoidance_fov_start_position(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].avoidance_fov_start_position;
+}
+Vector2 AutonomousAgents2D::get_agent_avoidance_fov_left_position(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].avoidance_fov_left_position;
+}
+Vector2 AutonomousAgents2D::get_agent_avoidance_fov_right_position(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].avoidance_fov_right_position;
+}
+Vector2 AutonomousAgents2D::get_agent_avoidance_fov_left_end_position(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].avoidance_fov_left_end_position;
+}
+Vector2 AutonomousAgents2D::get_agent_avoidance_fov_right_end_position(int index){
+  Agent *parray = agents.ptrw();
+  return parray[index].avoidance_fov_right_end_position;
 }
 bool AutonomousAgents2D::is_agent_avoiding_obstacles(int index) {
   Agent *parray = agents.ptrw();
@@ -1836,7 +1945,12 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_position"), &AutonomousAgents2D::get_agent_position);
   ClassDB::bind_method(D_METHOD("get_agent_aabb"), &AutonomousAgents2D::get_agent_aabb);
   ClassDB::bind_method(D_METHOD("get_agent_separation_aabb"), &AutonomousAgents2D::get_agent_separation_aabb);
-  ClassDB::bind_method(D_METHOD("get_agent_avoidance_aabb"), &AutonomousAgents2D::get_agent_avoidance_aabb);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_fov_aabb"), &AutonomousAgents2D::get_agent_avoidance_fov_aabb);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_fov_start_position"), &AutonomousAgents2D::get_agent_avoidance_fov_start_position);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_fov_left_position"), &AutonomousAgents2D::get_agent_avoidance_fov_left_position);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_fov_right_end_position"), &AutonomousAgents2D::get_agent_avoidance_fov_right_end_position);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_fov_left_end_position"), &AutonomousAgents2D::get_agent_avoidance_fov_left_end_position);
+  ClassDB::bind_method(D_METHOD("get_agent_avoidance_fov_right_position"), &AutonomousAgents2D::get_agent_avoidance_fov_right_position);
   ClassDB::bind_method(D_METHOD("is_agent_avoiding_obstacles"), &AutonomousAgents2D::is_agent_avoiding_obstacles);
   ClassDB::bind_method(D_METHOD("is_agent_separating"), &AutonomousAgents2D::is_agent_separating);
   ClassDB::bind_method(D_METHOD("is_agent_wandering"), &AutonomousAgents2D::is_agent_wandering);
