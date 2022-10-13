@@ -1160,6 +1160,7 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   Vector2 normalized_velocity = agent->velocity.normalized();
   Vector2 fov_start_position = agent->transform[2];
   double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
+  print_line(agent->avoid_obstacles_field_of_view_angle, " : ",fmin(agent->avoid_obstacles_field_of_view_angle, 90.0), " : ", fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0);
   Vector2 fov_left_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
   Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
   Vector2 far_distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance;
@@ -1167,22 +1168,25 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   AABB aabb = agent->aabb;
 
   Vector3 fpv3 = Vector3(far_distance_point.x, far_distance_point.y, 1.0);
+  Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
+  Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
   aabb.expand_to(fpv3);
+  aabb.expand_to(lpv3);
+  aabb.expand_to(rpv3);
 
+  // adjust if > 180.  the left and right positions will need to be place to the rear
   if (agent->avoid_obstacles_field_of_view_angle > 180) {
     double remaining_fov = fmin(180.0, agent->avoid_obstacles_field_of_view_angle - 180) * 0.5;
-    Vector2 fov_left_back_position = fov_left_position + (normalized_velocity.rotated(Math::deg_to_rad(-180.0))).normalized() * remaining_fov * axis_ratio;
+    double distance_ratio = agent->avoid_obstacles_field_of_view_distance / 90.0;
+    print_line(axis_ratio, " : ", distance_ratio);
+    double rear_distance = remaining_fov * distance_ratio;
+    Vector2 fov_left_back_position = fov_left_position + (normalized_velocity.rotated(Math::deg_to_rad(-180.0))).normalized() * rear_distance * axis_ratio;
     Vector3 lbpv3 = Vector3(fov_left_back_position.x, fov_left_back_position.y, 1.0);
     aabb.expand_to(lbpv3);
 
-    Vector2 fov_right_back_position = fov_right_position + (normalized_velocity.rotated(Math::deg_to_rad(180.0))).normalized() * remaining_fov * axis_ratio;
+    Vector2 fov_right_back_position = fov_right_position + (normalized_velocity.rotated(Math::deg_to_rad(180.0))).normalized() * rear_distance * axis_ratio;
     Vector3 rbpv3 = Vector3(fov_right_back_position.x, fov_right_back_position.y, 1.0);
     aabb.expand_to(rbpv3);
-  } else {
-    Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
-    Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
-    aabb.expand_to(lpv3);
-    aabb.expand_to(rpv3);
   }
 
   /*
@@ -1231,8 +1235,8 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
     agent->avoidance_fov_left_position = fov_left_position;
     agent->avoidance_fov_right_position = fov_right_position;
 
-    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * 100.0;
-    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * 100.0;
+    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * agent->avoid_obstacles_field_of_view_distance * 1.1;
+    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * agent->avoid_obstacles_field_of_view_distance * 1.1;
   }
 #endif
   return aabb;
