@@ -77,6 +77,7 @@ public:
     AGENT_FLAG_AVOID_OBSTACLES,
     AGENT_FLAG_SEPARATE,
     AGENT_FLAG_WANDER,
+    AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE,
     AGENT_FLAG_MAX
   };
 
@@ -126,7 +127,9 @@ private:
     real_t avoid_obstacles_decay_coefficient = 0.0;
     real_t avoid_obstacles_field_of_view_angle = 0.0;
     real_t avoid_obstacles_field_of_view_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_base_distance = 0.0;
     real_t avoid_obstacles_field_of_view_offset;
+    bool avoid_obstacles_fov_scale_to_size = false;
 
     bool separate = false;
     real_t separate_neighbourhood_expansion = 0.0;

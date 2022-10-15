@@ -796,9 +796,11 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
         p.avoid_obstacles = true;
         p.avoid_obstacles_field_of_view_angle = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed));
-        p.avoid_obstacles_field_of_view_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_base_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_distance = p.avoid_obstacles_field_of_view_base_distance;
         p.avoid_obstacles_field_of_view_offset = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET], rand_from_seed(p.seed));
         p.avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], parameters_max[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], rand_from_seed(p.seed));
+        p.avoid_obstacles_fov_scale_to_size = agent_flags[AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE];
       }
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
@@ -1085,6 +1087,13 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
     p.transform[2] += p.velocity * local_delta;
 
     if (p.steering) {
+
+      if (p.avoid_obstacles) {
+        if (p.avoid_obstacles_fov_scale_to_size){
+          p.avoid_obstacles_field_of_view_distance = p.avoid_obstacles_field_of_view_base_distance * base_scale.length();
+          p.avoid_obstacles_fov_scale_to_size = false; // only need to set the scaled distance the first time
+        }
+      }
       if (p.transform[2].x > 1280) {
         p.transform[2].x = 0;
       }
@@ -1159,11 +1168,11 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   Vector2 normalized_velocity = agent->velocity.normalized();
   Vector2 fov_start_position = agent->transform[2];
+  double far_distance = agent->avoid_obstacles_field_of_view_distance;
   double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
-  print_line(agent->avoid_obstacles_field_of_view_angle, " : ",fmin(agent->avoid_obstacles_field_of_view_angle, 90.0), " : ", fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0);
-  Vector2 fov_left_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
-  Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * agent->avoid_obstacles_field_of_view_distance * axis_ratio);
-  Vector2 far_distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance;
+  Vector2 fov_left_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * far_distance * axis_ratio);
+  Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * far_distance * axis_ratio);
+  Vector2 far_distance_point = agent->transform[2] + normalized_velocity * far_distance;
 
   AABB aabb = agent->aabb;
 
@@ -1177,8 +1186,7 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   // adjust if > 180.  the left and right positions will need to be place to the rear
   if (agent->avoid_obstacles_field_of_view_angle > 180) {
     double remaining_fov = fmin(180.0, agent->avoid_obstacles_field_of_view_angle - 180) * 0.5;
-    double distance_ratio = agent->avoid_obstacles_field_of_view_distance / 90.0;
-    print_line(axis_ratio, " : ", distance_ratio);
+    double distance_ratio = far_distance / 90.0;
     double rear_distance = remaining_fov * distance_ratio;
     Vector2 fov_left_back_position = fov_left_position + (normalized_velocity.rotated(Math::deg_to_rad(-180.0))).normalized() * rear_distance * axis_ratio;
     Vector3 lbpv3 = Vector3(fov_left_back_position.x, fov_left_back_position.y, 1.0);
@@ -1189,54 +1197,18 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
     aabb.expand_to(rbpv3);
   }
 
-  /*
   // TODO - clean this up and optimize it
   // TODO - the rest of the obstacle avoidance code (e.g check if in fov, only avoid closest, increase the distance if going fast, and also narrow the fov,  etc)
   // TODO - remove the degrees to rad - replace with only rads
-  double fov_angle = agent->avoid_obstacles_field_of_view_angle;
-  if (fov_angle > 180.0) {
-  fov_angle = 180.0;
-  }
-  // for now only do for less 180
-  double x_offset = agent->avoid_obstacles_field_of_view_offset;
-  if (agent->avoid_obstacles_field_of_view_angle > 180.0) {
-  double extra_fov = agent->avoid_obstacles_field_of_view_angle - 180.0;
-  if (extra_fov > 180.0) {
-  extra_fov = 180.0;
-  }
-  x_offset -= extra_fov * axis_unit;
-  }
 
-
-  double lr_dist = agent->avoid_obstacles_field_of_view_distance * axis_unit;
-
-  Vector2 normalized_velocity = agent->velocity.normalized();
-  Vector2 distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance * (agent->scale_rand + 1);
-  Vector2 offset_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_offset * (agent->scale_rand + 1);
-
-  Vector3 fpv3 = Vector3(distance_point.x, distance_point.y, 1.0);
-  aabb.position.x = offset_point.x - aabb.size.x * 0.5;
-  aabb.position.y = offset_point.y - aabb.size.y * 0.5;
-  aabb.expand_to(fpv3);
-
-  //  CONTINUE FORM HERE ---- the side points are too far backwards ... not in a line with the offset
-  Vector2 right_point = normalized_velocity.rotated(Math::deg_to_rad(90.0)) * lr_dist * (agent->scale_rand + 1);
-  right_point += agent->transform[2] + (normalized_velocity * x_offset);
-  Vector3 rp3 = Vector3(right_point.x,right_point.y,1.0);
-  Vector2 left_point = normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * lr_dist * (agent->scale_rand + 1);
-  left_point += agent->transform[2] + (normalized_velocity * x_offset);
-  Vector3 lp3 = Vector3(left_point.x,left_point.y,1.0);
-  aabb.expand_to(rp3);
-  aabb.expand_to(lp3);
-  */
 #ifdef DEBUG_ENABLED
   if (is_debug) {
     agent->avoidance_fov_start_position = fov_start_position;
     agent->avoidance_fov_left_position = fov_left_position;
     agent->avoidance_fov_right_position = fov_right_position;
 
-    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * agent->avoid_obstacles_field_of_view_distance * 1.1;
-    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * agent->avoid_obstacles_field_of_view_distance * 1.1;
+    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance * 1.1;
+    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance * 1.1;
   }
 #endif
   return aabb;
@@ -1279,23 +1251,23 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
 }
 
 /*
-AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
+  AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   AABB aabb = agent->aabb;
   // TODO - clean this up and optimize it
   // TODO - the rest of the obstacle avoidance code (e.g check if in fov, only avoid closest, increase the distance if going fast, and also narrow the fov,  etc)
   // TODO - remove the degrees to rad - replace with only rads
   double fov_angle = agent->avoid_obstacles_field_of_view_angle;
   if (fov_angle > 180.0) {
-    fov_angle = 180.0;
+  fov_angle = 180.0;
   }
   double axis_unit = fov_angle / 180.0;
   double x_offset = agent->avoid_obstacles_field_of_view_offset;
   if (agent->avoid_obstacles_field_of_view_angle > 180.0) {
-    double extra_fov = agent->avoid_obstacles_field_of_view_angle - 180.0;
-    if (extra_fov > 180.0) {
-      extra_fov = 180.0;
-    }
-    x_offset -= extra_fov * axis_unit;
+  double extra_fov = agent->avoid_obstacles_field_of_view_angle - 180.0;
+  if (extra_fov > 180.0) {
+  extra_fov = 180.0;
+  }
+  x_offset -= extra_fov * axis_unit;
   }
 
 
@@ -1320,15 +1292,15 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   aabb.expand_to(rp3);
   aabb.expand_to(lp3);
 
-#ifdef DEBUG_ENABLED
+  #ifdef DEBUG_ENABLED
   if (is_debug) {
-    agent->avoidance_fov_position = offset_point;
-    agent->avoidance_fov_left_arc = left_point;
-    agent->avoidance_fov_right_arc = right_point;
+  agent->avoidance_fov_position = offset_point;
+  agent->avoidance_fov_left_arc = left_point;
+  agent->avoidance_fov_right_arc = right_point;
   }
-#endif
+  #endif
   return aabb;
-}
+  }
 */
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
@@ -1771,7 +1743,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_base_size"), &AutonomousAgents2D::get_agent_base_size);
   ClassDB::bind_method(D_METHOD("set_agent_base_size", "agent_base_size"), &AutonomousAgents2D::set_agent_base_size);
   ClassDB::bind_method(D_METHOD("get_agent_aabb_expansion_ratio"), &AutonomousAgents2D::get_agent_aabb_expansion_ratio);
-  ClassDB::bind_method(D_METHOD("set_agent_aabb_expansion_ratio", "agent_aabb_expansion_ratio"), &AutonomousAgents2D::set_agent_aabb_expansion_ratio);
+  ClassDB::bind_method(D_METHOD("get_agent_aabb_expansion_ratio"), &AutonomousAgents2D::get_agent_aabb_expansion_ratio);
 
   ClassDB::bind_method(D_METHOD("get_split_scale"), &AutonomousAgents2D::get_split_scale);
   ClassDB::bind_method(D_METHOD("set_split_scale", "split_scale"), &AutonomousAgents2D::set_split_scale);
@@ -1802,12 +1774,13 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
 
   ADD_GROUP("Avoid Obstacles", "avoid_obstacles_");
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_angle_min", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_angle_max", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_offset_min", PROPERTY_HINT_NONE, U"suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_field_of_view_offset_max", PROPERTY_HINT_NONE, U"suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_fov_angle_min", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_fov_angle_max", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_fov_distance_min", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_fov_distance_max", PROPERTY_HINT_RANGE, "1,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_fov_offset_min", PROPERTY_HINT_NONE, U"suffix:px"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_fov_offset_max", PROPERTY_HINT_NONE, U"suffix:px"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "avoid_obstacles_fov_scale_to_size"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "avoid_obstacles_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT);
 
@@ -1933,6 +1906,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_MAX);
 
   BIND_ENUM_CONSTANT(AGENT_FLAG_ALIGN_Y_TO_VELOCITY);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_AVOID_OBSTACLES);
   BIND_ENUM_CONSTANT(AGENT_FLAG_SEPARATE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_WANDER);
@@ -2049,6 +2023,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
   agent_flags[AGENT_FLAG_WANDER] = true;
   agent_flags[AGENT_FLAG_SEPARATE] = false;
   agent_flags[AGENT_FLAG_AVOID_OBSTACLES] = false;
+  agent_flags[AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE] = false;
 
   set_color(Color(1, 1, 1, 1));
 
