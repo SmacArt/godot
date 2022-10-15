@@ -1168,7 +1168,11 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   Vector2 normalized_velocity = agent->velocity.normalized();
   Vector2 fov_start_position = agent->transform[2];
-  double far_distance = agent->avoid_obstacles_field_of_view_distance;
+
+  // adjust the distance for the current velocity
+  double speed = agent->velocity.length() / agent->max_speed;
+  double far_distance = agent->avoid_obstacles_field_of_view_base_distance + agent->avoid_obstacles_field_of_view_distance * speed;
+
   double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
   Vector2 fov_left_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * far_distance * axis_ratio);
   Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * far_distance * axis_ratio);
