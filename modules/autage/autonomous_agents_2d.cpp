@@ -796,9 +796,12 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
         p.avoid_obstacles = true;
         p.avoid_obstacles_field_of_view_angle = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_min_distance = parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE];
+        p.avoid_obstacles_field_of_view_max_distance = parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE];
         p.avoid_obstacles_field_of_view_base_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], rand_from_seed(p.seed));
         p.avoid_obstacles_field_of_view_distance = p.avoid_obstacles_field_of_view_base_distance;
         p.avoid_obstacles_field_of_view_offset = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_base_offset = p.avoid_obstacles_field_of_view_offset;
         p.avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], parameters_max[PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT], rand_from_seed(p.seed));
         p.avoid_obstacles_fov_scale_to_size = agent_flags[AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE];
       }
@@ -1090,7 +1093,10 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       if (p.avoid_obstacles) {
         if (p.avoid_obstacles_fov_scale_to_size){
-          p.avoid_obstacles_field_of_view_distance = p.avoid_obstacles_field_of_view_base_distance * base_scale.length();
+          double l = base_scale.length();
+          p.avoid_obstacles_field_of_view_min_distance = p.avoid_obstacles_field_of_view_min_distance * l;
+          p.avoid_obstacles_field_of_view_max_distance = p.avoid_obstacles_field_of_view_max_distance * l;
+          p.avoid_obstacles_field_of_view_offset = p.avoid_obstacles_field_of_view_base_offset * l;
           p.avoid_obstacles_fov_scale_to_size = false; // only need to set the scaled distance the first time
         }
       }
@@ -1167,18 +1173,18 @@ Vector2 AutonomousAgents2D::seek(Agent *agent, Vector2 target){
 
 AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   Vector2 normalized_velocity = agent->velocity.normalized();
-  Vector2 fov_start_position = agent->transform[2];
+  Vector2 fov_start_position = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_offset;
 
-  // adjust the distance for the current velocity
-  double speed = agent->velocity.length() / agent->max_speed;
-  double far_distance = agent->avoid_obstacles_field_of_view_base_distance + agent->avoid_obstacles_field_of_view_distance * speed;
+  double speed = agent->velocity.length_squared() / (agent->max_speed * agent->max_speed);
+  double far_distance = fmax(agent->avoid_obstacles_field_of_view_min_distance, agent->avoid_obstacles_field_of_view_max_distance * speed);
 
   double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
-  Vector2 fov_left_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * far_distance * axis_ratio);
-  Vector2 fov_right_position = agent->transform[2] + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * far_distance * axis_ratio);
-  Vector2 far_distance_point = agent->transform[2] + normalized_velocity * far_distance;
+  Vector2 fov_left_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * far_distance * axis_ratio);
+  Vector2 fov_right_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * far_distance * axis_ratio);
+  Vector2 far_distance_point = fov_start_position + normalized_velocity * far_distance;
 
-  AABB aabb = agent->aabb;
+  AABB aabb;
+  aabb.position = Vector3(fov_start_position.x, fov_start_position.y, 1.0);
 
   Vector3 fpv3 = Vector3(far_distance_point.x, far_distance_point.y, 1.0);
   Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);

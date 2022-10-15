@@ -126,9 +126,12 @@ private:
     bool avoid_obstacles = false;
     real_t avoid_obstacles_decay_coefficient = 0.0;
     real_t avoid_obstacles_field_of_view_angle = 0.0;
+    real_t avoid_obstacles_field_of_view_min_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_max_distance = 0.0;
     real_t avoid_obstacles_field_of_view_distance = 0.0;
     real_t avoid_obstacles_field_of_view_base_distance = 0.0;
     real_t avoid_obstacles_field_of_view_offset;
+    real_t avoid_obstacles_field_of_view_base_offset;
     bool avoid_obstacles_fov_scale_to_size = false;
 
     bool separate = false;
