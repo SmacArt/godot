@@ -1179,8 +1179,10 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   double far_distance = fmax(agent->avoid_obstacles_field_of_view_min_distance, agent->avoid_obstacles_field_of_view_max_distance * speed);
 
   double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
-  Vector2 fov_left_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * far_distance * axis_ratio);
-  Vector2 fov_right_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(90.0)) * far_distance * axis_ratio);
+  agent->avoid_obstacles_field_of_view_left_angle = normalized_velocity.rotated(Math::deg_to_rad(-90.0));
+  Vector2 fov_left_position = fov_start_position + (agent->avoid_obstacles_field_of_view_left_angle * far_distance * axis_ratio);
+  agent->avoid_obstacles_field_of_view_right_angle = normalized_velocity.rotated(Math::deg_to_rad(90.0));
+  Vector2 fov_right_position = fov_start_position + (agent->avoid_obstacles_field_of_view_right_angle * far_distance * axis_ratio);
   Vector2 far_distance_point = fov_start_position + normalized_velocity * far_distance;
 
   AABB aabb;
@@ -1217,14 +1219,19 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
     agent->avoidance_fov_left_position = fov_left_position;
     agent->avoidance_fov_right_position = fov_right_position;
 
-    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance * 1.1;
-    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance * 1.1;
+    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance;
+    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance;
   }
 #endif
   return aabb;
 }
 
 Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
+
+  //  agent_cull_convext_query();
+
+  Vector2 steering_force = Vector2(0,0);
+
   AABB aabb = create_avoidance_aabb_for_agent(agent);
   agent_cull_aabb_query(aabb);
 
@@ -1234,20 +1241,46 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   }
 #endif
 
-  Vector2 steering_force = Vector2(0,0);
-
+  double left_fov_angle = agent->avoid_obstacles_field_of_view_left_angle.angle();
+  double right_fov_angle = agent->avoid_obstacles_field_of_view_right_angle.angle();
   for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
     Agent *other_agent = agent_cull_aabb_result[i];
     if (other_agent != agent) {
 
-      Vector2 dir = other_agent->transform[2] - agent->transform[2];
-      double dist = dir.length();
+      Vector2 direction_to_other = (other_agent->transform[2]-agent->transform[2]).normalized();
+      if (direction_to_other.length() > agent->avoid_obstacles_field_of_view_distance) {
+        continue;
+
+      }
+      Vector2 facing_direction = Vector2(0,1).rotated(agent->transform[0].angle());
+      //      facing_direction = facing_direction.rotated(Math::deg_to_rad(90.0));
+      if (abs(direction_to_other.angle_to(facing_direction)) > Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5)) {
+        continue;
+      }
+
+      /*
+        if (agent->avoid_obstacles_field_of_view_left_angle.rotated(Math::deg_to_rad(45.0)).dot(dir) < 0 ||
+        agent->avoid_obstacles_field_of_view_right_angle.rotated(Math::deg_to_rad(45.0)).dot(dir) > 0
+        ) {
+        continue;
+        }
+      */
+      // make sure the other agent is in the agents FOV
+      /*
+        double angle_to_other = dir.normalized().angle();
+        if (angle_to_other < left_fov_angle ||
+        angle_to_other > right_fov_angle) {
+        continue;
+        }
+      */
+
+      double dist = direction_to_other.length();
       double strength = agent->avoid_obstacles_decay_coefficient / (dist * dist);
       if (strength > agent->max_steering_force) {
         strength = agent->max_steering_force;
       }
-      dir.normalize();
-      steering_force += strength * dir * -1;
+      direction_to_other.normalize();
+      steering_force += strength * direction_to_other * -1;
 
 #ifdef DEBUG_ENABLED
       if (is_debug) {
@@ -1381,10 +1414,52 @@ void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
 
 }
 
+void AutonomousAgents2D::agent_cull_convext_query() {
+
+  agent_cull_aabb_result.clear();
+  /*
+    Plane p[1];
+    p[0]= Plane(0,0,1,0);
+    Vector3 points[4];
+    points[0] = Vector3(0,0,0);
+    points[1] = Vector3(2000,0,0);
+    points[2] = Vector3(2000,2000,0);
+    points[2] = Vector3(0,2000,0);
+  */
+
+
+
+  if (use_bvh) {
+    struct CullAABBBVH {
+      PagedArray<Agent *> * result;
+      _FORCE_INLINE_ bool operator()(void *p_data) {
+        Agent *p_agent = (Agent *) p_data;
+        result->push_back(p_agent);
+        return false;
+      }
+    };
+    CullAABBBVH cull_aabb;
+    cull_aabb.result = &agent_cull_aabb_result;
+    agent_bvh.convex_query(p,1,points,4, cull_aabb);
+  } else {
+    /*
+      Agent *parray = agents.ptrw();
+      for (int i = 0; i < agents.size(); i++) {
+      Agent &p = parray[i];
+      if (p.aabb.intersects(p_aabb)) {
+      agent_cull_aabb_result.push_back(&p);
+      // todo - logic not to continue after the first one found -maybe
+      // this will give it similar behavior to bvh
+      }
+      }
+    */
+  }
+
+}
 
 Vector2 AutonomousAgents2D::wander(Agent *agent) {
   agent->wander_target_theta += agent->wander_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1);
-  Vector2 circle_position = agent->velocity.normalized() * agent->wander_circle_distance + agent->transform[2];
+  Vector2 circle_position = agent->velocity.normalized() * (agent->wander_circle_distance + agent->wander_circle_radius * 0.5) + agent->transform[2];
   double heading = agent->velocity.angle();
   Vector2 circle_offset = Vector2(agent->wander_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_circle_radius * Math::sin(agent->wander_target_theta + heading));
 
@@ -2039,6 +2114,18 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   agent_cull_aabb_result.set_page_pool(&agent_cull_aabb_page_pool);
 
+  p[0]= Plane(1,1,1,0);
+  /*
+    points[0] = Vector3(500.0,200.0,1.0);
+    points[1] = Vector3(600.0,200.0,1.0);
+    points[2] = Vector3(600.0,300.0,1.0);
+    points[3] = Vector3(500.0,300.0,1.0);
+  */
+
+  points[0] = Vector3(500.0,200.0,1.0);
+  points[1] = Vector3(600.0,200.0,1.0);
+  points[2] = Vector3(600.0,300.0,1.0);
+  points[3] = Vector3(500.0,300.0,1.0);
   _update_mesh_texture();
 }
 

@@ -132,6 +132,8 @@ private:
     real_t avoid_obstacles_field_of_view_base_distance = 0.0;
     real_t avoid_obstacles_field_of_view_offset;
     real_t avoid_obstacles_field_of_view_base_offset;
+    Vector2 avoid_obstacles_field_of_view_left_angle;
+    Vector2 avoid_obstacles_field_of_view_right_angle;
     bool avoid_obstacles_fov_scale_to_size = false;
 
     bool separate = false;
@@ -270,6 +272,7 @@ private:
 
   DynamicBVH agent_bvh;
   void agent_cull_aabb_query(const AABB &p_aabb);
+  void agent_cull_convext_query();
   AABB create_avoidance_aabb_for_agent(Agent *agent);
 
   template <class QueryResult>
@@ -412,6 +415,9 @@ public:
   bool get_did_agent_wander(int index);
 #endif
 
+  Plane p[1];
+  Vector3 points[4];
+
   void restart();
 
   AutonomousAgents2D();
@@ -423,5 +429,6 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
 VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
+
 
 #endif // AUTONOMOUS_AGENTS_2D_H
