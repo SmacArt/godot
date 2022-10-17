@@ -795,7 +795,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
         p.avoid_obstacles = true;
-        p.avoid_obstacles_field_of_view_angle = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed));
+        p.avoid_obstacles_field_of_view_angle = Math::deg_to_rad(Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed)));
         p.avoid_obstacles_field_of_view_min_distance = parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE];
         p.avoid_obstacles_field_of_view_max_distance = parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE];
         p.avoid_obstacles_field_of_view_base_distance = Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE], rand_from_seed(p.seed));
@@ -1001,7 +1001,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       else {
         p.steering = true;
         if (ai_phase == p.ai_phase) {
-          p.velocity += calculate_steering_force(&p, i);
+          p.velocity += calculate_steering_force(&p, i, local_delta);
           p.velocity = p.velocity.limit_length(p.max_speed);
         }
       }
@@ -1140,7 +1140,7 @@ struct AABBQueryResult {
   }
 };
 
-Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
+Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i, double delta) {
 
   Vector2 steering_force = Vector2(0,0);
 
@@ -1161,7 +1161,7 @@ Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i) {
       agent->did_wander=true;
     }
 #endif
-    steering_force += wander(agent);
+    steering_force += wander(agent, delta);
   }
   steering_force = steering_force.limit_length(agent->max_steering_force);
   return (steering_force / agent->mass).limit_length(agent->max_steering_force);
@@ -1178,10 +1178,10 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   double speed = agent->velocity.length_squared() / (agent->max_speed * agent->max_speed);
   double far_distance = fmax(agent->avoid_obstacles_field_of_view_min_distance, agent->avoid_obstacles_field_of_view_max_distance * speed);
 
-  double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, 90.0) / 90.0;
-  agent->avoid_obstacles_field_of_view_left_angle = normalized_velocity.rotated(Math::deg_to_rad(-90.0));
+  double axis_ratio = fmin(agent->avoid_obstacles_field_of_view_angle, half_pi) / (half_pi);
+  agent->avoid_obstacles_field_of_view_left_angle = normalized_velocity.rotated(-half_pi);
   Vector2 fov_left_position = fov_start_position + (agent->avoid_obstacles_field_of_view_left_angle * far_distance * axis_ratio);
-  agent->avoid_obstacles_field_of_view_right_angle = normalized_velocity.rotated(Math::deg_to_rad(90.0));
+  agent->avoid_obstacles_field_of_view_right_angle = normalized_velocity.rotated(half_pi);
   Vector2 fov_right_position = fov_start_position + (agent->avoid_obstacles_field_of_view_right_angle * far_distance * axis_ratio);
   Vector2 far_distance_point = fov_start_position + normalized_velocity * far_distance;
 
@@ -1197,21 +1197,17 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
 
   // adjust if > 180.  the left and right positions will need to be place to the rear
   if (agent->avoid_obstacles_field_of_view_angle > 180) {
-    double remaining_fov = fmin(180.0, agent->avoid_obstacles_field_of_view_angle - 180) * 0.5;
-    double distance_ratio = far_distance / 90.0;
+    double remaining_fov = fmin(Math_PI, agent->avoid_obstacles_field_of_view_angle - Math_PI) * 0.5;
+    double distance_ratio = far_distance / (half_pi);
     double rear_distance = remaining_fov * distance_ratio;
-    Vector2 fov_left_back_position = fov_left_position + (normalized_velocity.rotated(Math::deg_to_rad(-180.0))).normalized() * rear_distance * axis_ratio;
+    Vector2 fov_left_back_position = fov_left_position + (normalized_velocity.rotated(-Math_PI)).normalized() * rear_distance * axis_ratio;
     Vector3 lbpv3 = Vector3(fov_left_back_position.x, fov_left_back_position.y, 1.0);
     aabb.expand_to(lbpv3);
 
-    Vector2 fov_right_back_position = fov_right_position + (normalized_velocity.rotated(Math::deg_to_rad(180.0))).normalized() * rear_distance * axis_ratio;
+    Vector2 fov_right_back_position = fov_right_position + (normalized_velocity.rotated(Math_PI)).normalized() * rear_distance * axis_ratio;
     Vector3 rbpv3 = Vector3(fov_right_back_position.x, fov_right_back_position.y, 1.0);
     aabb.expand_to(rbpv3);
   }
-
-  // TODO - clean this up and optimize it
-  // TODO - the rest of the obstacle avoidance code (e.g check if in fov, only avoid closest, increase the distance if going fast, and also narrow the fov,  etc)
-  // TODO - remove the degrees to rad - replace with only rads
 
 #ifdef DEBUG_ENABLED
   if (is_debug) {
@@ -1219,16 +1215,14 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
     agent->avoidance_fov_left_position = fov_left_position;
     agent->avoidance_fov_right_position = fov_right_position;
 
-    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance;
-    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5))) * far_distance;
+    agent->avoidance_fov_left_end_position = fov_start_position + (normalized_velocity.rotated(-agent->avoid_obstacles_field_of_view_angle * 0.5)) * far_distance;
+    agent->avoidance_fov_right_end_position = fov_start_position + (normalized_velocity.rotated(agent->avoid_obstacles_field_of_view_angle * 0.5)) * far_distance;
   }
 #endif
   return aabb;
 }
 
 Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
-
-  //  agent_cull_convext_query();
 
   Vector2 steering_force = Vector2(0,0);
 
@@ -1241,8 +1235,6 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   }
 #endif
 
-  double left_fov_angle = agent->avoid_obstacles_field_of_view_left_angle.angle();
-  double right_fov_angle = agent->avoid_obstacles_field_of_view_right_angle.angle();
   for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
     Agent *other_agent = agent_cull_aabb_result[i];
     if (other_agent != agent) {
@@ -1253,26 +1245,9 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
 
       }
       Vector2 facing_direction = Vector2(0,1).rotated(agent->transform[0].angle());
-      //      facing_direction = facing_direction.rotated(Math::deg_to_rad(90.0));
-      if (abs(direction_to_other.angle_to(facing_direction)) > Math::deg_to_rad(agent->avoid_obstacles_field_of_view_angle * 0.5)) {
+      if (abs(direction_to_other.angle_to(facing_direction)) > agent->avoid_obstacles_field_of_view_angle * 0.5) {
         continue;
       }
-
-      /*
-        if (agent->avoid_obstacles_field_of_view_left_angle.rotated(Math::deg_to_rad(45.0)).dot(dir) < 0 ||
-        agent->avoid_obstacles_field_of_view_right_angle.rotated(Math::deg_to_rad(45.0)).dot(dir) > 0
-        ) {
-        continue;
-        }
-      */
-      // make sure the other agent is in the agents FOV
-      /*
-        double angle_to_other = dir.normalized().angle();
-        if (angle_to_other < left_fov_angle ||
-        angle_to_other > right_fov_angle) {
-        continue;
-        }
-      */
 
       double dist = direction_to_other.length();
       double strength = agent->avoid_obstacles_decay_coefficient / (dist * dist);
@@ -1292,59 +1267,6 @@ Vector2 AutonomousAgents2D::avoid_obstacles(Agent *agent) {
   steering_force = (steering_force / agent->mass).limit_length(agent->max_steering_force);
   return steering_force;
 }
-
-/*
-  AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
-  AABB aabb = agent->aabb;
-  // TODO - clean this up and optimize it
-  // TODO - the rest of the obstacle avoidance code (e.g check if in fov, only avoid closest, increase the distance if going fast, and also narrow the fov,  etc)
-  // TODO - remove the degrees to rad - replace with only rads
-  double fov_angle = agent->avoid_obstacles_field_of_view_angle;
-  if (fov_angle > 180.0) {
-  fov_angle = 180.0;
-  }
-  double axis_unit = fov_angle / 180.0;
-  double x_offset = agent->avoid_obstacles_field_of_view_offset;
-  if (agent->avoid_obstacles_field_of_view_angle > 180.0) {
-  double extra_fov = agent->avoid_obstacles_field_of_view_angle - 180.0;
-  if (extra_fov > 180.0) {
-  extra_fov = 180.0;
-  }
-  x_offset -= extra_fov * axis_unit;
-  }
-
-
-  double lr_dist = agent->avoid_obstacles_field_of_view_distance * axis_unit;
-
-  Vector2 normalized_velocity = agent->velocity.normalized();
-  Vector2 distance_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_distance * (agent->scale_rand + 1);
-  Vector2 offset_point = agent->transform[2] + normalized_velocity * agent->avoid_obstacles_field_of_view_offset * (agent->scale_rand + 1);
-
-  Vector3 fpv3 = Vector3(distance_point.x, distance_point.y, 1.0);
-  aabb.position.x = offset_point.x - aabb.size.x * 0.5;
-  aabb.position.y = offset_point.y - aabb.size.y * 0.5;
-  aabb.expand_to(fpv3);
-
-  //  CONTINUE FORM HERE ---- the side points are too far backwards ... not in a line with the offset
-  Vector2 right_point = normalized_velocity.rotated(Math::deg_to_rad(90.0)) * lr_dist * (agent->scale_rand + 1);
-  right_point += agent->transform[2] + (normalized_velocity * x_offset);
-  Vector3 rp3 = Vector3(right_point.x,right_point.y,1.0);
-  Vector2 left_point = normalized_velocity.rotated(Math::deg_to_rad(-90.0)) * lr_dist * (agent->scale_rand + 1);
-  left_point += agent->transform[2] + (normalized_velocity * x_offset);
-  Vector3 lp3 = Vector3(left_point.x,left_point.y,1.0);
-  aabb.expand_to(rp3);
-  aabb.expand_to(lp3);
-
-  #ifdef DEBUG_ENABLED
-  if (is_debug) {
-  agent->avoidance_fov_position = offset_point;
-  agent->avoidance_fov_left_arc = left_point;
-  agent->avoidance_fov_right_arc = right_point;
-  }
-  #endif
-  return aabb;
-  }
-*/
 
 Vector2 AutonomousAgents2D::separate(Agent *agent) {
 
@@ -1414,51 +1336,8 @@ void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
 
 }
 
-void AutonomousAgents2D::agent_cull_convext_query() {
-
-  agent_cull_aabb_result.clear();
-  /*
-    Plane p[1];
-    p[0]= Plane(0,0,1,0);
-    Vector3 points[4];
-    points[0] = Vector3(0,0,0);
-    points[1] = Vector3(2000,0,0);
-    points[2] = Vector3(2000,2000,0);
-    points[2] = Vector3(0,2000,0);
-  */
-
-
-
-  if (use_bvh) {
-    struct CullAABBBVH {
-      PagedArray<Agent *> * result;
-      _FORCE_INLINE_ bool operator()(void *p_data) {
-        Agent *p_agent = (Agent *) p_data;
-        result->push_back(p_agent);
-        return false;
-      }
-    };
-    CullAABBBVH cull_aabb;
-    cull_aabb.result = &agent_cull_aabb_result;
-    agent_bvh.convex_query(p,1,points,4, cull_aabb);
-  } else {
-    /*
-      Agent *parray = agents.ptrw();
-      for (int i = 0; i < agents.size(); i++) {
-      Agent &p = parray[i];
-      if (p.aabb.intersects(p_aabb)) {
-      agent_cull_aabb_result.push_back(&p);
-      // todo - logic not to continue after the first one found -maybe
-      // this will give it similar behavior to bvh
-      }
-      }
-    */
-  }
-
-}
-
-Vector2 AutonomousAgents2D::wander(Agent *agent) {
-  agent->wander_target_theta += agent->wander_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1);
+Vector2 AutonomousAgents2D::wander(Agent *agent, double delta) {
+  agent->wander_target_theta += agent->wander_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1) * delta;
   Vector2 circle_position = agent->velocity.normalized() * (agent->wander_circle_distance + agent->wander_circle_radius * 0.5) + agent->transform[2];
   double heading = agent->velocity.angle();
   Vector2 circle_offset = Vector2(agent->wander_circle_radius * Math::cos(agent->wander_target_theta + heading), agent->wander_circle_radius * Math::sin(agent->wander_target_theta + heading));

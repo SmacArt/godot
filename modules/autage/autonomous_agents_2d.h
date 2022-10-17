@@ -222,6 +222,7 @@ private:
 
   Vector2 direction = Vector2(1, 0);
   real_t spread = 45.0;
+  real_t half_pi = Math_PI * 0.5;
 
   real_t parameters_min[PARAM_MAX];
   real_t parameters_max[PARAM_MAX];
@@ -263,12 +264,12 @@ private:
 
   void _texture_changed();
 
-  Vector2 calculate_steering_force(Agent *agent, int i);
+  Vector2 calculate_steering_force(Agent *agent, int i, double delta);
 
   Vector2 avoid_obstacles(Agent *agent);
   Vector2 seek(Agent *agent, Vector2 target);
   Vector2 separate(Agent *agent);
-  Vector2 wander(Agent *agent);
+  Vector2 wander(Agent *agent, double delta);
 
   DynamicBVH agent_bvh;
   void agent_cull_aabb_query(const AABB &p_aabb);
