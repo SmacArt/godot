@@ -782,19 +782,19 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.anim_offset_rand = Math::randf();
 
       if (agent_flags[AGENT_FLAG_WANDER]) {
-        p.wander = true;
+        p.steering_behavior |= STEERING_BEHAVIOR_WANDER;
         p.wander_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(p.seed));
         p.wander_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
         p.wander_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
       }
       if (agent_flags[AGENT_FLAG_SEPARATE]) {
-        p.separate=true;
+        p.steering_behavior |= STEERING_BEHAVIOR_SEPARATE;
         p.separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(p.seed));
         p.separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
       if (agent_flags[AGENT_FLAG_AVOID_OBSTACLES]) {
-        p.avoid_obstacles = true;
+        p.steering_behavior |= STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
         p.avoid_obstacles_field_of_view_angle = Math::deg_to_rad(Math::lerp(parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed)));
         p.avoid_obstacles_field_of_view_min_distance = parameters_min[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE];
         p.avoid_obstacles_field_of_view_max_distance = parameters_max[PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE];
@@ -1091,7 +1091,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
     if (p.steering) {
 
-      if (p.avoid_obstacles) {
+      if (p.steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
         if (p.avoid_obstacles_fov_scale_to_size){
           double l = base_scale.length();
           p.avoid_obstacles_field_of_view_min_distance = p.avoid_obstacles_field_of_view_min_distance * l;
@@ -1149,13 +1149,13 @@ Vector2 AutonomousAgents2D::calculate_steering_force(Agent *agent, int i, double
     agent->did_wander=false;
   }
 #endif
-  if (agent->separate) {
+  if (agent->steering_behavior & STEERING_BEHAVIOR_SEPARATE) {
     steering_force += separate(agent);
   }
-  if (agent->avoid_obstacles) {
+  if (agent->steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
     steering_force += avoid_obstacles(agent);
   }
-  if (agent->wander && steering_force.length_squared() == 0) {
+  if (agent->steering_behavior & STEERING_BEHAVIOR_WANDER && steering_force.length_squared() == 0) {
 #ifdef DEBUG_ENABLED
     if (is_debug) {
       agent->did_wander=true;
@@ -1559,15 +1559,15 @@ Vector2 AutonomousAgents2D::get_agent_avoidance_fov_right_end_position(int index
 }
 bool AutonomousAgents2D::is_agent_avoiding_obstacles(int index) {
   Agent *parray = agents.ptrw();
-  return parray[index].avoid_obstacles;
+  return parray[index].steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
 }
 bool AutonomousAgents2D::is_agent_separating(int index) {
   Agent *parray = agents.ptrw();
-  return parray[index].separate;
+  return parray[index].steering_behavior & STEERING_BEHAVIOR_SEPARATE;
 }
 bool AutonomousAgents2D::is_agent_wandering(int index) {
   Agent *parray = agents.ptrw();
-  return parray[index].wander;
+  return parray[index].steering_behavior & STEERING_BEHAVIOR_WANDER;
 }
 bool AutonomousAgents2D::is_agent_steering(int index) {
   Agent *parray = agents.ptrw();

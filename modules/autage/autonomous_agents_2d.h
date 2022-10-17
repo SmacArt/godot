@@ -43,6 +43,14 @@ public:
     DRAW_ORDER_LIFETIME,
   };
 
+  enum SteeringBehaviorFlags {
+    STEERING_BEHAVIOR_NONE = 0x000,
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 0x001,
+    STEERING_BEHAVIOR_SEEK = 0x002,
+    STEERING_BEHAVIOR_SEPARATE = 0x004,
+    STEERING_BEHAVIOR_WANDER = 0x008,
+  };
+
   enum Parameter {
     PARAM_AGENT_MASS,
     PARAM_AGENT_MAX_SPEED,
@@ -123,7 +131,8 @@ private:
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
 
-    bool avoid_obstacles = false;
+    uint32_t steering_behavior = STEERING_BEHAVIOR_NONE;
+
     real_t avoid_obstacles_decay_coefficient = 0.0;
     real_t avoid_obstacles_field_of_view_angle = 0.0;
     real_t avoid_obstacles_field_of_view_min_distance = 0.0;
@@ -136,11 +145,9 @@ private:
     Vector2 avoid_obstacles_field_of_view_right_angle;
     bool avoid_obstacles_fov_scale_to_size = false;
 
-    bool separate = false;
     real_t separate_neighbourhood_expansion = 0.0;
     real_t separate_decay_coefficient = 0.0;
 
-    bool wander = false;  // todo - could these bools bit flags
     real_t wander_circle_distance = 0.0;
     real_t wander_circle_radius = 0.0;
     real_t wander_rate_of_change = 0.0;
