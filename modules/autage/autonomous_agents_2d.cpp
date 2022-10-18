@@ -808,6 +808,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
       p.max_speed = Math::lerp(parameters_min[PARAM_AGENT_MAX_SPEED], parameters_max[PARAM_AGENT_MAX_SPEED], rand_from_seed(p.seed));
+      p.max_acceleration = Math::lerp(parameters_min[PARAM_AGENT_MAX_ACCELERATION], parameters_max[PARAM_AGENT_MAX_ACCELERATION], rand_from_seed(p.seed));
       p.max_steering_force = Math::lerp(parameters_min[PARAM_AGENT_MAX_STEERING_FORCE], parameters_max[PARAM_AGENT_MAX_STEERING_FORCE], rand_from_seed(p.seed));
       p.max_turn_rate = Math::lerp(parameters_min[PARAM_AGENT_MAX_TURN_RATE], parameters_max[PARAM_AGENT_MAX_TURN_RATE], rand_from_seed(p.seed));
 
@@ -1001,8 +1002,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       else {
         p.steering = true;
         if (ai_phase == p.ai_phase) {
-          p.velocity += calculate_steering_force(&p, i, local_delta).linear;
-          p.velocity = p.velocity.limit_length(p.max_speed);
+          apply_steering_behaviors(&p, i, local_delta);
         }
       }
     }
@@ -1140,7 +1140,7 @@ struct AABBQueryResult {
   }
 };
 
-AutonomousAgents2D::SteeringOutput AutonomousAgents2D::calculate_steering_force(Agent *agent, int i, double delta) {
+void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double delta) {
 
   SteeringOutput steering_output;
 
@@ -1163,14 +1163,22 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::calculate_steering_force(
 #endif
     steering_output += wander(agent, delta);
   }
-  steering_output.linear = steering_output.linear.limit_length(agent->max_steering_force);
-  steering_output.linear = (steering_output.linear / agent->mass).limit_length(agent->max_steering_force);
-  return steering_output;
+
+  // todo - include mass i.e agent->velocity += steering_output.linear * delta;
+  agent->velocity += steering_output.linear * delta;
+  agent->rotation += steering_output.angular * delta;
+
+  if (agent->velocity.length() > agent->max_speed) {
+    agent->velocity = agent->velocity.normalized() * agent->max_speed;
+  }
 }
 
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::seek(Agent *agent, Vector2 target){
   SteeringOutput steering_output;
-  steering_output.linear = ((target - agent->transform[2]).normalized() * agent->max_speed) - agent->velocity;
+  steering_output.linear = target - agent->transform[2];
+  steering_output.linear.normalize();
+  steering_output.linear *= agent->max_acceleration;
+  steering_output.angular = 0;
   return steering_output;
 }
 
@@ -1729,6 +1737,8 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_mass_max", PROPERTY_HINT_RANGE, "-1000,1000,0.01,or_greater,suffix:kg"), "set_param_max", "get_param_max", PARAM_AGENT_MASS);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_speed_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_SPEED);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_speed_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_SPEED);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_acceleration_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_ACCELERATION);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_acceleration_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_ACCELERATION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_steering_force_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:N"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_STEERING_FORCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_steering_force_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:N"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_STEERING_FORCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_turn_rate_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_TURN_RATE);
@@ -1843,6 +1853,7 @@ void AutonomousAgents2D::_bind_methods() {
 
   BIND_ENUM_CONSTANT(PARAM_AGENT_MASS);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_SPEED);
+  BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_ACCELERATION);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_STEERING_FORCE);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
 
@@ -1930,10 +1941,12 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_param_min(PARAM_AGENT_MASS, 1);
   set_param_min(PARAM_AGENT_MAX_SPEED, 1);
+  set_param_min(PARAM_AGENT_MAX_ACCELERATION, 1);
   set_param_min(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_min(PARAM_AGENT_MAX_TURN_RATE, 1);
   set_param_max(PARAM_AGENT_MASS, 1);
   set_param_max(PARAM_AGENT_MAX_SPEED, 1);
+  set_param_max(PARAM_AGENT_MAX_ACCELERATION, 1);
   set_param_max(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_max(PARAM_AGENT_MAX_TURN_RATE, 1);
 

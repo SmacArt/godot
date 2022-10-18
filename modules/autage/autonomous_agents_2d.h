@@ -54,6 +54,7 @@ public:
   enum Parameter {
     PARAM_AGENT_MASS,
     PARAM_AGENT_MAX_SPEED,
+    PARAM_AGENT_MAX_ACCELERATION,
     PARAM_AGENT_MAX_STEERING_FORCE,
     PARAM_AGENT_MAX_TURN_RATE,
     PARAM_ANGLE,
@@ -111,6 +112,7 @@ private:
     Transform2D transform;
     real_t mass = 1.0;
     real_t max_speed = 0.0;
+    real_t max_acceleration = 0.0;
     real_t max_steering_force = 0.0;
     real_t max_turn_rate = 0.0;
     Color color;
@@ -299,7 +301,7 @@ private:
 
   void _texture_changed();
 
-  SteeringOutput calculate_steering_force(Agent *agent, int i, double delta);
+  void apply_steering_behaviors(Agent *agent, int index, double delta);
   SteeringOutput avoid_obstacles(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separate(Agent *agent);
