@@ -32,8 +32,6 @@
 
 #include "core/core_string_names.h"
 
-using namespace autonomous_agents_2d;
-
 void AutonomousAgents2D::set_running(bool p_running) {
   if (running == p_running) {
     return;
@@ -1157,7 +1155,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::calculate_steering_force(
   if (agent->steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
     steering_output += avoid_obstacles(agent);
   }
-  if (agent->steering_behavior & STEERING_BEHAVIOR_WANDER && steering_force.length_squared() == 0) {
+  if (agent->steering_behavior & STEERING_BEHAVIOR_WANDER && steering_output.linear.length_squared() == 0) {
 #ifdef DEBUG_ENABLED
     if (is_debug) {
       agent->did_wander=true;
@@ -1165,12 +1163,12 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::calculate_steering_force(
 #endif
     steering_output += wander(agent, delta);
   }
-  steering_output.linear = steering_force.limit_length(agent->max_steering_force);
-  steering_output.linear = (steering_force / agent->mass).limit_length(agent->max_steering_force);
+  steering_output.linear = steering_output.linear.limit_length(agent->max_steering_force);
+  steering_output.linear = (steering_output.linear / agent->mass).limit_length(agent->max_steering_force);
   return steering_output;
 }
 
-SteeringOutput AutonomousAgents2D::seek(Agent *agent, Vector2 target){
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::seek(Agent *agent, Vector2 target){
   SteeringOutput steering_output;
   steering_output.linear = ((target - agent->transform[2]).normalized() * agent->max_speed) - agent->velocity;
   return steering_output;
@@ -1227,7 +1225,7 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   return aabb;
 }
 
-SteeringOutput AutonomousAgents2D::avoid_obstacles(Agent *agent) {
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::avoid_obstacles(Agent *agent) {
 
   SteeringOutput steering_output;
 
@@ -1260,7 +1258,7 @@ SteeringOutput AutonomousAgents2D::avoid_obstacles(Agent *agent) {
         strength = agent->max_steering_force;
       }
       direction_to_other.normalize();
-      steering_force += strength * direction_to_other * -1;
+      steering_output.linear += strength * direction_to_other * -1;
 
 #ifdef DEBUG_ENABLED
       if (is_debug) {
@@ -1269,11 +1267,11 @@ SteeringOutput AutonomousAgents2D::avoid_obstacles(Agent *agent) {
 #endif
     }
   }
-  steering_output.linear = (steering_force / agent->mass).limit_length(agent->max_steering_force);
+  steering_output.linear = (steering_output.linear / agent->mass).limit_length(agent->max_steering_force);
   return steering_output;
 }
 
-SteeringOutput AutonomousAgents2D::separate(Agent *agent) {
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::separate(Agent *agent) {
 
   SteeringOutput steering_output;
 
@@ -1297,7 +1295,7 @@ SteeringOutput AutonomousAgents2D::separate(Agent *agent) {
         strength = agent->max_steering_force;
       }
       dir.normalize();
-      steering_force += strength * dir * -1;
+      steering_output.linear += strength * dir * -1;
 
 #ifdef DEBUG_ENABLED
       if (is_debug) {
@@ -1307,7 +1305,7 @@ SteeringOutput AutonomousAgents2D::separate(Agent *agent) {
     }
   }
 
-  steering_output.linear = (steering_force / agent->mass).limit_length(agent->max_steering_force);
+  steering_output.linear = (steering_output.linear / agent->mass).limit_length(agent->max_steering_force);
   return steering_output;
 }
 
@@ -1341,7 +1339,7 @@ void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
 
 }
 
-SteeringOutput AutonomousAgents2D::wander(Agent *agent, double delta) {
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::wander(Agent *agent, double delta) {
   agent->wander_target_theta += agent->wander_rate_of_change * (rand_from_seed(agent->seed) * 2.0 - 1) * delta;
   Vector2 circle_position = agent->velocity.normalized() * (agent->wander_circle_distance + agent->wander_circle_radius * 0.5) + agent->transform[2];
   double heading = agent->velocity.angle();

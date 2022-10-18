@@ -33,438 +33,436 @@
 #include "core/math/dynamic_bvh.h"
 #include "core/templates/paged_array.h"
 
-namespace autonomous_agents_2d {
-  class AutonomousAgents2D : public Node2D {
-  private:
-    GDCLASS(AutonomousAgents2D, Node2D);
+class AutonomousAgents2D : public Node2D {
+private:
+  GDCLASS(AutonomousAgents2D, Node2D);
 
-  public:
-    enum DrawOrder {
-      DRAW_ORDER_INDEX,
-      DRAW_ORDER_LIFETIME,
-    };
+public:
+  enum DrawOrder {
+    DRAW_ORDER_INDEX,
+    DRAW_ORDER_LIFETIME,
+  };
 
-    enum SteeringBehaviorFlags {
-      STEERING_BEHAVIOR_NONE = 0x000,
-      STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 0x001,
-      STEERING_BEHAVIOR_SEEK = 0x002,
-      STEERING_BEHAVIOR_SEPARATE = 0x004,
-      STEERING_BEHAVIOR_WANDER = 0x008,
-    };
+  enum SteeringBehaviorFlags {
+    STEERING_BEHAVIOR_NONE = 0x000,
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 0x001,
+    STEERING_BEHAVIOR_SEEK = 0x002,
+    STEERING_BEHAVIOR_SEPARATE = 0x004,
+    STEERING_BEHAVIOR_WANDER = 0x008,
+  };
 
-    enum Parameter {
-      PARAM_AGENT_MASS,
-      PARAM_AGENT_MAX_SPEED,
-      PARAM_AGENT_MAX_STEERING_FORCE,
-      PARAM_AGENT_MAX_TURN_RATE,
-      PARAM_ANGLE,
-      PARAM_ANGULAR_VELOCITY,
-      PARAM_ANIM_OFFSET,
-      PARAM_ANIM_SPEED,
-      PARAM_DAMPING,
-      PARAM_HUE_VARIATION,
-      PARAM_INITIAL_LINEAR_VELOCITY,
-      PARAM_LINEAR_ACCEL,
-      PARAM_ORBIT_VELOCITY,
-      PARAM_RADIAL_ACCEL,
-      PARAM_SCALE,
-      PARAM_TANGENTIAL_ACCEL,
-      PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT,
-      PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE,
-      PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE,
-      PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET,
-      PARAM_SEPARATE_DECAY_COEFFICIENT,
-      PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
-      PARAM_WANDER_CIRCLE_DISTANCE,
-      PARAM_WANDER_CIRCLE_RADIUS,
-      PARAM_WANDER_RATE_OF_CHANGE,
-      PARAM_MAX,
-    };
+  enum Parameter {
+    PARAM_AGENT_MASS,
+    PARAM_AGENT_MAX_SPEED,
+    PARAM_AGENT_MAX_STEERING_FORCE,
+    PARAM_AGENT_MAX_TURN_RATE,
+    PARAM_ANGLE,
+    PARAM_ANGULAR_VELOCITY,
+    PARAM_ANIM_OFFSET,
+    PARAM_ANIM_SPEED,
+    PARAM_DAMPING,
+    PARAM_HUE_VARIATION,
+    PARAM_INITIAL_LINEAR_VELOCITY,
+    PARAM_LINEAR_ACCEL,
+    PARAM_ORBIT_VELOCITY,
+    PARAM_RADIAL_ACCEL,
+    PARAM_SCALE,
+    PARAM_TANGENTIAL_ACCEL,
+    PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT,
+    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE,
+    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE,
+    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET,
+    PARAM_SEPARATE_DECAY_COEFFICIENT,
+    PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
+    PARAM_WANDER_CIRCLE_DISTANCE,
+    PARAM_WANDER_CIRCLE_RADIUS,
+    PARAM_WANDER_RATE_OF_CHANGE,
+    PARAM_MAX,
+  };
 
-    enum AgentFlags {
-      AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
-      AGENT_FLAG_AVOID_OBSTACLES,
-      AGENT_FLAG_SEPARATE,
-      AGENT_FLAG_WANDER,
-      AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE,
-      AGENT_FLAG_MAX
-    };
+  enum AgentFlags {
+    AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
+    AGENT_FLAG_AVOID_OBSTACLES,
+    AGENT_FLAG_SEPARATE,
+    AGENT_FLAG_WANDER,
+    AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE,
+    AGENT_FLAG_MAX
+  };
 
-    enum EmissionShape {
-      EMISSION_SHAPE_POINT,
-      EMISSION_SHAPE_SPHERE,
-      EMISSION_SHAPE_SPHERE_SURFACE,
-      EMISSION_SHAPE_RECTANGLE,
-      EMISSION_SHAPE_POINTS,
-      EMISSION_SHAPE_DIRECTED_POINTS,
-      EMISSION_SHAPE_MAX
-    };
+  enum EmissionShape {
+    EMISSION_SHAPE_POINT,
+    EMISSION_SHAPE_SPHERE,
+    EMISSION_SHAPE_SPHERE_SURFACE,
+    EMISSION_SHAPE_RECTANGLE,
+    EMISSION_SHAPE_POINTS,
+    EMISSION_SHAPE_DIRECTED_POINTS,
+    EMISSION_SHAPE_MAX
+  };
 
-  private:
+private:
 
-    struct Agent {
+  struct Agent {
 
-      uint32_t seed = 0;
+    uint32_t seed = 0;
 
-      bool is_new = true;
-      uint32_t ai_phase = 0;
+    bool is_new = true;
+    uint32_t ai_phase = 0;
 
-      Transform2D transform;
-      real_t mass = 1.0;
-      real_t max_speed = 0.0;
-      real_t max_steering_force = 0.0;
-      real_t max_turn_rate = 0.0;
-      Color color;
-      real_t custom[4] = {};
-      bool active = false;
-      bool steering = false;
-      real_t angle_rand = 0.0;
-      real_t scale_rand = 0.0;
-      real_t hue_rot_rand = 0.0;
-      real_t anim_offset_rand = 0.0;
-      Color start_color_rand;
-      double time = 0.0;
-      double lifetime = 0.0;
-      Color base_color;
-
-      DynamicBVH::ID bvh_leaf;
-      AABB aabb;
-
-      Vector2 velocity;
-      real_t rotation = 0.0;
-
-      uint32_t steering_behavior = STEERING_BEHAVIOR_NONE;
-
-      real_t avoid_obstacles_decay_coefficient = 0.0;
-      real_t avoid_obstacles_field_of_view_angle = 0.0;
-      real_t avoid_obstacles_field_of_view_min_distance = 0.0;
-      real_t avoid_obstacles_field_of_view_max_distance = 0.0;
-      real_t avoid_obstacles_field_of_view_distance = 0.0;
-      real_t avoid_obstacles_field_of_view_base_distance = 0.0;
-      real_t avoid_obstacles_field_of_view_offset;
-      real_t avoid_obstacles_field_of_view_base_offset;
-      Vector2 avoid_obstacles_field_of_view_left_angle;
-      Vector2 avoid_obstacles_field_of_view_right_angle;
-      bool avoid_obstacles_fov_scale_to_size = false;
-
-      real_t separate_neighbourhood_expansion = 0.0;
-      real_t separate_decay_coefficient = 0.0;
-
-      real_t wander_circle_distance = 0.0;
-      real_t wander_circle_radius = 0.0;
-      real_t wander_rate_of_change = 0.0;
-      real_t wander_target_theta = 0.0;
-
-#ifdef DEBUG_ENABLED
-      Vector2 wander_circle_position;
-      Vector2 wander_target;
-      bool aabb_culled;
-      AABB separation_aabb;
-      bool did_wander;
-      AABB avoidance_fov_aabb;
-      Vector2 avoidance_fov_start_position;
-      Vector2 avoidance_fov_left_position;
-      Vector2 avoidance_fov_right_position;
-      Vector2 avoidance_fov_left_end_position;
-      Vector2 avoidance_fov_right_end_position;
-#endif
-
-    };
-
-    struct SteeringOutput {
-      Vector2 linear;
-      real_t angular;
-
-      inline SteeringOutput() {
-        linear = Vector2(0,0);
-        angular = 0.0f;
-      }
-
-      inline SteeringOutput(const Vector2 p_linear, const double p_angular) {
-        linear = p_linear;
-        angular = p_angular;
-      }
-
-      inline SteeringOutput operator+(const SteeringOutput &steering_output) const{
-        return SteeringOutput(Vector2(linear + steering_output.linear), angular + steering_output.angular);
-      }
-
-      inline SteeringOutput &operator+=(const SteeringOutput &steering_output) {
-        linear += steering_output.linear;
-        angular += steering_output.angular;
-
-        return *this;
-      }
-
-    };
-
-    bool running = false;
-    bool use_bvh = false;
-
-    double time = 0.0;
-    double inactive_time = 0.0;
-    double frame_remainder = 0.0;
-    int cycle = 0;
-    bool do_redraw = false;
-    int ai_phase = 1;
-    Transform2D old_transform;
-
-    RID mesh;
-    RID multimesh;
-
-    Vector<Agent> agents;
-    Vector<float> agent_data;
-    Vector<int> agent_order;
-
-    struct SortLifetime {
-      const Agent *agents = nullptr;
-
-      bool operator()(int p_a, int p_b) const {
-        return agents[p_a].time > agents[p_b].time;
-      }
-    };
-
-    struct SortAxis {
-      const Agent *agents = nullptr;
-      Vector2 axis;
-      bool operator()(int p_a, int p_b) const {
-        return axis.dot(agents[p_a].transform[2]) < axis.dot(agents[p_b].transform[2]);
-      }
-    };
-
-    //
-
-    bool one_shot = false;
-
-    double lifetime = 1.0;
-    double pre_process_time = 0.0;
-    real_t explosiveness_ratio = 0.0;
-    real_t randomness_ratio = 0.0;
-    double lifetime_randomness = 0.0;
-    double speed_scale = 1.0;
-    bool local_coords = false;
-    int fixed_fps = 0;
-    bool fractional_delta = true;
-    double behaviour_delay = 0.0;
-    int number_of_ai_phases = 1;
-
-    Transform2D inv_emission_transform;
-
-    DrawOrder draw_order = DRAW_ORDER_INDEX;
-
-    Ref<Texture2D> texture;
-
-    ////////
-
-    Vector2 direction = Vector2(1, 0);
-    real_t spread = 45.0;
-    real_t half_pi = Math_PI * 0.5;
-
-    real_t parameters_min[PARAM_MAX];
-    real_t parameters_max[PARAM_MAX];
-
-    Ref<Curve> curve_parameters[PARAM_MAX];
+    Transform2D transform;
+    real_t mass = 1.0;
+    real_t max_speed = 0.0;
+    real_t max_steering_force = 0.0;
+    real_t max_turn_rate = 0.0;
     Color color;
-    Ref<Gradient> color_ramp;
-    Ref<Gradient> color_initial_ramp;
+    real_t custom[4] = {};
+    bool active = false;
+    bool steering = false;
+    real_t angle_rand = 0.0;
+    real_t scale_rand = 0.0;
+    real_t hue_rot_rand = 0.0;
+    real_t anim_offset_rand = 0.0;
+    Color start_color_rand;
+    double time = 0.0;
+    double lifetime = 0.0;
+    Color base_color;
 
-    bool agent_flags[AGENT_FLAG_MAX];
+    DynamicBVH::ID bvh_leaf;
+    AABB aabb;
 
-    EmissionShape emission_shape = EMISSION_SHAPE_POINT;
-    real_t emission_sphere_radius = 1.0;
-    Vector2 emission_rect_extents = Vector2(1, 1);
-    Vector<Vector2> emission_points;
-    Vector<Vector2> emission_normals;
-    Vector<Color> emission_colors;
-    int emission_point_count = 0;
+    Vector2 velocity;
+    real_t rotation = 0.0;
 
-    Ref<Curve> scale_curve_x;
-    Ref<Curve> scale_curve_y;
-    bool split_scale = false;
+    uint32_t steering_behavior = STEERING_BEHAVIOR_NONE;
 
-    Vector2 gravity = Vector2(0, 980);
-    Size2 agent_base_size = Size2(10, 10);
-    double agent_aabb_expansion_ratio = 1.2;
+    real_t avoid_obstacles_decay_coefficient = 0.0;
+    real_t avoid_obstacles_field_of_view_angle = 0.0;
+    real_t avoid_obstacles_field_of_view_min_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_max_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_base_distance = 0.0;
+    real_t avoid_obstacles_field_of_view_offset;
+    real_t avoid_obstacles_field_of_view_base_offset;
+    Vector2 avoid_obstacles_field_of_view_left_angle;
+    Vector2 avoid_obstacles_field_of_view_right_angle;
+    bool avoid_obstacles_fov_scale_to_size = false;
 
-    void _update_internal();
-    void _agents_process(double p_delta);
-    void _update_agent_data_buffer();
+    real_t separate_neighbourhood_expansion = 0.0;
+    real_t separate_decay_coefficient = 0.0;
 
-    Mutex update_mutex;
-
-    void _update_render_thread();
-
-    void _update_mesh_texture();
-
-    void _set_do_redraw(bool p_do_redraw);
-
-    void _texture_changed();
-
-    SteeringOutput calculate_steering_force(Agent *agent, int i, double delta);
-    SteeringOutput avoid_obstacles(Agent *agent);
-    SteeringOutput seek(Agent *agent, Vector2 target);
-    SteeringOutput separate(Agent *agent);
-    SteeringOutput wander(Agent *agent, double delta);
-
-    DynamicBVH agent_bvh;
-    void agent_cull_aabb_query(const AABB &p_aabb);
-    void agent_cull_convext_query();
-    AABB create_avoidance_aabb_for_agent(Agent *agent);
-
-    template <class QueryResult>
-    _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
+    real_t wander_circle_distance = 0.0;
+    real_t wander_circle_radius = 0.0;
+    real_t wander_rate_of_change = 0.0;
+    real_t wander_target_theta = 0.0;
 
 #ifdef DEBUG_ENABLED
-    bool is_debug;
+    Vector2 wander_circle_position;
+    Vector2 wander_target;
+    bool aabb_culled;
+    AABB separation_aabb;
+    bool did_wander;
+    AABB avoidance_fov_aabb;
+    Vector2 avoidance_fov_start_position;
+    Vector2 avoidance_fov_left_position;
+    Vector2 avoidance_fov_right_position;
+    Vector2 avoidance_fov_left_end_position;
+    Vector2 avoidance_fov_right_end_position;
 #endif
-
-  protected:
-    static void _bind_methods();
-    void _notification(int p_what);
-    void _validate_property(PropertyInfo &p_property) const;
-
-  public:
-    void set_running(bool p_running);
-    void set_amount(int p_amount);
-    void set_lifetime(double p_lifetime);
-    void set_pre_process_time(double p_time);
-    void set_one_shot(bool p_one_shot);
-    void set_explosiveness_ratio(real_t p_ratio);
-    void set_randomness_ratio(real_t p_ratio);
-    void set_lifetime_randomness(double p_random);
-    void set_use_local_coordinates(bool p_enable);
-    void set_speed_scale(double p_scale);
-    void set_behaviour_delay(double p_delay);
-    void set_number_of_ai_phases(int p_number_of_phases);
-    void set_use_bvh(bool p_use_bvh);
-
-    bool is_running() const;
-    int get_amount() const;
-    double get_lifetime() const;
-    bool get_one_shot() const;
-    double get_pre_process_time() const;
-    real_t get_explosiveness_ratio() const;
-    real_t get_randomness_ratio() const;
-    double get_lifetime_randomness() const;
-    bool get_use_local_coordinates() const;
-    double get_speed_scale() const;
-    double get_behaviour_delay() const;
-    int get_number_of_ai_phases() const;
-    bool is_using_bvh() const;
-
-    void set_fixed_fps(int p_count);
-    int get_fixed_fps() const;
-
-    void set_fractional_delta(bool p_enable);
-    bool get_fractional_delta() const;
-
-    void set_draw_order(DrawOrder p_order);
-    DrawOrder get_draw_order() const;
-
-    void set_texture(const Ref<Texture2D> &p_texture);
-    Ref<Texture2D> get_texture() const;
-
-    ///////////////////
-
-    void set_direction(Vector2 p_direction);
-    Vector2 get_direction() const;
-
-    void set_spread(real_t p_spread);
-    real_t get_spread() const;
-
-    void set_param_min(Parameter p_param, real_t p_value);
-    real_t get_param_min(Parameter p_param) const;
-
-    void set_param_max(Parameter p_param, real_t p_value);
-    real_t get_param_max(Parameter p_param) const;
-
-    void set_param_curve(Parameter p_param, const Ref<Curve> &p_curve);
-    Ref<Curve> get_param_curve(Parameter p_param) const;
-
-    void set_color(const Color &p_color);
-    Color get_color() const;
-
-    void set_color_ramp(const Ref<Gradient> &p_ramp);
-    Ref<Gradient> get_color_ramp() const;
-
-    void set_color_initial_ramp(const Ref<Gradient> &p_ramp);
-    Ref<Gradient> get_color_initial_ramp() const;
-
-    void set_agent_flag(AgentFlags p_agent_flag, bool p_enable);
-    bool get_agent_flag(AgentFlags p_agent_flag) const;
-
-    void set_emission_shape(EmissionShape p_shape);
-    void set_emission_sphere_radius(real_t p_radius);
-    void set_emission_rect_extents(Vector2 p_extents);
-    void set_emission_points(const Vector<Vector2> &p_points);
-    void set_emission_normals(const Vector<Vector2> &p_normals);
-    void set_emission_colors(const Vector<Color> &p_colors);
-    void set_scale_curve_x(Ref<Curve> p_scale_curve);
-    void set_scale_curve_y(Ref<Curve> p_scale_curve);
-    void set_split_scale(bool p_split_scale);
-
-    EmissionShape get_emission_shape() const;
-    real_t get_emission_sphere_radius() const;
-    Vector2 get_emission_rect_extents() const;
-    Vector<Vector2> get_emission_points() const;
-    Vector<Vector2> get_emission_normals() const;
-    Vector<Color> get_emission_colors() const;
-    Ref<Curve> get_scale_curve_x() const;
-    Ref<Curve> get_scale_curve_y() const;
-    bool get_split_scale();
-
-    void set_gravity(const Vector2 &p_gravity);
-    Vector2 get_gravity() const;
-
-    void set_agent_base_size(const Size2 &p_size);
-    Size2 get_agent_base_size() const;
-
-    void set_agent_aabb_expansion_ratio(const double p_ratio);
-    double get_agent_aabb_expansion_ratio() const;
-
-    PackedStringArray get_configuration_warnings() const override;
-
-    PagedArrayPool<Agent *> agent_cull_aabb_page_pool;
-    PagedArray<Agent *> agent_cull_aabb_result;
-
-#ifdef DEBUG_ENABLED
-    bool is_debugging() {return is_debug;};
-    void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
-    bool is_agent_steering(int index);
-    Vector2 get_agent_position(int index);
-    AABB get_agent_aabb(int index);
-    AABB get_agent_separation_aabb(int index);
-    AABB get_agent_avoidance_fov_aabb(int index);
-    Vector2 get_agent_avoidance_fov_start_position(int index);
-    Vector2 get_agent_avoidance_fov_left_position(int index);
-    Vector2 get_agent_avoidance_fov_right_position(int index);
-    Vector2 get_agent_avoidance_fov_left_end_position(int index);
-    Vector2 get_agent_avoidance_fov_right_end_position(int index);
-    bool is_agent_wandering(int index);
-    bool is_agent_avoiding_obstacles(int index);
-    bool is_agent_separating(int index);
-    Vector2 get_agent_wander_circle_position(int index);
-    real_t get_agent_wander_circle_radius(int index);
-    Vector2 get_agent_wander_target(int index);
-    bool is_agent_aabb_culled(int index);
-    int get_agent_ai_phase(int index);
-    bool get_did_agent_wander(int index);
-#endif
-
-    Plane p[1];
-    Vector3 points[4];
-
-    void restart();
-
-    AutonomousAgents2D();
-    ~AutonomousAgents2D();
 
   };
-}
 
-VARIANT_ENUM_CAST(autonomous_agents_2d::AutonomousAgents2D::DrawOrder)
-VARIANT_ENUM_CAST(autonomous_agents_2d::AutonomousAgents2D::Parameter)
-VARIANT_ENUM_CAST(autonomous_agents_2d::AutonomousAgents2D::AgentFlags)
-VARIANT_ENUM_CAST(autonomous_agents_2d::AutonomousAgents2D::EmissionShape)
+  struct SteeringOutput {
+    Vector2 linear;
+    real_t angular;
+
+    inline SteeringOutput() {
+      linear = Vector2(0,0);
+      angular = 0.0f;
+    }
+
+    inline SteeringOutput(const Vector2 p_linear, const double p_angular) {
+      linear = p_linear;
+      angular = p_angular;
+    }
+
+    inline SteeringOutput operator+(const SteeringOutput &steering_output) const{
+      return SteeringOutput(Vector2(linear + steering_output.linear), angular + steering_output.angular);
+    }
+
+    inline SteeringOutput &operator+=(const SteeringOutput &steering_output) {
+      linear += steering_output.linear;
+      angular += steering_output.angular;
+
+      return *this;
+    }
+
+  };
+
+  bool running = false;
+  bool use_bvh = false;
+
+  double time = 0.0;
+  double inactive_time = 0.0;
+  double frame_remainder = 0.0;
+  int cycle = 0;
+  bool do_redraw = false;
+  int ai_phase = 1;
+  Transform2D old_transform;
+
+  RID mesh;
+  RID multimesh;
+
+  Vector<Agent> agents;
+  Vector<float> agent_data;
+  Vector<int> agent_order;
+
+  struct SortLifetime {
+    const Agent *agents = nullptr;
+
+    bool operator()(int p_a, int p_b) const {
+      return agents[p_a].time > agents[p_b].time;
+    }
+  };
+
+  struct SortAxis {
+    const Agent *agents = nullptr;
+    Vector2 axis;
+    bool operator()(int p_a, int p_b) const {
+      return axis.dot(agents[p_a].transform[2]) < axis.dot(agents[p_b].transform[2]);
+    }
+  };
+
+  //
+
+  bool one_shot = false;
+
+  double lifetime = 1.0;
+  double pre_process_time = 0.0;
+  real_t explosiveness_ratio = 0.0;
+  real_t randomness_ratio = 0.0;
+  double lifetime_randomness = 0.0;
+  double speed_scale = 1.0;
+  bool local_coords = false;
+  int fixed_fps = 0;
+  bool fractional_delta = true;
+  double behaviour_delay = 0.0;
+  int number_of_ai_phases = 1;
+
+  Transform2D inv_emission_transform;
+
+  DrawOrder draw_order = DRAW_ORDER_INDEX;
+
+  Ref<Texture2D> texture;
+
+  ////////
+
+  Vector2 direction = Vector2(1, 0);
+  real_t spread = 45.0;
+  real_t half_pi = Math_PI * 0.5;
+
+  real_t parameters_min[PARAM_MAX];
+  real_t parameters_max[PARAM_MAX];
+
+  Ref<Curve> curve_parameters[PARAM_MAX];
+  Color color;
+  Ref<Gradient> color_ramp;
+  Ref<Gradient> color_initial_ramp;
+
+  bool agent_flags[AGENT_FLAG_MAX];
+
+  EmissionShape emission_shape = EMISSION_SHAPE_POINT;
+  real_t emission_sphere_radius = 1.0;
+  Vector2 emission_rect_extents = Vector2(1, 1);
+  Vector<Vector2> emission_points;
+  Vector<Vector2> emission_normals;
+  Vector<Color> emission_colors;
+  int emission_point_count = 0;
+
+  Ref<Curve> scale_curve_x;
+  Ref<Curve> scale_curve_y;
+  bool split_scale = false;
+
+  Vector2 gravity = Vector2(0, 980);
+  Size2 agent_base_size = Size2(10, 10);
+  double agent_aabb_expansion_ratio = 1.2;
+
+  void _update_internal();
+  void _agents_process(double p_delta);
+  void _update_agent_data_buffer();
+
+  Mutex update_mutex;
+
+  void _update_render_thread();
+
+  void _update_mesh_texture();
+
+  void _set_do_redraw(bool p_do_redraw);
+
+  void _texture_changed();
+
+  SteeringOutput calculate_steering_force(Agent *agent, int i, double delta);
+  SteeringOutput avoid_obstacles(Agent *agent);
+  SteeringOutput seek(Agent *agent, Vector2 target);
+  SteeringOutput separate(Agent *agent);
+  SteeringOutput wander(Agent *agent, double delta);
+
+  DynamicBVH agent_bvh;
+  void agent_cull_aabb_query(const AABB &p_aabb);
+  void agent_cull_convext_query();
+  AABB create_avoidance_aabb_for_agent(Agent *agent);
+
+  template <class QueryResult>
+  _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
+
+#ifdef DEBUG_ENABLED
+  bool is_debug;
+#endif
+
+protected:
+  static void _bind_methods();
+  void _notification(int p_what);
+  void _validate_property(PropertyInfo &p_property) const;
+
+public:
+  void set_running(bool p_running);
+  void set_amount(int p_amount);
+  void set_lifetime(double p_lifetime);
+  void set_pre_process_time(double p_time);
+  void set_one_shot(bool p_one_shot);
+  void set_explosiveness_ratio(real_t p_ratio);
+  void set_randomness_ratio(real_t p_ratio);
+  void set_lifetime_randomness(double p_random);
+  void set_use_local_coordinates(bool p_enable);
+  void set_speed_scale(double p_scale);
+  void set_behaviour_delay(double p_delay);
+  void set_number_of_ai_phases(int p_number_of_phases);
+  void set_use_bvh(bool p_use_bvh);
+
+  bool is_running() const;
+  int get_amount() const;
+  double get_lifetime() const;
+  bool get_one_shot() const;
+  double get_pre_process_time() const;
+  real_t get_explosiveness_ratio() const;
+  real_t get_randomness_ratio() const;
+  double get_lifetime_randomness() const;
+  bool get_use_local_coordinates() const;
+  double get_speed_scale() const;
+  double get_behaviour_delay() const;
+  int get_number_of_ai_phases() const;
+  bool is_using_bvh() const;
+
+  void set_fixed_fps(int p_count);
+  int get_fixed_fps() const;
+
+  void set_fractional_delta(bool p_enable);
+  bool get_fractional_delta() const;
+
+  void set_draw_order(DrawOrder p_order);
+  DrawOrder get_draw_order() const;
+
+  void set_texture(const Ref<Texture2D> &p_texture);
+  Ref<Texture2D> get_texture() const;
+
+  ///////////////////
+
+  void set_direction(Vector2 p_direction);
+  Vector2 get_direction() const;
+
+  void set_spread(real_t p_spread);
+  real_t get_spread() const;
+
+  void set_param_min(Parameter p_param, real_t p_value);
+  real_t get_param_min(Parameter p_param) const;
+
+  void set_param_max(Parameter p_param, real_t p_value);
+  real_t get_param_max(Parameter p_param) const;
+
+  void set_param_curve(Parameter p_param, const Ref<Curve> &p_curve);
+  Ref<Curve> get_param_curve(Parameter p_param) const;
+
+  void set_color(const Color &p_color);
+  Color get_color() const;
+
+  void set_color_ramp(const Ref<Gradient> &p_ramp);
+  Ref<Gradient> get_color_ramp() const;
+
+  void set_color_initial_ramp(const Ref<Gradient> &p_ramp);
+  Ref<Gradient> get_color_initial_ramp() const;
+
+  void set_agent_flag(AgentFlags p_agent_flag, bool p_enable);
+  bool get_agent_flag(AgentFlags p_agent_flag) const;
+
+  void set_emission_shape(EmissionShape p_shape);
+  void set_emission_sphere_radius(real_t p_radius);
+  void set_emission_rect_extents(Vector2 p_extents);
+  void set_emission_points(const Vector<Vector2> &p_points);
+  void set_emission_normals(const Vector<Vector2> &p_normals);
+  void set_emission_colors(const Vector<Color> &p_colors);
+  void set_scale_curve_x(Ref<Curve> p_scale_curve);
+  void set_scale_curve_y(Ref<Curve> p_scale_curve);
+  void set_split_scale(bool p_split_scale);
+
+  EmissionShape get_emission_shape() const;
+  real_t get_emission_sphere_radius() const;
+  Vector2 get_emission_rect_extents() const;
+  Vector<Vector2> get_emission_points() const;
+  Vector<Vector2> get_emission_normals() const;
+  Vector<Color> get_emission_colors() const;
+  Ref<Curve> get_scale_curve_x() const;
+  Ref<Curve> get_scale_curve_y() const;
+  bool get_split_scale();
+
+  void set_gravity(const Vector2 &p_gravity);
+  Vector2 get_gravity() const;
+
+  void set_agent_base_size(const Size2 &p_size);
+  Size2 get_agent_base_size() const;
+
+  void set_agent_aabb_expansion_ratio(const double p_ratio);
+  double get_agent_aabb_expansion_ratio() const;
+
+  PackedStringArray get_configuration_warnings() const override;
+
+  PagedArrayPool<Agent *> agent_cull_aabb_page_pool;
+  PagedArray<Agent *> agent_cull_aabb_result;
+
+#ifdef DEBUG_ENABLED
+  bool is_debugging() {return is_debug;};
+  void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
+  bool is_agent_steering(int index);
+  Vector2 get_agent_position(int index);
+  AABB get_agent_aabb(int index);
+  AABB get_agent_separation_aabb(int index);
+  AABB get_agent_avoidance_fov_aabb(int index);
+  Vector2 get_agent_avoidance_fov_start_position(int index);
+  Vector2 get_agent_avoidance_fov_left_position(int index);
+  Vector2 get_agent_avoidance_fov_right_position(int index);
+  Vector2 get_agent_avoidance_fov_left_end_position(int index);
+  Vector2 get_agent_avoidance_fov_right_end_position(int index);
+  bool is_agent_wandering(int index);
+  bool is_agent_avoiding_obstacles(int index);
+  bool is_agent_separating(int index);
+  Vector2 get_agent_wander_circle_position(int index);
+  real_t get_agent_wander_circle_radius(int index);
+  Vector2 get_agent_wander_target(int index);
+  bool is_agent_aabb_culled(int index);
+  int get_agent_ai_phase(int index);
+  bool get_did_agent_wander(int index);
+#endif
+
+  Plane p[1];
+  Vector3 points[4];
+
+  void restart();
+
+  AutonomousAgents2D();
+  ~AutonomousAgents2D();
+
+};
+
+VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
+VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
+VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
+VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
