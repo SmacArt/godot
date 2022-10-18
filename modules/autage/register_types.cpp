@@ -40,7 +40,7 @@ void initialize_autage_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-  GDREGISTER_CLASS(AutonomousAgents2D);
+  GDREGISTER_CLASS(autonomous_agents_2d::AutonomousAgents2D);
 
 }
 
