@@ -64,24 +64,24 @@ int AutonomousAgents2D::get_number_of_ai_phases() const {
   return number_of_ai_phases;
 }
 
-void AutonomousAgents2D::set_amount(int p_amount) {
-  ERR_FAIL_COND_MSG(p_amount < 1, "Amount of agents must be greater than 0.");
+void AutonomousAgents2D::set_number_of_agents(int p_number_of_agents) {
+  ERR_FAIL_COND_MSG(p_number_of_agents < 1, "Number of agents must be greater than 0.");
 
   agent_bvh.clear();
 
-  agents.resize(p_amount);
+  agents.resize(p_number_of_agents);
   {
     Agent *w = agents.ptrw();
 
-    for (int i = 0; i < p_amount; i++) {
+    for (int i = 0; i < p_number_of_agents; i++) {
       w[i].active = false;
     }
   }
 
-  agent_data.resize((8 + 4 + 4) * p_amount);
-  RS::get_singleton()->multimesh_allocate_data(multimesh, p_amount, RS::MULTIMESH_TRANSFORM_2D, true, true);
+  agent_data.resize((8 + 4 + 4) * p_number_of_agents);
+  RS::get_singleton()->multimesh_allocate_data(multimesh, p_number_of_agents, RS::MULTIMESH_TRANSFORM_2D, true, true);
 
-  agent_order.resize(p_amount);
+  agent_order.resize(p_number_of_agents);
 
 }
 
@@ -123,7 +123,7 @@ bool AutonomousAgents2D::is_running() const {
   return running;
 }
 
-int AutonomousAgents2D::get_amount() const {
+int AutonomousAgents2D::get_number_of_agents() const {
   return agents.size();
 }
 
@@ -782,19 +782,20 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.anim_offset_rand = Math::randf();
 
       if (agent_flags[AGENT_FLAG_WANDER]) {
-        p.steering_behavior |= STEERING_BEHAVIOR_WANDER;
+        p.steering_behavior += STEERING_BEHAVIOR_WANDER;
         p.wander_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(p.seed));
         p.wander_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
         p.wander_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
       }
       if (agent_flags[AGENT_FLAG_SEPARATE]) {
-        p.steering_behavior |= STEERING_BEHAVIOR_SEPARATE;
+        p.steering_behavior += STEERING_BEHAVIOR_SEPARATE;
         p.separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(p.seed));
         p.separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
       }
 
       if (agent_flags[AGENT_FLAG_OBSTACLE_AVOIDANCE]) {
-        p.steering_behavior |= STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
+        print_line("WANTS TO AVOID");
+        p.steering_behavior += STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
         p.avoid_obstacles_field_of_view_angle = Math::deg_to_rad(Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed)));
         p.avoid_obstacles_field_of_view_min_distance = parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE];
         p.avoid_obstacles_field_of_view_max_distance = parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE];
@@ -1092,6 +1093,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
     if (p.steering) {
 
       if (p.steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
+        print_line("avoid");
         if (p.avoid_obstacles_fov_scale_to_size){
           double l = base_scale.length();
           p.avoid_obstacles_field_of_view_min_distance = p.avoid_obstacles_field_of_view_min_distance * l;
@@ -1532,68 +1534,31 @@ bool AutonomousAgents2D::is_agent_steering(int index) {
   return parray[index].steering;
 }
 
-void AutonomousAgents2D::set_agent_behavior(Agent *agent, uint32_t behavior, bool is_on) {
+// TODO - will need to set up the agent for the behavior when switched on.
+//        if turned on and off and on it should retain its previously set settings.
+
+void AutonomousAgents2D::set_behavior(Agent *agent, uint32_t behavior, bool is_on) {
   if (behavior == STEERING_BEHAVIOR_NONE) {
     agent->steering_behavior = STEERING_BEHAVIOR_NONE;
   } else if (is_on) {
-    agent->steering_behavior |= behavior;
+    agent->steering_behavior += behavior;
   } else {
-    agent->steering_behavior &= ~behavior; 
+    agent->steering_behavior -= behavior;
   }
+}
+
+void AutonomousAgents2D::set_agent_behavior(int index, uint32_t behavior, bool is_on) {
+  Agent *parray = agents.ptrw();
+  set_behavior(&parray[index], behavior, is_on);
 }
 
 void AutonomousAgents2D::set_agent_behavior_none(int index) {
   Agent *parray = agents.ptrw();
-  set_agent_behavior(&parray[index], STEERING_BEHAVIOR_NONE, true);
+  set_behavior(&parray[index], STEERING_BEHAVIOR_NONE, true);
 }
-bool AutonomousAgents2D::is_agent_behavior_none(int index) {
+bool AutonomousAgents2D::is_agent_behavior(int index, uint32_t behavior) {
   Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & STEERING_BEHAVIOR_NONE;
-}
-
-void AutonomousAgents2D::set_agent_behavior_obstacle_avoidance(int index, bool is_on) {
-  Agent *parray = agents.ptrw();
-  set_agent_behavior(&parray[index], STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE, is_on);
-}
-bool AutonomousAgents2D::is_agent_behavior_obstacle_avoidance(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
-}
-
-void AutonomousAgents2D::set_agent_behavior_remotely_controlled(int index, bool is_on){
-  Agent *parray = agents.ptrw();
-  set_agent_behavior(&parray[index], STEERING_BEHAVIOR_REMOTELY_CONTROLLED, is_on);
-}
-bool AutonomousAgents2D::is_agent_behavior_remotely_controlled(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & STEERING_BEHAVIOR_REMOTELY_CONTROLLED;
-}
-
-void AutonomousAgents2D::set_agent_behavior_seek(int index, bool is_on){
-  Agent *parray = agents.ptrw();
-  set_agent_behavior(&parray[index], STEERING_BEHAVIOR_SEEK, is_on);
-}
-bool AutonomousAgents2D::is_agent_behavior_seek(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & STEERING_BEHAVIOR_SEEK;
-}
-
-void AutonomousAgents2D::set_agent_behavior_separate(int index, bool is_on){
-  Agent *parray = agents.ptrw();
-  set_agent_behavior(&parray[index], STEERING_BEHAVIOR_SEPARATE, is_on);
-}
-bool AutonomousAgents2D::is_agent_behavior_separate(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & STEERING_BEHAVIOR_SEPARATE;
-}
-
-void AutonomousAgents2D::set_agent_behavior_wander(int index, bool is_on){
-  Agent *parray = agents.ptrw();
-  set_agent_behavior(&parray[index], STEERING_BEHAVIOR_WANDER, is_on);
-}
-bool AutonomousAgents2D::is_agent_behavior_wander(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & STEERING_BEHAVIOR_WANDER;
+  return parray[index].steering_behavior & behavior;
 }
 
 #ifdef DEBUG_ENABLED
@@ -1661,7 +1626,7 @@ bool AutonomousAgents2D::get_did_agent_wander(int index){
 
 void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_running", "running"), &AutonomousAgents2D::set_running);
-  ClassDB::bind_method(D_METHOD("set_amount", "amount"), &AutonomousAgents2D::set_amount);
+  ClassDB::bind_method(D_METHOD("set_number_of_agents", "number_of_agents"), &AutonomousAgents2D::set_number_of_agents);
   ClassDB::bind_method(D_METHOD("set_behaviour_delay", "behaviour_delay"), &AutonomousAgents2D::set_behaviour_delay);
   ClassDB::bind_method(D_METHOD("set_number_of_ai_phases", "number_of_ai_phases"), &AutonomousAgents2D::set_number_of_ai_phases);
   ClassDB::bind_method(D_METHOD("set_lifetime", "secs"), &AutonomousAgents2D::set_lifetime);
@@ -1677,7 +1642,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_use_bvh", "use_bvh"), &AutonomousAgents2D::set_use_bvh);
 
   ClassDB::bind_method(D_METHOD("is_running"), &AutonomousAgents2D::is_running);
-  ClassDB::bind_method(D_METHOD("get_amount"), &AutonomousAgents2D::get_amount);
+  ClassDB::bind_method(D_METHOD("get_number_of_agents"), &AutonomousAgents2D::get_number_of_agents);
   ClassDB::bind_method(D_METHOD("get_behaviour_delay"), &AutonomousAgents2D::get_behaviour_delay);
   ClassDB::bind_method(D_METHOD("get_number_of_ai_phases"), &AutonomousAgents2D::get_number_of_ai_phases);
   ClassDB::bind_method(D_METHOD("get_lifetime"), &AutonomousAgents2D::get_lifetime);
@@ -1702,7 +1667,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("restart"), &AutonomousAgents2D::restart);
 
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
-  ADD_PROPERTY(PropertyInfo(Variant::INT, "amount", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_amount", "get_amount");
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "number_of_agents", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_number_of_agents", "get_number_of_agents");
   ADD_GROUP("Optimizations", "");
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_bvh"), "set_use_bvh", "is_using_bvh");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "number_of_ai_phases", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"), "set_number_of_ai_phases", "get_number_of_ai_phases");
@@ -1796,21 +1761,12 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_steering_force_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:N"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_STEERING_FORCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_turn_rate_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_TURN_RATE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_turn_rate", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_TURN_RATE);
-  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align_heading_to_velocity"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN_HEADING_TO_VELOCITY);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_align_heading_to_velocity"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN_HEADING_TO_VELOCITY);
 
   ClassDB::bind_method(D_METHOD("is_agent_steering"), &AutonomousAgents2D::is_agent_steering);
-  ClassDB::bind_method(D_METHOD("set_agent_behaviour_none"), &AutonomousAgents2D::set_agent_behavior_none);
-  ClassDB::bind_method(D_METHOD("is_agent_behaviour_none"), &AutonomousAgents2D::is_agent_behavior_none);
-  ClassDB::bind_method(D_METHOD("set_agent_behaviour_obstacle_avoidance"), &AutonomousAgents2D::set_agent_behavior_obstacle_avoidance);
-  ClassDB::bind_method(D_METHOD("is_agent_behaviour_obstacle_avoidance"), &AutonomousAgents2D::is_agent_behavior_obstacle_avoidance);
-  ClassDB::bind_method(D_METHOD("set_agent_behaviour_remotely_controlled"), &AutonomousAgents2D::set_agent_behavior_remotely_controlled);
-  ClassDB::bind_method(D_METHOD("set_agent_behaviour_remotely_controlled"), &AutonomousAgents2D::set_agent_behavior_remotely_controlled);
-  ClassDB::bind_method(D_METHOD("set_agent_behaviour_seek"), &AutonomousAgents2D::set_agent_behavior_seek);
-  ClassDB::bind_method(D_METHOD("set_agent_behaviour_seek"), &AutonomousAgents2D::set_agent_behavior_seek);
-  ClassDB::bind_method(D_METHOD("is_agent_behaviour_separate"), &AutonomousAgents2D::is_agent_behavior_separate);
-  ClassDB::bind_method(D_METHOD("is_agent_behaviour_separate"), &AutonomousAgents2D::is_agent_behavior_separate);
-  ClassDB::bind_method(D_METHOD("is_agent_behaviour_wander"), &AutonomousAgents2D::is_agent_behavior_wander);
-  ClassDB::bind_method(D_METHOD("is_agent_behaviour_wander"), &AutonomousAgents2D::is_agent_behavior_wander);
+  ClassDB::bind_method(D_METHOD("set_agent_behavior","behavior"), &AutonomousAgents2D::set_agent_behavior);
+  ClassDB::bind_method(D_METHOD("set_agent_behavior_none"), &AutonomousAgents2D::set_agent_behavior_none);
+  ClassDB::bind_method(D_METHOD("is_agent_behavior"), &AutonomousAgents2D::is_agent_behavior);
 
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_obstacle_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE);
@@ -1970,6 +1926,13 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
 
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_NONE);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_REMOTELY_CONTROLLED);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEEK);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEPARATE);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_WANDER);
+
 #ifdef DEBUG_ENABLED
   ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);
   ClassDB::bind_method(D_METHOD("set_is_debug", "is_debug"), &AutonomousAgents2D::set_is_debug);
@@ -1998,7 +1961,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_running(true);
   set_behaviour_delay(0);
-  set_amount(8);
+  set_number_of_agents(8);
   set_use_local_coordinates(false);
 
   set_agent_base_size(Size2(10,10));

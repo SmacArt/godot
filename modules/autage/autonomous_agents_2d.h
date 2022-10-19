@@ -43,13 +43,13 @@ public:
     DRAW_ORDER_LIFETIME,
   };
 
-  enum SteeringBehaviorFlags {
-    STEERING_BEHAVIOR_NONE = 0x000,
-    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 0x001,
-    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 0x002,
-    STEERING_BEHAVIOR_SEEK = 0x004,
-    STEERING_BEHAVIOR_SEPARATE = 0x008,
-    STEERING_BEHAVIOR_WANDER = 0x016,
+  enum SteeringBehavior {
+    STEERING_BEHAVIOR_NONE = 0,
+    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = (1 << 0),
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = (1 << 1),
+    STEERING_BEHAVIOR_SEEK = (1 << 2),
+    STEERING_BEHAVIOR_SEPARATE = (1 << 3),
+    STEERING_BEHAVIOR_WANDER = (1 << 4)
   };
 
   enum Parameter {
@@ -330,7 +330,7 @@ protected:
 
 public:
   void set_running(bool p_running);
-  void set_amount(int p_amount);
+  void set_number_of_agents(int p_number_of_agents);
   void set_lifetime(double p_lifetime);
   void set_pre_process_time(double p_time);
   void set_one_shot(bool p_one_shot);
@@ -344,7 +344,7 @@ public:
   void set_use_bvh(bool p_use_bvh);
 
   bool is_running() const;
-  int get_amount() const;
+  int get_number_of_agents() const;
   double get_lifetime() const;
   bool get_one_shot() const;
   double get_pre_process_time() const;
@@ -433,19 +433,10 @@ public:
   PagedArray<Agent *> agent_cull_aabb_result;
 
   bool is_agent_steering(int index);
-  void set_agent_behavior(Agent *agent, uint32_t behavior, bool is_on);
+  void set_behavior(Agent *agent, uint32_t behavior, bool is_on);
+  void set_agent_behavior(int index, uint32_t behavior, bool is_on);
   void set_agent_behavior_none(int index);
-  bool is_agent_behavior_on(int index, uint32_t behavior);
-  void set_agent_behavior_obstacle_avoidance(int index, bool is_on);
-  bool is_agent_behavior_obstacle_avoidance(int index);
-  void set_agent_behavior_remotely_controlled(int index, bool is_on);
-  bool is_agent_behavior_remotely_controlled(int index);
-  void set_agent_behavior_seek(int index, bool is_on);
-  bool is_agent_behavior_seek(int index);
-  void set_agent_behavior_separate(int index, bool is_on);
-  bool is_agent_behavior_separate(int index);
-  void set_agent_behavior_wander(int index, bool is_on);
-  bool is_agent_behavior_wander(int index);
+  bool is_agent_behavior(int index, uint32_t behavior);
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
@@ -481,5 +472,6 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
 VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
+VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
