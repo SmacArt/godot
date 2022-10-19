@@ -45,10 +45,11 @@ public:
 
   enum SteeringBehaviorFlags {
     STEERING_BEHAVIOR_NONE = 0x000,
-    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 0x001,
-    STEERING_BEHAVIOR_SEEK = 0x002,
-    STEERING_BEHAVIOR_SEPARATE = 0x004,
-    STEERING_BEHAVIOR_WANDER = 0x008,
+    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 0x001,
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 0x002,
+    STEERING_BEHAVIOR_SEEK = 0x004,
+    STEERING_BEHAVIOR_SEPARATE = 0x008,
+    STEERING_BEHAVIOR_WANDER = 0x016,
   };
 
   enum Parameter {
@@ -69,10 +70,10 @@ public:
     PARAM_RADIAL_ACCEL,
     PARAM_SCALE,
     PARAM_TANGENTIAL_ACCEL,
-    PARAM_AVOID_OBSTACLES_DECAY_COEFFICIENT,
-    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_ANGLE,
-    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_DISTANCE,
-    PARAM_AVOID_OBSTACLES_FIELD_OF_VIEW_OFFSET,
+    PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT,
+    PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
+    PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
+    PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
     PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
     PARAM_WANDER_CIRCLE_DISTANCE,
@@ -82,11 +83,14 @@ public:
   };
 
   enum AgentFlags {
-    AGENT_FLAG_ALIGN_Y_TO_VELOCITY,
-    AGENT_FLAG_AVOID_OBSTACLES,
+    AGENT_FLAG_NONE,
+    AGENT_FLAG_OBSTACLE_AVOIDANCE,
+    AGENT_FLAG_REMOTELY_CONTROLLED,
+    AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATE,
     AGENT_FLAG_WANDER,
-    AGENT_FLAG_AVOID_OBSTACLES_FOV_SCALE_TO_SIZE,
+    AGENT_FLAG_ALIGN_HEADING_TO_VELOCITY,
+    AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE,
     AGENT_FLAG_MAX
   };
 
@@ -428,10 +432,24 @@ public:
   PagedArrayPool<Agent *> agent_cull_aabb_page_pool;
   PagedArray<Agent *> agent_cull_aabb_result;
 
+  bool is_agent_steering(int index);
+  void set_agent_behavior(Agent *agent, uint32_t behavior, bool is_on);
+  void set_agent_behavior_none(int index);
+  bool is_agent_behavior_on(int index, uint32_t behavior);
+  void set_agent_behavior_obstacle_avoidance(int index, bool is_on);
+  bool is_agent_behavior_obstacle_avoidance(int index);
+  void set_agent_behavior_remotely_controlled(int index, bool is_on);
+  bool is_agent_behavior_remotely_controlled(int index);
+  void set_agent_behavior_seek(int index, bool is_on);
+  bool is_agent_behavior_seek(int index);
+  void set_agent_behavior_separate(int index, bool is_on);
+  bool is_agent_behavior_separate(int index);
+  void set_agent_behavior_wander(int index, bool is_on);
+  bool is_agent_behavior_wander(int index);
+
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
-  bool is_agent_steering(int index);
   Vector2 get_agent_position(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
@@ -441,9 +459,6 @@ public:
   Vector2 get_agent_avoidance_fov_right_position(int index);
   Vector2 get_agent_avoidance_fov_left_end_position(int index);
   Vector2 get_agent_avoidance_fov_right_end_position(int index);
-  bool is_agent_wandering(int index);
-  bool is_agent_avoiding_obstacles(int index);
-  bool is_agent_separating(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_circle_radius(int index);
   Vector2 get_agent_wander_target(int index);
