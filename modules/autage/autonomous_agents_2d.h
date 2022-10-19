@@ -160,6 +160,8 @@ private:
     real_t wander_rate_of_change = 0.0;
     real_t wander_target_theta = 0.0;
 
+    int32_t target_agent = -1;
+
 #ifdef DEBUG_ENABLED
     Vector2 wander_circle_position;
     Vector2 wander_target;
@@ -172,6 +174,8 @@ private:
     Vector2 avoidance_fov_right_position;
     Vector2 avoidance_fov_left_end_position;
     Vector2 avoidance_fov_right_end_position;
+    bool did_seek;
+    Vector2 seek_target;
 #endif
 
   };
@@ -201,6 +205,16 @@ private:
       return *this;
     }
 
+    inline SteeringOutput operator-(const SteeringOutput &steering_output) const{
+      return SteeringOutput(Vector2(linear - steering_output.linear), angular - steering_output.angular);
+    }
+
+    inline SteeringOutput &operator-=(const SteeringOutput &steering_output) {
+      linear -= steering_output.linear;
+      angular -= steering_output.angular;
+
+      return *this;
+    }
   };
 
   bool running = false;
@@ -220,6 +234,8 @@ private:
   Vector<Agent> agents;
   Vector<float> agent_data;
   Vector<int> agent_order;
+
+  Agent *agents_arr;
 
   struct SortLifetime {
     const Agent *agents = nullptr;
@@ -307,6 +323,7 @@ private:
 
   void apply_steering_behaviors(Agent *agent, int index, double delta);
   SteeringOutput avoid_obstacles(Agent *agent);
+  SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separate(Agent *agent);
   SteeringOutput wander(Agent *agent, double delta);
@@ -438,6 +455,8 @@ public:
   void set_agent_behavior_none(int index);
   bool is_agent_behavior(int index, uint32_t behavior);
 
+  void set_agent_target_agent(int index, int index_to_target);
+
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
@@ -456,10 +475,9 @@ public:
   bool is_agent_aabb_culled(int index);
   int get_agent_ai_phase(int index);
   bool get_did_agent_wander(int index);
+  bool get_did_agent_seek(int index);
+  Vector2 get_agent_seek_target(int index);
 #endif
-
-  Plane p[1];
-  Vector3 points[4];
 
   void restart();
 
