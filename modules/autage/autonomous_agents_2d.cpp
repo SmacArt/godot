@@ -289,10 +289,9 @@ void AutonomousAgents2D::restart() {
 
   {
     int pc = agents.size();
-    Agent *w = agents.ptrw();
 
     for (int i = 0; i < pc; i++) {
-      w[i].active = false;
+      agents_arr[i].active = false;
     }
   }
 
@@ -664,8 +663,6 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
   p_delta *= speed_scale;
 
   int pcount = agents.size();
-  Agent *w = agents.ptrw();
-  Agent *parray = w;
 
   double prev_time = time;
   time += p_delta;
@@ -691,14 +688,14 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 #ifdef DEBUG_ENABLED
   if (is_debug) {
     for (int i = 0; i < pcount; i++) {
-      Agent &p = parray[i];
+      Agent &p = agents_arr[i];
       p.aabb_culled = true;
     }
   }
 #endif
 
   for (int i = 0; i < pcount; i++) {
-    Agent &p = parray[i];
+    Agent &p = agents_arr[i];
 
     if (!running && !p.active) {
       continue;
@@ -1188,7 +1185,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::seek(Agent *agent){
     if (is_debug) {
       agent->did_seek=true;
       agent->seek_target = agents_arr[agent->target_agent].transform[2];
-      print_line(agent->seek_target);
     }
 #endif
     return seek(agent, agents_arr[agent->target_agent].transform[2]);
@@ -1357,9 +1353,8 @@ void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
     cull_aabb.result = &agent_cull_aabb_result;
     agent_bvh.aabb_query(p_aabb, cull_aabb);
   } else {
-    Agent *parray = agents.ptrw();
     for (int i = 0; i < agents.size(); i++) {
-      Agent &p = parray[i];
+      Agent &p = agents_arr[i];
       if (p.aabb.intersects(p_aabb)) {
         agent_cull_aabb_result.push_back(&p);
         // todo - logic not to continue after the first one found -maybe
@@ -1395,7 +1390,6 @@ void AutonomousAgents2D::_update_agent_data_buffer() {
   int *order = nullptr;
 
   float *w = agent_data.ptrw();
-  const Agent *r = agents.ptr();
   float *ptr = w;
 
   if (draw_order != DRAW_ORDER_INDEX) {
@@ -1407,7 +1401,7 @@ void AutonomousAgents2D::_update_agent_data_buffer() {
     }
     if (draw_order == DRAW_ORDER_LIFETIME) {
       SortArray<int, SortLifetime> sorter;
-      sorter.compare.agents = r;
+      sorter.compare.agents = agents_arr;
       sorter.sort(order, pc);
     }
   }
@@ -1415,13 +1409,13 @@ void AutonomousAgents2D::_update_agent_data_buffer() {
   for (int i = 0; i < pc; i++) {
     int idx = order ? order[i] : i;
 
-    Transform2D t = r[idx].transform;
+    Transform2D t = agents_arr[idx].transform;
 
     if (!local_coords) {
       t = inv_emission_transform * t;
     }
 
-    if (r[idx].active) {
+    if (agents_arr[idx].active) {
       ptr[0] = t.columns[0][0];
       ptr[1] = t.columns[1][0];
       ptr[2] = 0;
@@ -1435,17 +1429,17 @@ void AutonomousAgents2D::_update_agent_data_buffer() {
       memset(ptr, 0, sizeof(float) * 8);
     }
 
-    Color c = r[idx].color;
+    Color c = agents_arr[idx].color;
 
     ptr[8] = c.r;
     ptr[9] = c.g;
     ptr[10] = c.b;
     ptr[11] = c.a;
 
-    ptr[12] = r[idx].custom[0];
-    ptr[13] = r[idx].custom[1];
-    ptr[14] = r[idx].custom[2];
-    ptr[15] = r[idx].custom[3];
+    ptr[12] = agents_arr[idx].custom[0];
+    ptr[13] = agents_arr[idx].custom[1];
+    ptr[14] = agents_arr[idx].custom[2];
+    ptr[15] = agents_arr[idx].custom[3];
 
     ptr += 16;
   }
@@ -1523,13 +1517,12 @@ void AutonomousAgents2D::_notification(int p_what) {
       int pc = agents.size();
 
       float *w = agent_data.ptrw();
-      const Agent *r = agents.ptr();
       float *ptr = w;
 
       for (int i = 0; i < pc; i++) {
-        Transform2D t = inv_emission_transform * r[i].transform;
+        Transform2D t = inv_emission_transform * agents_arr[i].transform;
 
-        if (r[i].active) {
+        if (agents_arr[i].active) {
           ptr[0] = t.columns[0][0];
           ptr[1] = t.columns[1][0];
           ptr[2] = 0;
@@ -1551,8 +1544,7 @@ void AutonomousAgents2D::_notification(int p_what) {
 }
 
 bool AutonomousAgents2D::is_agent_steering(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering;
+  return agents_arr[index].steering;
 }
 
 // TODO - will need to set up the agent for the behavior when switched on.
@@ -1560,7 +1552,7 @@ bool AutonomousAgents2D::is_agent_steering(int index) {
 
 void AutonomousAgents2D::set_behavior(Agent *agent, uint32_t behavior, bool is_on) {
   if (behavior == STEERING_BEHAVIOR_NONE) {
-    agent->steering_behavior = STEERING_BEHAVIOR_NONE;
+    agent->steering_behavior = 0;
   } else if (is_on) {
     agent->steering_behavior += behavior;
   } else {
@@ -1569,92 +1561,71 @@ void AutonomousAgents2D::set_behavior(Agent *agent, uint32_t behavior, bool is_o
 }
 
 void AutonomousAgents2D::set_agent_behavior(int index, uint32_t behavior, bool is_on) {
-  Agent *parray = agents.ptrw();
-  set_behavior(&parray[index], behavior, is_on);
+  set_behavior(&agents_arr[index], behavior, is_on);
 }
 
 void AutonomousAgents2D::set_agent_behavior_none(int index) {
-  Agent *parray = agents.ptrw();
-  set_behavior(&parray[index], STEERING_BEHAVIOR_NONE, true);
+  agents_arr[index].steering_behavior = 0;
 }
 bool AutonomousAgents2D::is_agent_behavior(int index, uint32_t behavior) {
-  Agent *parray = agents.ptrw();
-  return parray[index].steering_behavior & behavior;
+  return agents_arr[index].steering_behavior & behavior;
 }
 
 void AutonomousAgents2D::set_agent_target_agent(int index, int index_to_target){
-  Agent *parray = agents.ptrw();
-  parray[index].target_agent = index_to_target;
+  agents_arr[index].target_agent = index_to_target;
 }
 
 #ifdef DEBUG_ENABLED
 Vector2 AutonomousAgents2D::get_agent_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].transform[2];
+  return agents_arr[index].transform[2];
 }
 AABB AutonomousAgents2D::get_agent_aabb(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].aabb;
+  return agents_arr[index].aabb;
 }
 AABB AutonomousAgents2D::get_agent_separation_aabb(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].separation_aabb;
+  return agents_arr[index].separation_aabb;
 }
 AABB AutonomousAgents2D::get_agent_avoidance_fov_aabb(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].avoidance_fov_aabb;
+  return agents_arr[index].avoidance_fov_aabb;
 }
 bool AutonomousAgents2D::is_agent_aabb_culled(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].aabb_culled;
+  return agents_arr[index].aabb_culled;
 }
 Vector2 AutonomousAgents2D::get_agent_avoidance_fov_start_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].avoidance_fov_start_position;
+  return agents_arr[index].avoidance_fov_start_position;
 }
 Vector2 AutonomousAgents2D::get_agent_avoidance_fov_left_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].avoidance_fov_left_position;
+  return agents_arr[index].avoidance_fov_left_position;
 }
 Vector2 AutonomousAgents2D::get_agent_avoidance_fov_right_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].avoidance_fov_right_position;
+  return agents_arr[index].avoidance_fov_right_position;
 }
 Vector2 AutonomousAgents2D::get_agent_avoidance_fov_left_end_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].avoidance_fov_left_end_position;
+  return agents_arr[index].avoidance_fov_left_end_position;
 }
 Vector2 AutonomousAgents2D::get_agent_avoidance_fov_right_end_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].avoidance_fov_right_end_position;
+  return agents_arr[index].avoidance_fov_right_end_position;
 }
 Vector2 AutonomousAgents2D::get_agent_wander_circle_position(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].wander_circle_position;
+  return agents_arr[index].wander_circle_position;
 }
 real_t AutonomousAgents2D::get_agent_wander_circle_radius(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].wander_circle_radius;
+  return agents_arr[index].wander_circle_radius;
 }
 Vector2 AutonomousAgents2D::get_agent_wander_target(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].wander_target;
+  return agents_arr[index].wander_target;
 }
 int AutonomousAgents2D::get_agent_ai_phase(int index) {
-  Agent *parray = agents.ptrw();
-  return parray[index].ai_phase;
+  return agents_arr[index].ai_phase;
 }
 bool AutonomousAgents2D::get_did_agent_wander(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].did_wander;
+  return agents_arr[index].did_wander;
 }
 bool AutonomousAgents2D::get_did_agent_seek(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].did_seek;
+  return agents_arr[index].did_seek;
 }
 Vector2 AutonomousAgents2D::get_agent_seek_target(int index){
-  Agent *parray = agents.ptrw();
-  return parray[index].seek_target;
+  return agents_arr[index].seek_target;
 }
 #endif
 
