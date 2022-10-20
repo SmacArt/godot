@@ -1150,32 +1150,36 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
 #ifdef DEBUG_ENABLED
   if (is_debug) {
     agent->did_wander=false;
+    agent->did_seek=false;
   }
 #endif
-  if (agent->steering_behavior & STEERING_BEHAVIOR_SEEK) {
-    steering_output += seek(agent);
-  }
-  if (agent->steering_behavior & STEERING_BEHAVIOR_SEPARATE) {
-    steering_output += separate(agent);
-  }
-  if (agent->steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
-    steering_output += avoid_obstacles(agent);
-  }
-  if (agent->steering_behavior & STEERING_BEHAVIOR_WANDER && steering_output.linear.length_squared() == 0) {
-#ifdef DEBUG_ENABLED
-    if (is_debug) {
-      agent->did_wander=true;
+  if (agent->steering_behavior & STEERING_BEHAVIOR_REMOTELY_CONTROLLED) {
+  } else {
+    if (agent->steering_behavior & STEERING_BEHAVIOR_SEEK) {
+      steering_output += seek(agent);
     }
+    if (agent->steering_behavior & STEERING_BEHAVIOR_SEPARATE) {
+      steering_output += separate(agent);
+    }
+    if (agent->steering_behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
+      steering_output += avoid_obstacles(agent);
+    }
+    if (agent->steering_behavior & STEERING_BEHAVIOR_WANDER && steering_output.linear.length_squared() == 0) {
+#ifdef DEBUG_ENABLED
+      if (is_debug) {
+        agent->did_wander=true;
+      }
 #endif
-    steering_output += wander(agent, delta);
-  }
+      steering_output += wander(agent, delta);
+    }
 
-  // todo - include mass i.e agent->velocity += steering_output.linear * delta;
-  agent->velocity += steering_output.linear * delta;
-  agent->rotation += steering_output.angular * delta;
+    // todo - include mass i.e agent->velocity += steering_output.linear * delta;
+    agent->velocity += steering_output.linear * delta;
+    agent->rotation += steering_output.angular * delta;
 
-  if (agent->velocity.length() > agent->max_speed) {
-    agent->velocity = agent->velocity.normalized() * agent->max_speed;
+    if (agent->velocity.length() > agent->max_speed) {
+      agent->velocity = agent->velocity.normalized() * agent->max_speed;
+    }
   }
 }
 
@@ -1575,10 +1579,16 @@ void AutonomousAgents2D::set_agent_target_agent(int index, int index_to_target){
   agents_arr[index].target_agent = index_to_target;
 }
 
-#ifdef DEBUG_ENABLED
+void AutonomousAgents2D::set_agent_position_from_remote(int index, Vector2 p_position){
+  agents_arr[index].velocity = Vector2(0,0);
+  agents_arr[index].transform[2] = p_position;
+}
+
 Vector2 AutonomousAgents2D::get_agent_position(int index){
   return agents_arr[index].transform[2];
 }
+
+#ifdef DEBUG_ENABLED
 AABB AutonomousAgents2D::get_agent_aabb(int index){
   return agents_arr[index].aabb;
 }
@@ -1741,7 +1751,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_base_size"), &AutonomousAgents2D::get_agent_base_size);
   ClassDB::bind_method(D_METHOD("set_agent_base_size", "agent_base_size"), &AutonomousAgents2D::set_agent_base_size);
   ClassDB::bind_method(D_METHOD("get_agent_aabb_expansion_ratio"), &AutonomousAgents2D::get_agent_aabb_expansion_ratio);
-  ClassDB::bind_method(D_METHOD("get_agent_aabb_expansion_ratio"), &AutonomousAgents2D::get_agent_aabb_expansion_ratio);
+  ClassDB::bind_method(D_METHOD("set_agent_aabb_expansion_ratio","agent_aabb_expansion_ratio"), &AutonomousAgents2D::set_agent_aabb_expansion_ratio);
 
   ClassDB::bind_method(D_METHOD("get_split_scale"), &AutonomousAgents2D::get_split_scale);
   ClassDB::bind_method(D_METHOD("set_split_scale", "split_scale"), &AutonomousAgents2D::set_split_scale);
@@ -1773,6 +1783,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_agent_behavior_none"), &AutonomousAgents2D::set_agent_behavior_none);
   ClassDB::bind_method(D_METHOD("is_agent_behavior"), &AutonomousAgents2D::is_agent_behavior);
   ClassDB::bind_method(D_METHOD("set_agent_target_agent","target_agent"), &AutonomousAgents2D::set_agent_target_agent);
+  ClassDB::bind_method(D_METHOD("set_agent_position_from_remote"), &AutonomousAgents2D::set_agent_position_from_remote);
 
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_obstacle_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE);

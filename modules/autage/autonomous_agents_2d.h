@@ -454,13 +454,13 @@ public:
   void set_agent_behavior(int index, uint32_t behavior, bool is_on);
   void set_agent_behavior_none(int index);
   bool is_agent_behavior(int index, uint32_t behavior);
-
   void set_agent_target_agent(int index, int index_to_target);
+  Vector2 get_agent_position(int index);
+  void set_agent_position_from_remote(int index, Vector2 position);
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
-  Vector2 get_agent_position(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
   AABB get_agent_avoidance_fov_aabb(int index);
