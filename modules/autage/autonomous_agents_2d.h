@@ -458,6 +458,11 @@ public:
   Vector2 get_agent_position(int index);
   void set_agent_position_from_remote(int index, Vector2 position);
 
+  void setup_agent_with_obstacle_avoidance(Agent *agent);
+  void setup_agent_with_separate(Agent *agent);
+  void setup_agent_with_wander(Agent *agent);
+
+
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}

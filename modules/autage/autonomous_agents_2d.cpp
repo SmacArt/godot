@@ -659,6 +659,30 @@ void AutonomousAgents2D::_update_internal() {
   _update_agent_data_buffer();
 }
 
+void AutonomousAgents2D:: setup_agent_with_obstacle_avoidance(Agent *agent){
+  agent->steering_behavior += STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
+  agent->avoid_obstacles_field_of_view_angle = Math::deg_to_rad(Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE], rand_from_seed(agent->seed)));
+  agent->avoid_obstacles_field_of_view_min_distance = parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE];
+  agent->avoid_obstacles_field_of_view_max_distance = parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE];
+  agent->avoid_obstacles_field_of_view_base_distance = Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE], rand_from_seed(agent->seed));
+  agent->avoid_obstacles_field_of_view_distance = agent->avoid_obstacles_field_of_view_base_distance;
+  agent->avoid_obstacles_field_of_view_offset = Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET], rand_from_seed(agent->seed));
+  agent->avoid_obstacles_field_of_view_base_offset = agent->avoid_obstacles_field_of_view_offset;
+  agent->avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT], parameters_max[PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT], rand_from_seed(agent->seed));
+  agent->avoid_obstacles_fov_scale_to_size = agent_flags[AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE];
+}
+
+void AutonomousAgents2D::setup_agent_with_separate(Agent *agent){
+  agent->separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(agent->seed));
+  agent->separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(agent->seed));
+}
+
+void AutonomousAgents2D::setup_agent_with_wander(Agent *agent){
+  agent->wander_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(agent->seed));
+  agent->wander_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(agent->seed));
+  agent->wander_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(agent->seed));
+}
+
 void AutonomousAgents2D::_agents_process(double p_delta) {
   p_delta *= speed_scale;
 
@@ -779,34 +803,17 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.hue_rot_rand = Math::randf();
       p.anim_offset_rand = Math::randf();
 
-      if (agent_flags[AGENT_FLAG_WANDER]) {
-        p.steering_behavior += STEERING_BEHAVIOR_WANDER;
-        p.wander_rate_of_change = Math::lerp(parameters_min[PARAM_WANDER_RATE_OF_CHANGE], parameters_max[PARAM_WANDER_RATE_OF_CHANGE], rand_from_seed(p.seed));
-        p.wander_circle_distance = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_DISTANCE], parameters_max[PARAM_WANDER_CIRCLE_DISTANCE], rand_from_seed(p.seed));
-        p.wander_circle_radius = Math::lerp(parameters_min[PARAM_WANDER_CIRCLE_RADIUS], parameters_max[PARAM_WANDER_CIRCLE_RADIUS], rand_from_seed(p.seed));
-      }
-
-      if (agent_flags[AGENT_FLAG_SEEK]) {
-        p.steering_behavior += STEERING_BEHAVIOR_SEEK;
-      }
-
-      if (agent_flags[AGENT_FLAG_SEPARATE]) {
-        p.steering_behavior += STEERING_BEHAVIOR_SEPARATE;
-        p.separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(p.seed));
-        p.separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
-      }
-
       if (agent_flags[AGENT_FLAG_OBSTACLE_AVOIDANCE]) {
-        p.steering_behavior += STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE;
-        p.avoid_obstacles_field_of_view_angle = Math::deg_to_rad(Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE], rand_from_seed(p.seed)));
-        p.avoid_obstacles_field_of_view_min_distance = parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE];
-        p.avoid_obstacles_field_of_view_max_distance = parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE];
-        p.avoid_obstacles_field_of_view_base_distance = Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE], rand_from_seed(p.seed));
-        p.avoid_obstacles_field_of_view_distance = p.avoid_obstacles_field_of_view_base_distance;
-        p.avoid_obstacles_field_of_view_offset = Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET], parameters_max[PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET], rand_from_seed(p.seed));
-        p.avoid_obstacles_field_of_view_base_offset = p.avoid_obstacles_field_of_view_offset;
-        p.avoid_obstacles_decay_coefficient = Math::lerp(parameters_min[PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT], parameters_max[PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT], rand_from_seed(p.seed));
-        p.avoid_obstacles_fov_scale_to_size = agent_flags[AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE];
+        set_behavior(&p, STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE, true);
+      }
+      if (agent_flags[AGENT_FLAG_SEEK]) {
+        set_behavior(&p, STEERING_BEHAVIOR_SEEK, true);
+      }
+      if (agent_flags[AGENT_FLAG_SEPARATE]) {
+        set_behavior(&p, STEERING_BEHAVIOR_SEPARATE, true);
+      }
+      if (agent_flags[AGENT_FLAG_WANDER]) {
+        set_behavior(&p, STEERING_BEHAVIOR_WANDER, true);
       }
 
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
@@ -1551,14 +1558,20 @@ bool AutonomousAgents2D::is_agent_steering(int index) {
   return agents_arr[index].steering;
 }
 
-// TODO - will need to set up the agent for the behavior when switched on.
-//        if turned on and off and on it should retain its previously set settings.
-
 void AutonomousAgents2D::set_behavior(Agent *agent, uint32_t behavior, bool is_on) {
   if (behavior == STEERING_BEHAVIOR_NONE) {
     agent->steering_behavior = 0;
   } else if (is_on) {
     agent->steering_behavior += behavior;
+    if (behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
+      setup_agent_with_obstacle_avoidance(agent);
+    }
+    if (behavior & STEERING_BEHAVIOR_SEPARATE) {
+      setup_agent_with_separate(agent);
+    }
+    if (behavior & STEERING_BEHAVIOR_WANDER) {
+      setup_agent_with_wander(agent);
+    }
   } else {
     agent->steering_behavior -= behavior;
   }
