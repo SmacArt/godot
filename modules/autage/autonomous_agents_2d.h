@@ -45,11 +45,12 @@ public:
 
   enum SteeringBehavior {
     STEERING_BEHAVIOR_NONE = 0,
-    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = (1 << 0),
+    STEERING_BEHAVIOR_FLEE = (1 << 0),
     STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = (1 << 1),
-    STEERING_BEHAVIOR_SEEK = (1 << 2),
-    STEERING_BEHAVIOR_SEPARATE = (1 << 3),
-    STEERING_BEHAVIOR_WANDER = (1 << 4)
+    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = (1 << 2),
+    STEERING_BEHAVIOR_SEEK = (1 << 3),
+    STEERING_BEHAVIOR_SEPARATE = (1 << 4),
+    STEERING_BEHAVIOR_WANDER = (1 << 5)
   };
 
   enum Parameter {
@@ -83,6 +84,7 @@ public:
   };
 
   enum AgentFlags {
+    AGENT_FLAG_FLEE,
     AGENT_FLAG_NONE,
     AGENT_FLAG_OBSTACLE_AVOIDANCE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
@@ -176,6 +178,8 @@ private:
     Vector2 avoidance_fov_right_end_position;
     bool did_seek;
     Vector2 seek_target;
+    bool did_flee;
+    Vector2 flee_target;
 #endif
 
   };
@@ -323,6 +327,8 @@ private:
 
   void apply_steering_behaviors(Agent *agent, int index, double delta);
   SteeringOutput avoid_obstacles(Agent *agent);
+  SteeringOutput flee(Agent *agent);
+  SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separate(Agent *agent);
@@ -482,6 +488,8 @@ public:
   bool get_did_agent_wander(int index);
   bool get_did_agent_seek(int index);
   Vector2 get_agent_seek_target(int index);
+  bool get_did_agent_flee(int index);
+  Vector2 get_agent_flee_target(int index);
 #endif
 
   void restart();

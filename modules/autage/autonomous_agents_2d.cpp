@@ -803,6 +803,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.hue_rot_rand = Math::randf();
       p.anim_offset_rand = Math::randf();
 
+      if (agent_flags[AGENT_FLAG_FLEE]) {
+        set_behavior(&p, STEERING_BEHAVIOR_FLEE, true);
+      }
       if (agent_flags[AGENT_FLAG_OBSTACLE_AVOIDANCE]) {
         set_behavior(&p, STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE, true);
       }
@@ -1158,10 +1161,14 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
   if (is_debug) {
     agent->did_wander=false;
     agent->did_seek=false;
+    agent->did_flee=false;
   }
 #endif
   if (agent->steering_behavior & STEERING_BEHAVIOR_REMOTELY_CONTROLLED) {
   } else {
+    if (agent->steering_behavior & STEERING_BEHAVIOR_FLEE) {
+      steering_output += flee(agent);
+    }
     if (agent->steering_behavior & STEERING_BEHAVIOR_SEEK) {
       steering_output += seek(agent);
     }
@@ -1188,6 +1195,27 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
       agent->velocity = agent->velocity.normalized() * agent->max_speed;
     }
   }
+}
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent){
+  if (agent->target_agent > -1) {
+#ifdef DEBUG_ENABLED
+    if (is_debug) {
+      agent->did_flee=true;
+      agent->flee_target = agents_arr[agent->target_agent].transform[2];
+    }
+#endif
+    return flee(agent, agents_arr[agent->target_agent].transform[2]);
+  }
+  return SteeringOutput();
+}
+
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent, Vector2 target){
+  SteeringOutput steering_output;
+  steering_output.linear = agent->transform[2] - target;
+  steering_output.linear.normalize();
+  steering_output.linear *= agent->max_acceleration;
+  steering_output.angular = 0;
+  return steering_output;
 }
 
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::seek(Agent *agent){
@@ -1641,11 +1669,17 @@ Vector2 AutonomousAgents2D::get_agent_wander_target(int index){
 int AutonomousAgents2D::get_agent_ai_phase(int index) {
   return agents_arr[index].ai_phase;
 }
+bool AutonomousAgents2D::get_did_agent_flee(int index){
+  return agents_arr[index].did_flee;
+}
 bool AutonomousAgents2D::get_did_agent_wander(int index){
   return agents_arr[index].did_wander;
 }
 bool AutonomousAgents2D::get_did_agent_seek(int index){
   return agents_arr[index].did_seek;
+}
+Vector2 AutonomousAgents2D::get_agent_flee_target(int index){
+  return agents_arr[index].flee_target;
 }
 Vector2 AutonomousAgents2D::get_agent_seek_target(int index){
   return agents_arr[index].seek_target;
@@ -1801,6 +1835,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_obstacle_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_remotely_controlled"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_REMOTELY_CONTROLLED);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flee"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLEE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_seek"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEEK);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_wander"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_WANDER);
@@ -1938,6 +1973,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_ANIM_OFFSET);
   BIND_ENUM_CONSTANT(PARAM_MAX);
 
+  BIND_ENUM_CONSTANT(AGENT_FLAG_FLEE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_NONE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_OBSTACLE_AVOIDANCE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_REMOTELY_CONTROLLED);
@@ -1956,6 +1992,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_DIRECTED_POINTS);
   BIND_ENUM_CONSTANT(EMISSION_SHAPE_MAX);
 
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_FLEE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_NONE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_REMOTELY_CONTROLLED);
@@ -1981,6 +2018,8 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("is_agent_aabb_culled"), &AutonomousAgents2D::is_agent_aabb_culled);
   ClassDB::bind_method(D_METHOD("get_agent_ai_phase"), &AutonomousAgents2D::get_agent_ai_phase);
   ClassDB::bind_method(D_METHOD("get_did_agent_wander"), &AutonomousAgents2D::get_did_agent_wander);
+  ClassDB::bind_method(D_METHOD("get_did_agent_flee"), &AutonomousAgents2D::get_did_agent_flee);
+  ClassDB::bind_method(D_METHOD("get_agent_flee_target"), &AutonomousAgents2D::get_agent_flee_target);
   ClassDB::bind_method(D_METHOD("get_did_agent_seek"), &AutonomousAgents2D::get_did_agent_seek);
   ClassDB::bind_method(D_METHOD("get_agent_seek_target"), &AutonomousAgents2D::get_agent_seek_target);
 #endif
