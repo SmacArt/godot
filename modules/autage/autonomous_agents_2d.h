@@ -44,13 +44,48 @@ public:
   };
 
   enum SteeringBehavior {
-    STEERING_BEHAVIOR_NONE = 0,
-    STEERING_BEHAVIOR_FLEE = (1 << 0),
-    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = (1 << 1),
-    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = (1 << 2),
-    STEERING_BEHAVIOR_SEEK = (1 << 3),
-    STEERING_BEHAVIOR_SEPARATE = (1 << 4),
-    STEERING_BEHAVIOR_WANDER = (1 << 5)
+    STEERING_BEHAVIOR_ARRIVE = 1 << 0,
+    STEERING_BEHAVIOR_FLEE = 1 << 1,
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 2,
+    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 3,
+    STEERING_BEHAVIOR_SEEK = 1 << 4,
+    STEERING_BEHAVIOR_SEPARATE = 1 << 5,
+    STEERING_BEHAVIOR_WANDER = 1 << 6
+  };
+
+  struct SteeringBehaviorFlag
+  {
+    void set(SteeringBehavior flag)
+    {
+      value |= (int)flag;
+    }
+
+    void unset(SteeringBehavior flag)
+    {
+      value &= ~(int)flag;
+    }
+
+    void flip(SteeringBehavior flag)
+    {
+      value ^= (int)flag;
+    }
+
+    //Check whether a flag is set to true
+    inline bool has(SteeringBehavior flag)
+    {
+      return (value & (int)flag) == (int)flag;
+    }
+
+    bool has_any(SteeringBehavior multi_flag)
+    {
+      return (value & (int)multi_flag) != 0;
+    }
+
+    void clear() {
+      value = 0;
+    }
+
+    uint32_t value = 0;
   };
 
   enum Parameter {
@@ -71,6 +106,9 @@ public:
     PARAM_RADIAL_ACCEL,
     PARAM_SCALE,
     PARAM_TANGENTIAL_ACCEL,
+    PARAM_ARRIVE_SLOW_RADIUS,
+    PARAM_ARRIVE_TARGET_RADIUS,
+    PARAM_ARRIVE_TIME_TO_TARGET,
     PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
@@ -84,8 +122,8 @@ public:
   };
 
   enum AgentFlags {
+    AGENT_FLAG_ARRIVE,
     AGENT_FLAG_FLEE,
-    AGENT_FLAG_NONE,
     AGENT_FLAG_OBSTACLE_AVOIDANCE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_SEEK,
@@ -140,7 +178,11 @@ private:
     Vector2 velocity;
     real_t rotation = 0.0;
 
-    uint32_t steering_behavior = STEERING_BEHAVIOR_NONE;
+    SteeringBehaviorFlag steering_behavior;
+
+    real_t arrive_target_radius = 0.0;
+    real_t arrive_slow_radius = 0.0;
+    real_t arrive_time_to_target = 0.0;
 
     real_t avoid_obstacles_decay_coefficient = 0.0;
     real_t avoid_obstacles_field_of_view_angle = 0.0;
@@ -169,17 +211,21 @@ private:
     Vector2 wander_target;
     bool aabb_culled;
     AABB separation_aabb;
-    bool did_wander;
     AABB avoidance_fov_aabb;
     Vector2 avoidance_fov_start_position;
     Vector2 avoidance_fov_left_position;
     Vector2 avoidance_fov_right_position;
     Vector2 avoidance_fov_left_end_position;
     Vector2 avoidance_fov_right_end_position;
-    bool did_seek;
-    Vector2 seek_target;
-    bool did_flee;
+    Vector2 arrive_target;
     Vector2 flee_target;
+    Vector2 seek_target;
+    bool arriving_in_slow_radius;
+    bool arriving_in_target_radius;
+    bool did_arrive;
+    bool did_flee;
+    bool did_seek;
+    bool did_wander;
 #endif
 
   };
@@ -326,6 +372,8 @@ private:
   void _texture_changed();
 
   void apply_steering_behaviors(Agent *agent, int index, double delta);
+  SteeringOutput arrive(Agent *agent);
+  SteeringOutput arrive(Agent *agent, Vector2 target);
   SteeringOutput avoid_obstacles(Agent *agent);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
@@ -456,14 +504,16 @@ public:
   PagedArray<Agent *> agent_cull_aabb_result;
 
   bool is_agent_steering(int index);
-  void set_behavior(Agent *agent, uint32_t behavior, bool is_on);
-  void set_agent_behavior(int index, uint32_t behavior, bool is_on);
-  void set_agent_behavior_none(int index);
-  bool is_agent_behavior(int index, uint32_t behavior);
+  void set_behavior(Agent *agent, SteeringBehavior behavior, bool is_on);
+  void set_agent_behavior(int index, SteeringBehavior behavior);
+  void unset_agent_behavior(int index, SteeringBehavior behavior);
+  void clear_agent_behavior(int index);
+  bool has_agent_behavior(int index, SteeringBehavior behavior);
   void set_agent_target_agent(int index, int index_to_target);
   Vector2 get_agent_position(int index);
   void set_agent_position_from_remote(int index, Vector2 position);
 
+  void setup_agent_with_arrive(Agent *agent);
   void setup_agent_with_obstacle_avoidance(Agent *agent);
   void setup_agent_with_separate(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
@@ -490,6 +540,13 @@ public:
   Vector2 get_agent_seek_target(int index);
   bool get_did_agent_flee(int index);
   Vector2 get_agent_flee_target(int index);
+  bool get_did_agent_arrive(int index);
+  Vector2 get_agent_arrive_target(int index);
+  bool is_agent_arriving_in_slow_radius(int index);
+  bool is_agent_arriving_in_target_radius(int index);
+  real_t get_agent_arrive_slow_radius(int index);
+  real_t get_agent_arrive_target_radius(int index);
+
 #endif
 
   void restart();
