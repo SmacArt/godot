@@ -136,7 +136,7 @@ public:
     AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATE,
     AGENT_FLAG_WANDER,
-    AGENT_FLAG_ALIGN_HEADING_TO_VELOCITY,
+    AGENT_FLAG_ALIGN_ORIENTATION_TO_VELOCITY,
     AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE,
     AGENT_FLAG_MAX
   };
@@ -180,7 +180,7 @@ private:
     double time = 0.0;
     double lifetime = 0.0;
     Color base_color;
-    bool align_heading_to_velocity = false;
+    bool align_orientation_to_velocity = false;
 
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
@@ -533,7 +533,8 @@ public:
   void set_agent_target_agent(int index, int index_to_target);
   Vector2 get_agent_position(int index);
   void set_agent_position_from_remote(int index, Vector2 position);
-  void set_agent_align_heading_to_velocity(int index, bool is_align);
+  void set_agent_orientation_from_remote(int index, real_t orientation);
+  void set_agent_align_orientation_to_velocity(int index, bool is_align);
 
   void setup_agent_with_align(Agent *agent);
   void setup_agent_with_arrive(Agent *agent);
