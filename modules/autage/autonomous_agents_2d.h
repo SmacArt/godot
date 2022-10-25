@@ -188,6 +188,8 @@ private:
     Vector2 velocity;
     real_t rotation = 0.0;
 
+    real_t orientation = 0.0;
+
     SteeringBehaviorFlag steering_behavior;
 
     real_t align_target_radius = 0.0;
@@ -349,6 +351,7 @@ private:
   Vector2 direction = Vector2(1, 0);
   real_t spread = 45.0;
   real_t half_pi = Math_PI * 0.5;
+  real_t two_pi = Math_PI * 2.0;
 
   real_t parameters_min[PARAM_MAX];
   real_t parameters_max[PARAM_MAX];
@@ -583,6 +586,17 @@ public:
 
   AutonomousAgents2D();
   ~AutonomousAgents2D();
+
+inline double map_orientation_to_pi_randian_range(const double orientation) {
+  double r = fmod(orientation, two_pi);
+  if (Math::abs(r) > Math_PI) {
+    if (r < 0.0f)
+      r += two_pi;
+    else
+      r -= two_pi;
+  }
+  return r;
+}
 
 };
 

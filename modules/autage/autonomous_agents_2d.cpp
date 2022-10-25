@@ -857,7 +857,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.velocity = rot * Math::lerp(parameters_min[PARAM_INITIAL_LINEAR_VELOCITY], parameters_max[PARAM_INITIAL_LINEAR_VELOCITY], (real_t)Math::randf());
 
       real_t base_angle = tex_angle * Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
-      p.rotation = Math::deg_to_rad(base_angle);
+      p.orientation = Math::deg_to_rad(base_angle);
 
       if (p.align_orientation_to_velocity) {
         old_transform = Transform2D(p.transform);
@@ -1029,7 +1029,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
         real_t base_angle = (tex_angle)*Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
         base_angle += p.custom[1] * lifetime * tex_angular_velocity * Math::lerp(parameters_min[PARAM_ANGULAR_VELOCITY], parameters_max[PARAM_ANGULAR_VELOCITY], rand_from_seed(alt_seed));
-        p.rotation = Math::deg_to_rad(base_angle); //angle
+        p.orientation = Math::deg_to_rad(base_angle); //angle
 
         p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
       }
@@ -1106,8 +1106,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform.columns[1] = old_transform.columns[1];
       }
     } else {
-      p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
-      p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
+      p.orientation += p.rotation * local_delta;
+      p.transform.columns[0] = Vector2(Math::cos(p.orientation), -Math::sin(p.orientation));
+      p.transform.columns[1] = Vector2(Math::sin(p.orientation), Math::cos(p.orientation));
     }
 
     //scale by scale
@@ -1211,7 +1212,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
       steering_output += wander(agent, delta);
     }
 
-    // todo - include mass i.e agent->velocity += steering_output.linear * delta;
+    // TODO - include mass i.e agent->velocity += steering_output.linear * mass * delta;
     agent->velocity += steering_output.linear * delta;
     agent->rotation += steering_output.angular * delta;
 
@@ -1225,7 +1226,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
       agent->rotation *= agent->max_rotation;
     }
 
-    print_line("agent speed:", agent->velocity.length(), " rotation:", agent->rotation);
+    //    print_line("agent speed:", agent->velocity.length(), " rotation:", agent->rotation, " orientation:", agent->orientation);
   }
 }
 
@@ -1285,7 +1286,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
       agent->aligning_in_target_radius = false;
     }
 #endif
-    return align(agent, agents_arr[agent->target_agent].transform[0].angle(), delta);
+    return align(agent, agents_arr[agent->target_agent].orientation, delta);
   }
   return SteeringOutput();
 }
@@ -1293,9 +1294,8 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, double target, double delta){
   SteeringOutput steering_output;
 
-  double rotation = target - agent->transform[0].angle();   // radians
+  double rotation = map_orientation_to_pi_randian_range(target - agent->orientation);
   double rotation_size = Math::abs(rotation);
-
 
   if (rotation_size < agent->align_target_radius) {
 #ifdef DEBUG_ENABLED
@@ -1303,14 +1303,12 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
       agent->aligning_in_target_radius = true;
     }
 #endif
-    print_line("less_than_target_radius");
     return steering_output;
   }
 
   double target_rotation = 0.0f;
 
   if (rotation_size > agent->align_slow_radius) {
-    print_line("too_big");
     target_rotation = agent->max_rotation;
   } else {
 #ifdef DEBUG_ENABLED
@@ -1318,15 +1316,13 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
       agent->aligning_in_slow_radius = true;
     }
 #endif
-    target_rotation = agent->max_rotation * rotation_size;// / agent->align_slow_radius;
+    target_rotation = agent->max_rotation * rotation_size / agent->align_slow_radius;
   }
 
   target_rotation *= rotation / rotation_size;
-  print_line("rotation size:", rotation_size, " targetrotation", target_rotation);
 
-  steering_output.angular = (target_rotation - agent->rotation);// / agent->align_time_to_target;
+  steering_output.angular = (target_rotation - agent->rotation) / agent->align_time_to_target;
 
-  print_line("angular: ", steering_output.angular);
   double angular_acceleration = Math::abs(steering_output.angular);
   if (angular_acceleration > agent->max_angular_acceleration) {
     steering_output.angular /= angular_acceleration;
@@ -1791,7 +1787,7 @@ void AutonomousAgents2D::set_agent_position_from_remote(int index, Vector2 p_pos
 
 void AutonomousAgents2D::set_agent_orientation_from_remote(int index, real_t p_orientation){
   if (has_agent_behavior(index, STEERING_BEHAVIOR_REMOTELY_CONTROLLED)) {
-    agents_arr[index].rotation = p_orientation;
+    agents_arr[index].orientation = p_orientation;
   }
 }
 
