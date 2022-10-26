@@ -51,7 +51,8 @@ public:
     STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 4,
     STEERING_BEHAVIOR_SEEK = 1 << 5,
     STEERING_BEHAVIOR_SEPARATE = 1 << 6,
-    STEERING_BEHAVIOR_WANDER = 1 << 7
+    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 7,
+    STEERING_BEHAVIOR_WANDER = 1 << 8
   };
 
   struct SteeringBehaviorFlag
@@ -121,6 +122,7 @@ public:
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
     PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
+    PARAM_VELOCITY_MATCHING_TIME_TO_TARGET,
     PARAM_WANDER_CIRCLE_DISTANCE,
     PARAM_WANDER_CIRCLE_RADIUS,
     PARAM_WANDER_RATE_OF_CHANGE,
@@ -135,6 +137,7 @@ public:
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATE,
+    AGENT_FLAG_VELOCITY_MATCHING,
     AGENT_FLAG_WANDER,
     AGENT_FLAG_ALIGN_ORIENTATION_TO_VELOCITY,
     AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE,
@@ -215,6 +218,8 @@ private:
     real_t separate_neighbourhood_expansion = 0.0;
     real_t separate_decay_coefficient = 0.0;
 
+    real_t velocity_matching_time_to_target = 0.0;
+
     real_t wander_circle_distance = 0.0;
     real_t wander_circle_radius = 0.0;
     real_t wander_rate_of_change = 0.0;
@@ -237,6 +242,7 @@ private:
     Vector2 arrive_target;
     Vector2 flee_target;
     Vector2 seek_target;
+    Vector2 velocity_matching_target;
     bool aligning_in_slow_radius = false;
     bool aligning_in_target_radius = false;
     bool arriving_in_slow_radius = false;
@@ -245,6 +251,7 @@ private:
     bool did_arrive = false;
     bool did_flee = false;
     bool did_seek = false;
+    bool did_velocity_matching = false;
     bool did_wander = false;
 #endif
 
@@ -404,6 +411,8 @@ private:
   SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separate(Agent *agent);
+  SteeringOutput velocity_matching(Agent *agent, double delta);
+  SteeringOutput velocity_matching(Agent *agent, Vector2 target, double delta);
   SteeringOutput wander(Agent *agent, double delta);
 
   DynamicBVH agent_bvh;
@@ -543,6 +552,7 @@ public:
   void setup_agent_with_arrive(Agent *agent);
   void setup_agent_with_obstacle_avoidance(Agent *agent);
   void setup_agent_with_separate(Agent *agent);
+  void setup_agent_with_velocity_matching(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
 
 
@@ -579,6 +589,8 @@ public:
   bool is_agent_arriving_in_target_radius(int index);
   real_t get_agent_arrive_slow_radius(int index);
   real_t get_agent_arrive_target_radius(int index);
+  bool get_did_agent_velocity_matching(int index);
+  Vector2 get_agent_velocity_matching_target(int index);
 
 #endif
 
