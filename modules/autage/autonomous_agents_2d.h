@@ -402,7 +402,7 @@ private:
 
   void apply_steering_behaviors(Agent *agent, int index, double delta);
   SteeringOutput align(Agent *agent, double delta);
-  SteeringOutput align(Agent *agent, double target, double delta);
+  SteeringOutput align(Agent *agent, double target_rotation, double delta);
   SteeringOutput arrive(Agent *agent, double delta);
   SteeringOutput arrive(Agent *agent, Vector2 target, double delta);
   SteeringOutput avoid_obstacles(Agent *agent);
@@ -599,16 +599,21 @@ public:
   AutonomousAgents2D();
   ~AutonomousAgents2D();
 
-inline double map_orientation_to_pi_randian_range(const double orientation) {
-  double r = fmod(orientation, two_pi);
-  if (Math::abs(r) > Math_PI) {
-    if (r < 0.0f)
-      r += two_pi;
-    else
-      r -= two_pi;
+  inline double map_orientation_to_pi_randian_range(const double orientation) {
+    double r = fmod(orientation, two_pi);
+    if (Math::abs(r) > Math_PI) {
+      if (r < 0.0f)
+        r += two_pi;
+      else
+        r -= two_pi;
+    }
+    return r;
   }
-  return r;
-}
+
+  inline double short_angle_distance(const double from, const double to) {
+    double difference = fmod(to - from, two_pi);
+    return fmod(2.0 * difference, two_pi) - difference;
+  }
 
 };
 

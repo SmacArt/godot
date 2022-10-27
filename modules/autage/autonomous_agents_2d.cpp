@@ -1112,7 +1112,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform.columns[0] = old_transform.columns[0];
         p.transform.columns[1] = old_transform.columns[1];
       }
-      // TODO ---  set this propery p.orientation = p.transform.columns[1].angle();
+      // todo-- this is rubbish --  p.orientation = p.transform.columns[1].angle() + half_pi;
     } else {
       p.orientation += p.rotation * local_delta;
       p.transform.columns[0] = Vector2(Math::cos(p.orientation), -Math::sin(p.orientation));
@@ -1298,16 +1298,15 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
       agent->aligning_in_target_radius = false;
     }
 #endif
-    print_line("target_orientationn:",agents_arr[agent->target_agent].orientation);
-    return align(agent, agents_arr[agent->target_agent].orientation, delta);
+    return align(agent, agents_arr[agent->target_agent].transform.get_rotation(), delta);
   }
   return SteeringOutput();
 }
 
-AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, double target, double delta){
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, double target_rotation, double delta){
   SteeringOutput steering_output;
 
-  double rotation = map_orientation_to_pi_randian_range(target - agent->orientation);
+  double rotation = short_angle_distance(target_rotation, agent->transform.get_rotation());
   double rotation_size = Math::abs(rotation);
 
   if (rotation_size < agent->align_target_radius) {
