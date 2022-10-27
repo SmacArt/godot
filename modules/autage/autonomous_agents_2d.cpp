@@ -1303,10 +1303,10 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
   return SteeringOutput();
 }
 
-AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, double target_rotation, double delta){
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, double target, double delta){
   SteeringOutput steering_output;
 
-  double rotation = short_angle_distance(target_rotation, agent->transform.get_rotation());
+  double rotation = short_angle_distance(target, agent->transform.get_rotation());
   double rotation_size = Math::abs(rotation);
 
   if (rotation_size < agent->align_target_radius) {
