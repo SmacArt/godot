@@ -206,17 +206,17 @@ private:
     real_t arrive_slow_radius = 0.0;
     real_t arrive_time_to_target = 0.0;
 
-    real_t avoid_obstacles_decay_coefficient = 0.0;
-    real_t avoid_obstacles_field_of_view_angle = 0.0;
-    real_t avoid_obstacles_field_of_view_min_distance = 0.0;
-    real_t avoid_obstacles_field_of_view_max_distance = 0.0;
-    real_t avoid_obstacles_field_of_view_distance = 0.0;
-    real_t avoid_obstacles_field_of_view_base_distance = 0.0;
-    real_t avoid_obstacles_field_of_view_offset = 0.0;
-    real_t avoid_obstacles_field_of_view_base_offset = 0.0;
-    Vector2 avoid_obstacles_field_of_view_left_angle;
-    Vector2 avoid_obstacles_field_of_view_right_angle;
-    bool avoid_obstacles_fov_scale_to_size = false;
+    real_t obstacle_avoidance_decay_coefficient = 0.0;
+    real_t obstacle_avoidance_field_of_view_angle = 0.0;
+    real_t obstacle_avoidance_field_of_view_min_distance = 0.0;
+    real_t obstacle_avoidance_field_of_view_max_distance = 0.0;
+    real_t obstacle_avoidance_field_of_view_distance = 0.0;
+    real_t obstacle_avoidance_field_of_view_base_distance = 0.0;
+    real_t obstacle_avoidance_field_of_view_offset = 0.0;
+    real_t obstacle_avoidance_field_of_view_base_offset = 0.0;
+    Vector2 obstacle_avoidance_field_of_view_left_angle;
+    Vector2 obstacle_avoidance_field_of_view_right_angle;
+    bool obstacle_avoidance_fov_scale_to_size = false;
 
     real_t pursue_max_prediction = 0.0;
 
@@ -237,12 +237,12 @@ private:
     Vector2 wander_target;
     bool aabb_culled = false;
     AABB separation_aabb;
-    AABB avoidance_fov_aabb;
-    Vector2 avoidance_fov_start_position;
-    Vector2 avoidance_fov_left_position;
-    Vector2 avoidance_fov_right_position;
-    Vector2 avoidance_fov_left_end_position;
-    Vector2 avoidance_fov_right_end_position;
+    AABB obstacle_avoidance_fov_aabb;
+    Vector2 obstacle_avoidance_fov_start_position;
+    Vector2 obstacle_avoidance_fov_left_position;
+    Vector2 obstacle_avoidance_fov_right_position;
+    Vector2 obstacle_avoidance_fov_left_end_position;
+    Vector2 obstacle_avoidance_fov_right_end_position;
     real_t align_target;
     Vector2 arrive_target;
     Vector2 flee_target;
@@ -412,7 +412,7 @@ private:
   SteeringOutput align(Agent *agent, double target_rotation, double delta);
   SteeringOutput arrive(Agent *agent, double delta);
   SteeringOutput arrive(Agent *agent, Vector2 target, double delta);
-  SteeringOutput avoid_obstacles(Agent *agent);
+  SteeringOutput obstacle_avoidance(Agent *agent);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput pursue(Agent *agent);
@@ -571,12 +571,12 @@ public:
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
-  AABB get_agent_avoidance_fov_aabb(int index);
-  Vector2 get_agent_avoidance_fov_start_position(int index);
-  Vector2 get_agent_avoidance_fov_left_position(int index);
-  Vector2 get_agent_avoidance_fov_right_position(int index);
-  Vector2 get_agent_avoidance_fov_left_end_position(int index);
-  Vector2 get_agent_avoidance_fov_right_end_position(int index);
+  AABB get_agent_obstacle_avoidance_fov_aabb(int index);
+  Vector2 get_agent_obstacle_avoidance_fov_start_position(int index);
+  Vector2 get_agent_obstacle_avoidance_fov_left_position(int index);
+  Vector2 get_agent_obstacle_avoidance_fov_right_position(int index);
+  Vector2 get_agent_obstacle_avoidance_fov_left_end_position(int index);
+  Vector2 get_agent_obstacle_avoidance_fov_right_end_position(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_circle_radius(int index);
   Vector2 get_agent_wander_target(int index);
