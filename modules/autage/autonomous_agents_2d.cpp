@@ -683,6 +683,10 @@ void AutonomousAgents2D::setup_agent_with_arrive(Agent *agent){
   agent->arrive_time_to_target = Math::lerp(parameters_min[PARAM_ARRIVE_TIME_TO_TARGET], parameters_max[PARAM_ARRIVE_TIME_TO_TARGET], rand_from_seed(agent->seed));
 }
 
+void AutonomousAgents2D::setup_agent_with_pursue(Agent *agent){
+  agent->pursue_max_prediction = Math::lerp(parameters_min[PARAM_PURSUE_MAX_PREDICTION], parameters_max[PARAM_PURSUE_MAX_PREDICTION], rand_from_seed(agent->seed));
+}
+
 void AutonomousAgents2D::setup_agent_with_separate(Agent *agent){
   agent->separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(agent->seed));
   agent->separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(agent->seed));
@@ -830,6 +834,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       if (agent_flags[AGENT_FLAG_OBSTACLE_AVOIDANCE]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE);
       }
+      if (agent_flags[AGENT_FLAG_PURSUE]) {
+        set_agent_behavior(i, STEERING_BEHAVIOR_PURSUE);
+      }
       if (agent_flags[AGENT_FLAG_SEEK]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_SEEK);
       }
@@ -848,7 +855,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.mass = Math::lerp(parameters_min[PARAM_AGENT_MASS], parameters_max[PARAM_AGENT_MASS], rand_from_seed(p.seed));
       p.max_speed = Math::lerp(parameters_min[PARAM_AGENT_MAX_SPEED], parameters_max[PARAM_AGENT_MAX_SPEED], rand_from_seed(p.seed));
       p.max_acceleration = Math::lerp(parameters_min[PARAM_AGENT_MAX_ACCELERATION], parameters_max[PARAM_AGENT_MAX_ACCELERATION], rand_from_seed(p.seed));
-      p.max_rotation = Math::lerp(parameters_min[PARAM_AGENT_MAX_ROTATION], parameters_max[PARAM_AGENT_MAX_ROTATION], rand_from_seed(p.seed));
+      p.max_rotation_speed = Math::lerp(parameters_min[PARAM_AGENT_MAX_ROTATION_SPEED], parameters_max[PARAM_AGENT_MAX_ROTATION_SPEED], rand_from_seed(p.seed));
       p.max_angular_acceleration = Math::lerp(parameters_min[PARAM_AGENT_MAX_ANGULAR_ACCELERATION], parameters_max[PARAM_AGENT_MAX_ANGULAR_ACCELERATION], rand_from_seed(p.seed));
       p.max_steering_force = Math::lerp(parameters_min[PARAM_AGENT_MAX_STEERING_FORCE], parameters_max[PARAM_AGENT_MAX_STEERING_FORCE], rand_from_seed(p.seed));
       p.max_turn_rate = Math::lerp(parameters_min[PARAM_AGENT_MAX_TURN_RATE], parameters_max[PARAM_AGENT_MAX_TURN_RATE], rand_from_seed(p.seed));
@@ -864,7 +871,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       p.velocity = rot * Math::lerp(parameters_min[PARAM_INITIAL_LINEAR_VELOCITY], parameters_max[PARAM_INITIAL_LINEAR_VELOCITY], (real_t)Math::randf());
 
       real_t base_angle = tex_angle * Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
-      p.orientation = Math::deg_to_rad(base_angle);
+      p.rotation = Math::deg_to_rad(base_angle);
 
       if (p.align_orientation_to_velocity) {
         old_transform = Transform2D(p.transform);
@@ -1036,7 +1043,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
         real_t base_angle = (tex_angle)*Math::lerp(parameters_min[PARAM_ANGLE], parameters_max[PARAM_ANGLE], p.angle_rand);
         base_angle += p.custom[1] * lifetime * tex_angular_velocity * Math::lerp(parameters_min[PARAM_ANGULAR_VELOCITY], parameters_max[PARAM_ANGULAR_VELOCITY], rand_from_seed(alt_seed));
-        p.orientation = Math::deg_to_rad(base_angle); //angle
+        p.rotation = Math::deg_to_rad(base_angle); //angle
 
         p.custom[2] = tex_anim_offset * Math::lerp(parameters_min[PARAM_ANIM_OFFSET], parameters_max[PARAM_ANIM_OFFSET], p.anim_offset_rand) + tv * tex_anim_speed * Math::lerp(parameters_min[PARAM_ANIM_SPEED], parameters_max[PARAM_ANIM_SPEED], rand_from_seed(alt_seed));
       }
@@ -1112,11 +1119,10 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform.columns[0] = old_transform.columns[0];
         p.transform.columns[1] = old_transform.columns[1];
       }
-      // todo-- this is rubbish --  p.orientation = p.transform.columns[1].angle() + half_pi;
     } else {
-      p.orientation += p.rotation * local_delta;
-      p.transform.columns[0] = Vector2(Math::cos(p.orientation), -Math::sin(p.orientation));
-      p.transform.columns[1] = Vector2(Math::sin(p.orientation), Math::cos(p.orientation));
+      p.rotation += p.rotation_velocity * local_delta;
+      p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
+      p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
     }
 
     //scale by scale
@@ -1143,17 +1149,17 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
           p.avoid_obstacles_fov_scale_to_size = false; // only need to set the scaled distance the first time
         }
       }
-      if (p.transform[2].x > 1280) {
+      if (p.transform[2].x > 1920) {
         p.transform[2].x = 0;
       }
       if (p.transform[2].x < 0) {
-        p.transform[2].x = 1280;
+        p.transform[2].x = 920;
       }
-      if (p.transform[2].y > 720) {
+      if (p.transform[2].y > 800) {
         p.transform[2].y = 0;
       }
       if (p.transform[2].y < 0) {
-        p.transform[2].y = 720;
+        p.transform[2].y = 800;
       }
     }
 
@@ -1192,6 +1198,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     agent->did_align=false;
     agent->did_arrive=false;
     agent->did_flee=false;
+    agent->did_pursue=false;
     agent->did_seek=false;
     agent->did_velocity_matching=false;
     agent->did_wander=false;
@@ -1207,6 +1214,9 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_FLEE)) {
       steering_output += flee(agent);
+    }
+    if (agent->steering_behavior.has(STEERING_BEHAVIOR_PURSUE)) {
+      steering_output += pursue(agent);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_SEEK)) {
       steering_output += seek(agent);
@@ -1226,16 +1236,16 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
 
     // TODO - include mass i.e agent->velocity += steering_output.linear * mass * delta;
     agent->velocity += steering_output.linear * delta;
-    agent->rotation += steering_output.angular * delta;
+    agent->rotation_velocity += steering_output.angular * delta;
 
     if (agent->velocity.length() > agent->max_speed) {
       agent->velocity = agent->velocity.normalized() * agent->max_speed;
     }
 
-    double abs_agent_rotation = Math::abs(agent->rotation);
-    if (abs_agent_rotation > agent->max_rotation) {
-      agent->rotation /= abs_agent_rotation;
-      agent->rotation *= agent->max_rotation;
+    double abs_agent_rotation = Math::abs(agent->rotation_velocity);
+    if (abs_agent_rotation > agent->max_rotation_speed) {
+      agent->rotation_velocity /= abs_agent_rotation;
+      agent->rotation_velocity *= agent->max_rotation_speed;
     }
 
     //    print_line("agent speed:", agent->velocity.length(), " rotation:", agent->rotation, " orientation:", agent->orientation);
@@ -1321,19 +1331,19 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::align(Agent *agent, doubl
   double target_rotation = 0.0f;
 
   if (rotation_size > agent->align_slow_radius) {
-    target_rotation = agent->max_rotation;
+    target_rotation = agent->max_rotation_speed;
   } else {
 #ifdef DEBUG_ENABLED
     if (is_debug) {
       agent->aligning_in_slow_radius = true;
     }
 #endif
-    target_rotation = agent->max_rotation * rotation_size / agent->align_slow_radius;
+    target_rotation = agent->max_rotation_speed * rotation_size / agent->align_slow_radius;
   }
 
   target_rotation *= rotation / rotation_size;
 
-  steering_output.angular = (target_rotation - agent->rotation) / (agent->align_time_to_target * delta);
+  steering_output.angular = (target_rotation - agent->rotation_velocity) / (agent->align_time_to_target * delta);
 
   double angular_acceleration = Math::abs(steering_output.angular);
   if (angular_acceleration > agent->max_angular_acceleration) {
@@ -1419,6 +1429,33 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent, Vector
   return steering_output;
 }
 
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent){
+  if (agent->target_agent > -1) {
+    return pursue(agent, agents_arr[agent->target_agent].transform[2], agents_arr[agent->target_agent].velocity);
+  }
+  return SteeringOutput();
+}
+
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity){
+  Vector2 direction = target_position - agent->transform[2];
+  double distance = direction.length();
+  double speed = agent->velocity.length();
+
+  double prediction = 0.0f;
+  if (speed <= distance / agent->pursue_max_prediction) {
+    prediction = agent->pursue_max_prediction;
+  } else {
+    prediction = distance / speed;
+  }
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->did_pursue=true;
+    agent->pursue_target = target_position + target_velocity * prediction;
+  }
+#endif
+  return seek(agent, target_position + target_velocity * prediction);
+}
+
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::seek(Agent *agent){
   if (agent->target_agent > -1) {
 #ifdef DEBUG_ENABLED
@@ -1487,7 +1524,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::velocity_matching(Agent *
       agent->arrive_target = agents_arr[agent->target_agent].transform[2];
     }
 #endif
-    print_line("target velocity:", agents_arr[agent->target_agent].velocity);
     return velocity_matching(agent, agents_arr[agent->target_agent].velocity, delta);
   }
   return SteeringOutput();
@@ -1777,6 +1813,9 @@ void AutonomousAgents2D::set_behavior(Agent *agent, SteeringBehavior behavior, b
       if (behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
         setup_agent_with_obstacle_avoidance(agent);
       }
+      if (behavior & STEERING_BEHAVIOR_PURSUE) {
+        setup_agent_with_pursue(agent);
+      }
       if (behavior & STEERING_BEHAVIOR_SEPARATE) {
         setup_agent_with_separate(agent);
       }
@@ -1792,7 +1831,6 @@ void AutonomousAgents2D::set_behavior(Agent *agent, SteeringBehavior behavior, b
       agent->steering_behavior.unset(behavior);
     }
   }
-  print_line("");
 }
 
 void AutonomousAgents2D::set_agent_behavior(int index, SteeringBehavior behavior) {
@@ -1824,10 +1862,11 @@ void AutonomousAgents2D::set_agent_position_from_remote(int index, Vector2 p_pos
 
 void AutonomousAgents2D::set_agent_orientation_from_remote(int index, real_t p_orientation){
   if (has_agent_behavior(index, STEERING_BEHAVIOR_REMOTELY_CONTROLLED)) {
-    agents_arr[index].orientation = p_orientation;
+    agents_arr[index].rotation = p_orientation;
   }
 }
 
+// TODO - add an option to use the max_rotation_acceleration to control the turning (so just doesnt happen immedialtey)
 void AutonomousAgents2D::set_agent_align_orientation_to_velocity(int index, bool is_align){
   agents_arr[index].align_orientation_to_velocity = is_align;
 }
@@ -1912,6 +1951,9 @@ bool AutonomousAgents2D::get_did_agent_arrive(int index){
 bool AutonomousAgents2D::get_did_agent_flee(int index){
   return agents_arr[index].did_flee;
 }
+bool AutonomousAgents2D::get_did_agent_pursue(int index){
+  return agents_arr[index].did_pursue;
+}
 bool AutonomousAgents2D::get_did_agent_seek(int index){
   return agents_arr[index].did_seek;
 }
@@ -1929,6 +1971,9 @@ Vector2 AutonomousAgents2D::get_agent_arrive_target(int index){
 }
 Vector2 AutonomousAgents2D::get_agent_flee_target(int index){
   return agents_arr[index].flee_target;
+}
+Vector2 AutonomousAgents2D::get_agent_pursue_target(int index){
+  return agents_arr[index].pursue_target;
 }
 Vector2 AutonomousAgents2D::get_agent_seek_target(int index){
   return agents_arr[index].seek_target;
@@ -2068,8 +2113,8 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_speed_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_SPEED);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_acceleration_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_ACCELERATION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_acceleration_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_ACCELERATION);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_rotation_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_ROTATION);
-  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_rotation_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_ROTATION);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_rotation_speed_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_ROTATION_SPEED);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_rotation_speed_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_ROTATION_SPEED);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_angular_acceleration_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_ANGULAR_ACCELERATION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_angular_acceleration_max", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:px/s"), "set_param_max", "get_param_max", PARAM_AGENT_MAX_ANGULAR_ACCELERATION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "agent_max_steering_force_min", PROPERTY_HINT_RANGE, "0,100000,0.01,or_greater,suffix:N"), "set_param_min", "get_param_min", PARAM_AGENT_MAX_STEERING_FORCE);
@@ -2094,6 +2139,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_arrive"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ARRIVE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flee"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLEE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_obstacle_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_pursue"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_PURSUE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_seek"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEEK);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_velocity_matching"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_VELOCITY_MATCHING);
@@ -2125,6 +2171,10 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "obstacle_avoidance_fov_scale_to_size"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "obstacle_avoidance_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "obstacle_avoidance_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT);
+
+  ADD_GROUP("Pursue", "pursue_");
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "pursue_max_prediction_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_PURSUE_MAX_PREDICTION);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "pursue_max_prediction_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_PURSUE_MAX_PREDICTION);
 
   ADD_GROUP("Separate", "separate_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
@@ -2223,7 +2273,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_AGENT_MASS);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_SPEED);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_ACCELERATION);
-  BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_ROTATION);
+  BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_ROTATION_SPEED);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_ANGULAR_ACCELERATION);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_STEERING_FORCE);
   BIND_ENUM_CONSTANT(PARAM_AGENT_MAX_TURN_RATE);
@@ -2240,6 +2290,8 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE);
   BIND_ENUM_CONSTANT(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE);
   BIND_ENUM_CONSTANT(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET);
+
+  BIND_ENUM_CONSTANT(PARAM_PURSUE_MAX_PREDICTION);
 
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
   BIND_ENUM_CONSTANT(PARAM_SEPARATE_DECAY_COEFFICIENT);
@@ -2269,6 +2321,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(AGENT_FLAG_FLEE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_OBSTACLE_AVOIDANCE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_REMOTELY_CONTROLLED);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_PURSUE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_SEEK);
   BIND_ENUM_CONSTANT(AGENT_FLAG_SEPARATE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_VELOCITY_MATCHING);
@@ -2290,6 +2343,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_FLEE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_REMOTELY_CONTROLLED);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_PURSUE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEEK);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEPARATE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_VELOCITY_MATCHING);
@@ -2324,12 +2378,14 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_did_agent_flee"), &AutonomousAgents2D::get_did_agent_flee);
   ClassDB::bind_method(D_METHOD("get_did_agent_align"), &AutonomousAgents2D::get_did_agent_align);
   ClassDB::bind_method(D_METHOD("get_did_agent_arrive"), &AutonomousAgents2D::get_did_agent_arrive);
+  ClassDB::bind_method(D_METHOD("get_did_agent_pursue"), &AutonomousAgents2D::get_did_agent_pursue);
   ClassDB::bind_method(D_METHOD("get_did_agent_seek"), &AutonomousAgents2D::get_did_agent_seek);
   ClassDB::bind_method(D_METHOD("get_did_agent_velocity_matching"), &AutonomousAgents2D::get_did_agent_velocity_matching);
   ClassDB::bind_method(D_METHOD("get_did_agent_wander"), &AutonomousAgents2D::get_did_agent_wander);
   ClassDB::bind_method(D_METHOD("get_agent_align_target"), &AutonomousAgents2D::get_agent_align_target);
   ClassDB::bind_method(D_METHOD("get_agent_arrive_target"), &AutonomousAgents2D::get_agent_arrive_target);
   ClassDB::bind_method(D_METHOD("get_agent_flee_target"), &AutonomousAgents2D::get_agent_flee_target);
+  ClassDB::bind_method(D_METHOD("get_agent_pursue_target"), &AutonomousAgents2D::get_agent_pursue_target);
   ClassDB::bind_method(D_METHOD("get_agent_seek_target"), &AutonomousAgents2D::get_agent_seek_target);
 #endif
 }
@@ -2353,14 +2409,14 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_min(PARAM_AGENT_MASS, 1);
   set_param_min(PARAM_AGENT_MAX_SPEED, 1);
   set_param_min(PARAM_AGENT_MAX_ACCELERATION, 1);
-  set_param_min(PARAM_AGENT_MAX_ROTATION, 1);
+  set_param_min(PARAM_AGENT_MAX_ROTATION_SPEED, 1);
   set_param_min(PARAM_AGENT_MAX_ANGULAR_ACCELERATION, 1);
   set_param_min(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_min(PARAM_AGENT_MAX_TURN_RATE, 1);
   set_param_max(PARAM_AGENT_MASS, 1);
   set_param_max(PARAM_AGENT_MAX_SPEED, 1);
   set_param_max(PARAM_AGENT_MAX_ACCELERATION, 1);
-  set_param_max(PARAM_AGENT_MAX_ROTATION, 1);
+  set_param_max(PARAM_AGENT_MAX_ROTATION_SPEED, 1);
   set_param_max(PARAM_AGENT_MAX_ANGULAR_ACCELERATION, 1);
   set_param_max(PARAM_AGENT_MAX_STEERING_FORCE, 1);
   set_param_max(PARAM_AGENT_MAX_TURN_RATE, 1);
@@ -2388,6 +2444,9 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_min(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET, 0);
   set_param_max(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET, 0);
 
+  set_param_min(PARAM_PURSUE_MAX_PREDICTION, 50);
+  set_param_max(PARAM_PURSUE_MAX_PREDICTION, 50);
+  
   set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
   set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
   set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);

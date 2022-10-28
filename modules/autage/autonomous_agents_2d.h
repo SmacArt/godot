@@ -49,10 +49,11 @@ public:
     STEERING_BEHAVIOR_FLEE = 1 << 2,
     STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 3,
     STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 4,
-    STEERING_BEHAVIOR_SEEK = 1 << 5,
-    STEERING_BEHAVIOR_SEPARATE = 1 << 6,
-    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 7,
-    STEERING_BEHAVIOR_WANDER = 1 << 8
+    STEERING_BEHAVIOR_PURSUE = 1 << 5,
+    STEERING_BEHAVIOR_SEEK = 1 << 6,
+    STEERING_BEHAVIOR_SEPARATE = 1 << 7,
+    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 8,
+    STEERING_BEHAVIOR_WANDER = 1 << 9
   };
 
   struct SteeringBehaviorFlag
@@ -94,7 +95,7 @@ public:
     PARAM_AGENT_MASS,
     PARAM_AGENT_MAX_SPEED,
     PARAM_AGENT_MAX_ACCELERATION,
-    PARAM_AGENT_MAX_ROTATION,
+    PARAM_AGENT_MAX_ROTATION_SPEED,
     PARAM_AGENT_MAX_ANGULAR_ACCELERATION,
     PARAM_AGENT_MAX_STEERING_FORCE,
     PARAM_AGENT_MAX_TURN_RATE,
@@ -120,6 +121,7 @@ public:
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
+    PARAM_PURSUE_MAX_PREDICTION,
     PARAM_SEPARATE_DECAY_COEFFICIENT,
     PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
     PARAM_VELOCITY_MATCHING_TIME_TO_TARGET,
@@ -135,6 +137,7 @@ public:
     AGENT_FLAG_FLEE,
     AGENT_FLAG_OBSTACLE_AVOIDANCE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
+    AGENT_FLAG_PURSUE,
     AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATE,
     AGENT_FLAG_VELOCITY_MATCHING,
@@ -167,7 +170,7 @@ private:
     real_t mass = 1.0;
     real_t max_speed = 0.0;
     real_t max_acceleration = 0.0;
-    real_t max_rotation = 0.0;
+    real_t max_rotation_speed = 0.0;
     real_t max_angular_acceleration = 0.0;
     real_t max_steering_force = 0.0;  // todo - dont think is used by me - max_acceleration might be its replacment
     real_t max_turn_rate = 0.0;  // todo - dont think is used by me - max_angular_acceleration might be its replacment
@@ -189,9 +192,9 @@ private:
     AABB aabb;
 
     Vector2 velocity;
-    real_t rotation = 0.0;
+    real_t rotation_velocity = 0.0;
 
-    real_t orientation = 0.0;
+    real_t rotation = 0.0;
 
     SteeringBehaviorFlag steering_behavior;
 
@@ -214,6 +217,8 @@ private:
     Vector2 avoid_obstacles_field_of_view_left_angle;
     Vector2 avoid_obstacles_field_of_view_right_angle;
     bool avoid_obstacles_fov_scale_to_size = false;
+
+    real_t pursue_max_prediction = 0.0;
 
     real_t separate_neighbourhood_expansion = 0.0;
     real_t separate_decay_coefficient = 0.0;
@@ -241,6 +246,7 @@ private:
     real_t align_target;
     Vector2 arrive_target;
     Vector2 flee_target;
+    Vector2 pursue_target;
     Vector2 seek_target;
     Vector2 velocity_matching_target;
     bool aligning_in_slow_radius = false;
@@ -250,6 +256,7 @@ private:
     bool did_align = false;
     bool did_arrive = false;
     bool did_flee = false;
+    bool did_pursue = false;
     bool did_seek = false;
     bool did_velocity_matching = false;
     bool did_wander = false;
@@ -408,6 +415,8 @@ private:
   SteeringOutput avoid_obstacles(Agent *agent);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
+  SteeringOutput pursue(Agent *agent);
+  SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity);
   SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separate(Agent *agent);
@@ -551,6 +560,7 @@ public:
   void setup_agent_with_align(Agent *agent);
   void setup_agent_with_arrive(Agent *agent);
   void setup_agent_with_obstacle_avoidance(Agent *agent);
+  void setup_agent_with_pursue(Agent *agent);
   void setup_agent_with_separate(Agent *agent);
   void setup_agent_with_velocity_matching(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
@@ -573,6 +583,8 @@ public:
   bool is_agent_aabb_culled(int index);
   int get_agent_ai_phase(int index);
   bool get_did_agent_wander(int index);
+  bool get_did_agent_pursue(int index);
+  Vector2 get_agent_pursue_target(int index);
   bool get_did_agent_seek(int index);
   Vector2 get_agent_seek_target(int index);
   bool get_did_agent_flee(int index);
