@@ -432,12 +432,12 @@ Ref<Gradient> AutonomousAgents2D::get_color_initial_ramp() const {
   return color_initial_ramp;
 }
 
-void AutonomousAgents2D::set_agent_flag(AgentFlags p_agent_flag, bool p_enable) {
+void AutonomousAgents2D::set_agent_flag(AgentFlag p_agent_flag, bool p_enable) {
   ERR_FAIL_INDEX(p_agent_flag, AGENT_FLAG_MAX);
   agent_flags[p_agent_flag] = p_enable;
 }
 
-bool AutonomousAgents2D::get_agent_flag(AgentFlags p_agent_flag) const {
+bool AutonomousAgents2D::get_agent_flag(AgentFlag p_agent_flag) const {
   ERR_FAIL_INDEX_V(p_agent_flag, AGENT_FLAG_MAX, false);
   return agent_flags[p_agent_flag];
 }
@@ -685,10 +685,12 @@ void AutonomousAgents2D::setup_agent_with_arrive(Agent *agent){
 
 void AutonomousAgents2D::setup_agent_with_pursue(Agent *agent){
   agent->pursue_max_prediction = Math::lerp(parameters_min[PARAM_PURSUE_MAX_PREDICTION], parameters_max[PARAM_PURSUE_MAX_PREDICTION], rand_from_seed(agent->seed));
+  agent->pursue_delegate_steering_behavior = get_pursue_delegate_steering_behavior();
 }
 
-void AutonomousAgents2D::setup_agent_with_separate(Agent *agent){
-  agent->separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(agent->seed));
+void AutonomousAgents2D::setup_agent_with_separate(Agent *agent){:w
+    /pursue_delegate_steering_behavior
+    agent->separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(agent->seed));
   agent->separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(agent->seed));
 }
 
@@ -1453,6 +1455,9 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, Vect
     agent->pursue_target = target_position + target_velocity * prediction;
   }
 #endif
+  if (agent->pursue_delegate_steering_behavior.has(STEERING_BEHAVIOR_ARRIVE)) {
+    return arrive(agent, target_position + target_velocity * prediction);
+  }
   return seek(agent, target_position + target_velocity * prediction);
 }
 
@@ -1871,6 +1876,19 @@ void AutonomousAgents2D::set_agent_align_orientation_to_velocity(int index, bool
   agents_arr[index].align_orientation_to_velocity = is_align;
 }
 
+void AutonomousAgents2D::set_pursue_delegate_steering_behavior(int index) {
+  pursue_delegate_steering_behavior.clear();
+  if (index == 0) {
+    pursue_delegate_steering_behavior.set(STEERING_BEHAVIOR_ARRIVE);
+  } else {
+    pursue_delegate_steering_behavior.set(STEERING_BEHAVIOR_SEEK);
+  }
+}
+
+SteeringBehaviorFlag AutonomousAgents2D::get_pursue_delegate_steering_behavior() {
+  return pursue_delegate_steering_behavior;
+}
+
 Vector2 AutonomousAgents2D::get_agent_position(int index){
   return agents_arr[index].transform[2];
 }
@@ -2134,12 +2152,12 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_agent_align_orientation_to_velocity"), &AutonomousAgents2D::set_agent_align_orientation_to_velocity);
 
   ADD_GROUP("Behaviour", "agent_flag_");
-  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_remotely_controlled"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_REMOTELY_CONTROLLED);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_arrive"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ARRIVE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flee"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLEE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_obstacle_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_pursue"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_PURSUE);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_remotely_controlled"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_REMOTELY_CONTROLLED);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_seek"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEEK);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_separate"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEPARATE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_velocity_matching"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_VELOCITY_MATCHING);
@@ -2175,6 +2193,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_GROUP("Pursue", "pursue_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "pursue_max_prediction_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_PURSUE_MAX_PREDICTION);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "pursue_max_prediction_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_PURSUE_MAX_PREDICTION);
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "pursue_delegate_steering_behavior", PROPERTY_HINT_ENUM, "Arrive,Seek"), "set_pursue_delegate_steering_behavior", "get_pursue_delegate_steering_behavior");
 
   ADD_GROUP("Separate", "separate_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "separate_neighbourhood_expansion_min", PROPERTY_HINT_RANGE, "-10000,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION);
@@ -2446,7 +2465,7 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_param_min(PARAM_PURSUE_MAX_PREDICTION, 50);
   set_param_max(PARAM_PURSUE_MAX_PREDICTION, 50);
-  
+
   set_param_min(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
   set_param_max(PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION, 20);
   set_param_min(PARAM_SEPARATE_DECAY_COEFFICIENT, 5000);

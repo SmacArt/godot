@@ -131,7 +131,7 @@ public:
     PARAM_MAX,
   };
 
-  enum AgentFlags {
+  enum AgentFlag {
     AGENT_FLAG_ALIGN,
     AGENT_FLAG_ARRIVE,
     AGENT_FLAG_FLEE,
@@ -196,7 +196,7 @@ private:
 
     real_t rotation = 0.0;
 
-    SteeringBehaviorFlag steering_behavior;
+    SteeringBehaviorFlag steering_behavior = 0;
 
     real_t align_target_radius = 0.0;
     real_t align_slow_radius = 0.0;
@@ -219,6 +219,7 @@ private:
     bool obstacle_avoidance_fov_scale_to_size = false;
 
     real_t pursue_max_prediction = 0.0;
+    SteeringBehaviorFlag pursue_delegate_steering_behavior = 0;
 
     real_t separate_neighbourhood_expansion = 0.0;
     real_t separate_decay_coefficient = 0.0;
@@ -393,6 +394,10 @@ private:
   Size2 agent_base_size = Size2(10, 10);
   double agent_aabb_expansion_ratio = 1.2;
 
+  SteeringBehaviorFlag pursue_delegate_steering_behavior;
+  void set_pursue_delegate_steering_behavior(int index);
+  SteeringBehaviorFlag get_pursue_delegate_steering_behavior();
+
   void _update_internal();
   void _agents_process(double p_delta);
   void _update_agent_data_buffer();
@@ -412,9 +417,9 @@ private:
   SteeringOutput align(Agent *agent, double target_rotation, double delta);
   SteeringOutput arrive(Agent *agent, double delta);
   SteeringOutput arrive(Agent *agent, Vector2 target, double delta);
-  SteeringOutput obstacle_avoidance(Agent *agent);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
+  SteeringOutput obstacle_avoidance(Agent *agent);
   SteeringOutput pursue(Agent *agent);
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity);
   SteeringOutput seek(Agent *agent);
@@ -508,8 +513,8 @@ public:
   void set_color_initial_ramp(const Ref<Gradient> &p_ramp);
   Ref<Gradient> get_color_initial_ramp() const;
 
-  void set_agent_flag(AgentFlags p_agent_flag, bool p_enable);
-  bool get_agent_flag(AgentFlags p_agent_flag) const;
+  void set_agent_flag(AgentFlag p_agent_flag, bool p_enable);
+  bool get_agent_flag(AgentFlag p_agent_flag) const;
 
   void set_emission_shape(EmissionShape p_shape);
   void set_emission_sphere_radius(real_t p_radius);
@@ -631,7 +636,7 @@ public:
 
 VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
 VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
-VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlags)
+VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlag)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
 
