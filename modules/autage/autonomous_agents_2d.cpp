@@ -686,11 +686,14 @@ void AutonomousAgents2D::setup_agent_with_arrive(Agent *agent){
 void AutonomousAgents2D::setup_agent_with_pursue(Agent *agent){
   agent->pursue_max_prediction = Math::lerp(parameters_min[PARAM_PURSUE_MAX_PREDICTION], parameters_max[PARAM_PURSUE_MAX_PREDICTION], rand_from_seed(agent->seed));
   agent->pursue_delegate_steering_behavior = get_pursue_delegate_steering_behavior();
+
+  if (agent->pursue_delegate_steering_behavior == PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE) {
+    setup_agent_with_arrive(agent);
+  }
 }
 
-void AutonomousAgents2D::setup_agent_with_separate(Agent *agent){:w
-    /pursue_delegate_steering_behavior
-    agent->separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(agent->seed));
+void AutonomousAgents2D::setup_agent_with_separate(Agent *agent){
+  agent->separate_neighbourhood_expansion = Math::lerp(parameters_min[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], parameters_max[PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION], rand_from_seed(agent->seed));
   agent->separate_decay_coefficient = Math::lerp(parameters_min[PARAM_SEPARATE_DECAY_COEFFICIENT], parameters_max[PARAM_SEPARATE_DECAY_COEFFICIENT], rand_from_seed(agent->seed));
 }
 
@@ -1218,7 +1221,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
       steering_output += flee(agent);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_PURSUE)) {
-      steering_output += pursue(agent);
+      steering_output += pursue(agent, delta);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_SEEK)) {
       steering_output += seek(agent);
@@ -1431,14 +1434,14 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent, Vector
   return steering_output;
 }
 
-AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent){
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, double delta){
   if (agent->target_agent > -1) {
-    return pursue(agent, agents_arr[agent->target_agent].transform[2], agents_arr[agent->target_agent].velocity);
+    return pursue(agent, agents_arr[agent->target_agent].transform[2], agents_arr[agent->target_agent].velocity, delta);
   }
   return SteeringOutput();
 }
 
-AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity){
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta){
   Vector2 direction = target_position - agent->transform[2];
   double distance = direction.length();
   double speed = agent->velocity.length();
@@ -1455,8 +1458,8 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, Vect
     agent->pursue_target = target_position + target_velocity * prediction;
   }
 #endif
-  if (agent->pursue_delegate_steering_behavior.has(STEERING_BEHAVIOR_ARRIVE)) {
-    return arrive(agent, target_position + target_velocity * prediction);
+  if (agent->pursue_delegate_steering_behavior == PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE) {
+    return arrive(agent, target_position + target_velocity * prediction, delta);
   }
   return seek(agent, target_position + target_velocity * prediction);
 }
@@ -1876,16 +1879,11 @@ void AutonomousAgents2D::set_agent_align_orientation_to_velocity(int index, bool
   agents_arr[index].align_orientation_to_velocity = is_align;
 }
 
-void AutonomousAgents2D::set_pursue_delegate_steering_behavior(int index) {
-  pursue_delegate_steering_behavior.clear();
-  if (index == 0) {
-    pursue_delegate_steering_behavior.set(STEERING_BEHAVIOR_ARRIVE);
-  } else {
-    pursue_delegate_steering_behavior.set(STEERING_BEHAVIOR_SEEK);
-  }
+void AutonomousAgents2D::set_pursue_delegate_steering_behavior(PursueDelegateSteeringBehavior p_behavior) {
+  pursue_delegate_steering_behavior = p_behavior;
 }
 
-SteeringBehaviorFlag AutonomousAgents2D::get_pursue_delegate_steering_behavior() {
+AutonomousAgents2D::PursueDelegateSteeringBehavior AutonomousAgents2D::get_pursue_delegate_steering_behavior() const {
   return pursue_delegate_steering_behavior;
 }
 
@@ -2150,6 +2148,8 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_agent_position_from_remote"), &AutonomousAgents2D::set_agent_position_from_remote);
   ClassDB::bind_method(D_METHOD("set_agent_orientation_from_remote"), &AutonomousAgents2D::set_agent_orientation_from_remote);
   ClassDB::bind_method(D_METHOD("set_agent_align_orientation_to_velocity"), &AutonomousAgents2D::set_agent_align_orientation_to_velocity);
+  ClassDB::bind_method(D_METHOD("set_pursue_delegate_steering_behavior"), &AutonomousAgents2D::set_pursue_delegate_steering_behavior);
+  ClassDB::bind_method(D_METHOD("get_pursue_delegate_steering_behavior"), &AutonomousAgents2D::get_pursue_delegate_steering_behavior);
 
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN);
@@ -2367,6 +2367,9 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEPARATE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_VELOCITY_MATCHING);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_WANDER);
+
+  BIND_ENUM_CONSTANT(PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE);
+  BIND_ENUM_CONSTANT(PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK);
 
 #ifdef DEBUG_ENABLED
   ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);

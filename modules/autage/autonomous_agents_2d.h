@@ -91,6 +91,11 @@ public:
     uint32_t value = 0;
   };
 
+  enum PursueDelegateSteeringBehavior {
+    PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE,
+    PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK,
+  };
+
   enum Parameter {
     PARAM_AGENT_MASS,
     PARAM_AGENT_MAX_SPEED,
@@ -196,7 +201,7 @@ private:
 
     real_t rotation = 0.0;
 
-    SteeringBehaviorFlag steering_behavior = 0;
+    SteeringBehaviorFlag steering_behavior;
 
     real_t align_target_radius = 0.0;
     real_t align_slow_radius = 0.0;
@@ -219,7 +224,7 @@ private:
     bool obstacle_avoidance_fov_scale_to_size = false;
 
     real_t pursue_max_prediction = 0.0;
-    SteeringBehaviorFlag pursue_delegate_steering_behavior = 0;
+    PursueDelegateSteeringBehavior pursue_delegate_steering_behavior = PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK;
 
     real_t separate_neighbourhood_expansion = 0.0;
     real_t separate_decay_coefficient = 0.0;
@@ -394,9 +399,7 @@ private:
   Size2 agent_base_size = Size2(10, 10);
   double agent_aabb_expansion_ratio = 1.2;
 
-  SteeringBehaviorFlag pursue_delegate_steering_behavior;
-  void set_pursue_delegate_steering_behavior(int index);
-  SteeringBehaviorFlag get_pursue_delegate_steering_behavior();
+  PursueDelegateSteeringBehavior pursue_delegate_steering_behavior = PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -420,8 +423,8 @@ private:
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput obstacle_avoidance(Agent *agent);
-  SteeringOutput pursue(Agent *agent);
-  SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity);
+  SteeringOutput pursue(Agent *agent, double delta);
+  SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
   SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separate(Agent *agent);
@@ -570,6 +573,8 @@ public:
   void setup_agent_with_velocity_matching(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
 
+  void set_pursue_delegate_steering_behavior(PursueDelegateSteeringBehavior p_behavior);
+  PursueDelegateSteeringBehavior get_pursue_delegate_steering_behavior() const;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
@@ -639,5 +644,6 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlag)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
+VARIANT_ENUM_CAST(AutonomousAgents2D::PursueDelegateSteeringBehavior)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
