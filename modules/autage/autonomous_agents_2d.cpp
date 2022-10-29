@@ -683,6 +683,10 @@ void AutonomousAgents2D::setup_agent_with_arrive(Agent *agent){
   agent->arrive_time_to_target = Math::lerp(parameters_min[PARAM_ARRIVE_TIME_TO_TARGET], parameters_max[PARAM_ARRIVE_TIME_TO_TARGET], rand_from_seed(agent->seed));
 }
 
+void AutonomousAgents2D::setup_agent_with_evade(Agent *agent){
+  agent->evade_max_prediction = Math::lerp(parameters_min[PARAM_EVADE_MAX_PREDICTION], parameters_max[PARAM_EVADE_MAX_PREDICTION], rand_from_seed(agent->seed));
+}
+
 void AutonomousAgents2D::setup_agent_with_pursue(Agent *agent){
   agent->pursue_max_prediction = Math::lerp(parameters_min[PARAM_PURSUE_MAX_PREDICTION], parameters_max[PARAM_PURSUE_MAX_PREDICTION], rand_from_seed(agent->seed));
   if (get_pursue_delegate_steering_behavior() == 0) {
@@ -833,6 +837,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       if (agent_flags[AGENT_FLAG_ARRIVE]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_ARRIVE);
+      }
+      if (agent_flags[AGENT_FLAG_EVADE]) {
+        set_agent_behavior(i, STEERING_BEHAVIOR_EVADE);
       }
       if (agent_flags[AGENT_FLAG_FLEE]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_FLEE);
@@ -1203,6 +1210,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
   if (is_debug) {
     agent->did_align=false;
     agent->did_arrive=false;
+    agent->did_evade=false;
     agent->did_flee=false;
     agent->did_pursue=false;
     agent->did_seek=false;
@@ -1217,6 +1225,9 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_ARRIVE)) {
       steering_output += arrive(agent, delta);
+    }
+    if (agent->steering_behavior.has(STEERING_BEHAVIOR_EVADE)) {
+      steering_output += evade(agent);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_FLEE)) {
       steering_output += flee(agent);
@@ -1411,6 +1422,33 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::arrive(Agent *agent, Vect
   steering_output.angular = 0;
 
   return steering_output;
+}
+
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::evade(Agent *agent){
+  if (agent->target_agent > -1) {
+    return evade(agent, agents_arr[agent->target_agent].transform[2], agents_arr[agent->target_agent].velocity);
+  }
+  return SteeringOutput();
+}
+
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::evade(Agent *agent, Vector2 target_position, Vector2 target_velocity){
+  Vector2 direction = target_position - agent->transform[2];
+  double distance = direction.length();
+  double speed = agent->velocity.length();
+
+  double prediction = 0.0f;
+  if (speed <= distance / agent->evade_max_prediction) {
+    prediction = agent->evade_max_prediction;
+  } else {
+    prediction = distance / speed;
+  }
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->did_evade=true;
+    agent->evade_target = target_position + target_velocity * prediction;
+  }
+#endif
+  return flee(agent, target_position + target_velocity * prediction);
 }
 
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent){
@@ -1819,6 +1857,9 @@ void AutonomousAgents2D::set_behavior(Agent *agent, SteeringBehavior behavior, b
       if (behavior & STEERING_BEHAVIOR_ARRIVE) {
         setup_agent_with_arrive(agent);
       }
+      if (behavior & STEERING_BEHAVIOR_EVADE) {
+        setup_agent_with_evade(agent);
+      }
       if (behavior & STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE) {
         setup_agent_with_obstacle_avoidance(agent);
       }
@@ -1965,6 +2006,9 @@ bool AutonomousAgents2D::get_did_agent_align(int index){
 bool AutonomousAgents2D::get_did_agent_arrive(int index){
   return agents_arr[index].did_arrive;
 }
+bool AutonomousAgents2D::get_did_agent_evade(int index){
+  return agents_arr[index].did_evade;
+}
 bool AutonomousAgents2D::get_did_agent_flee(int index){
   return agents_arr[index].did_flee;
 }
@@ -1985,6 +2029,9 @@ real_t AutonomousAgents2D::get_agent_align_target(int index){
 }
 Vector2 AutonomousAgents2D::get_agent_arrive_target(int index){
   return agents_arr[index].arrive_target;
+}
+Vector2 AutonomousAgents2D::get_agent_evade_target(int index){
+  return agents_arr[index].evade_target;
 }
 Vector2 AutonomousAgents2D::get_agent_flee_target(int index){
   return agents_arr[index].flee_target;
@@ -2155,6 +2202,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_GROUP("Behaviour", "agent_flag_");
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_align"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ALIGN);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_arrive"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_ARRIVE);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_evade"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_EVADE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flee"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLEE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_obstacle_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_OBSTACLE_AVOIDANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_pursue"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_PURSUE);
@@ -2179,6 +2227,10 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "arrive_target_radius_distance_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_ARRIVE_TARGET_RADIUS);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "arrive_time_to_target_min", PROPERTY_HINT_RANGE, "0.1,1000,0.0001,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_ARRIVE_TIME_TO_TARGET);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "arrive_time_to_target_max", PROPERTY_HINT_RANGE, "0.1,1000,0.0001,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_ARRIVE_TIME_TO_TARGET);
+
+  ADD_GROUP("Evade", "evade_");
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "evade_max_prediction_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_EVADE_MAX_PREDICTION);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "evade_max_prediction_max", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_EVADE_MAX_PREDICTION);
 
   ADD_GROUP("Obstacle Avoidance", "obstacle_avoidance_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "obstacle_avoidance_fov_angle_min", PROPERTY_HINT_RANGE, "1,360,0.01,or_greater,suffix:degrees"), "set_param_min", "get_param_min", PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE);
@@ -2306,6 +2358,8 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_ARRIVE_TARGET_RADIUS);
   BIND_ENUM_CONSTANT(PARAM_ARRIVE_TIME_TO_TARGET);
 
+  BIND_ENUM_CONSTANT(PARAM_EVADE_MAX_PREDICTION);
+
   BIND_ENUM_CONSTANT(PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT);
   BIND_ENUM_CONSTANT(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE);
   BIND_ENUM_CONSTANT(PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE);
@@ -2338,6 +2392,7 @@ void AutonomousAgents2D::_bind_methods() {
 
   BIND_ENUM_CONSTANT(AGENT_FLAG_ALIGN);
   BIND_ENUM_CONSTANT(AGENT_FLAG_ARRIVE);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_EVADE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_FLEE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_OBSTACLE_AVOIDANCE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_REMOTELY_CONTROLLED);
@@ -2360,6 +2415,7 @@ void AutonomousAgents2D::_bind_methods() {
 
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_ALIGN);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_ARRIVE);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_EVADE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_FLEE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_REMOTELY_CONTROLLED);
@@ -2395,6 +2451,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
   ClassDB::bind_method(D_METHOD("is_agent_aabb_culled"), &AutonomousAgents2D::is_agent_aabb_culled);
   ClassDB::bind_method(D_METHOD("get_agent_ai_phase"), &AutonomousAgents2D::get_agent_ai_phase);
+  ClassDB::bind_method(D_METHOD("get_did_agent_evade"), &AutonomousAgents2D::get_did_agent_evade);
   ClassDB::bind_method(D_METHOD("get_did_agent_flee"), &AutonomousAgents2D::get_did_agent_flee);
   ClassDB::bind_method(D_METHOD("get_did_agent_align"), &AutonomousAgents2D::get_did_agent_align);
   ClassDB::bind_method(D_METHOD("get_did_agent_arrive"), &AutonomousAgents2D::get_did_agent_arrive);
@@ -2404,6 +2461,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_did_agent_wander"), &AutonomousAgents2D::get_did_agent_wander);
   ClassDB::bind_method(D_METHOD("get_agent_align_target"), &AutonomousAgents2D::get_agent_align_target);
   ClassDB::bind_method(D_METHOD("get_agent_arrive_target"), &AutonomousAgents2D::get_agent_arrive_target);
+  ClassDB::bind_method(D_METHOD("get_agent_evade_target"), &AutonomousAgents2D::get_agent_evade_target);
   ClassDB::bind_method(D_METHOD("get_agent_flee_target"), &AutonomousAgents2D::get_agent_flee_target);
   ClassDB::bind_method(D_METHOD("get_agent_pursue_target"), &AutonomousAgents2D::get_agent_pursue_target);
   ClassDB::bind_method(D_METHOD("get_agent_seek_target"), &AutonomousAgents2D::get_agent_seek_target);
@@ -2454,6 +2512,9 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_max(PARAM_ARRIVE_TARGET_RADIUS, 10);
   set_param_min(PARAM_ARRIVE_TIME_TO_TARGET, 0.1);
   set_param_max(PARAM_ARRIVE_TIME_TO_TARGET, 0.1);
+
+  set_param_min(PARAM_EVADE_MAX_PREDICTION, 50);
+  set_param_max(PARAM_EVADE_MAX_PREDICTION, 50);
 
   set_param_min(PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT, 5000);
   set_param_max(PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT, 5000);

@@ -46,14 +46,15 @@ public:
   enum SteeringBehavior {
     STEERING_BEHAVIOR_ALIGN = 1 << 0,
     STEERING_BEHAVIOR_ARRIVE = 1 << 1,
-    STEERING_BEHAVIOR_FLEE = 1 << 2,
-    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 3,
-    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 4,
-    STEERING_BEHAVIOR_PURSUE = 1 << 5,
-    STEERING_BEHAVIOR_SEEK = 1 << 6,
-    STEERING_BEHAVIOR_SEPARATE = 1 << 7,
-    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 8,
-    STEERING_BEHAVIOR_WANDER = 1 << 9
+    STEERING_BEHAVIOR_EVADE = 1 << 2,
+    STEERING_BEHAVIOR_FLEE = 1 << 3,
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 4,
+    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 5,
+    STEERING_BEHAVIOR_PURSUE = 1 << 6,
+    STEERING_BEHAVIOR_SEEK = 1 << 7,
+    STEERING_BEHAVIOR_SEPARATE = 1 << 8,
+    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 9,
+    STEERING_BEHAVIOR_WANDER = 1 << 10
   };
 
   struct SteeringBehaviorFlag
@@ -117,6 +118,7 @@ public:
     PARAM_ARRIVE_SLOW_RADIUS,
     PARAM_ARRIVE_TARGET_RADIUS,
     PARAM_ARRIVE_TIME_TO_TARGET,
+    PARAM_EVADE_MAX_PREDICTION,
     PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
@@ -134,6 +136,7 @@ public:
   enum AgentFlag {
     AGENT_FLAG_ALIGN,
     AGENT_FLAG_ARRIVE,
+    AGENT_FLAG_EVADE,
     AGENT_FLAG_FLEE,
     AGENT_FLAG_OBSTACLE_AVOIDANCE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
@@ -206,6 +209,8 @@ private:
     real_t arrive_slow_radius = 0.0;
     real_t arrive_time_to_target = 0.0;
 
+    real_t evade_max_prediction = 0.0;
+
     real_t obstacle_avoidance_decay_coefficient = 0.0;
     real_t obstacle_avoidance_field_of_view_angle = 0.0;
     real_t obstacle_avoidance_field_of_view_min_distance = 0.0;
@@ -246,6 +251,7 @@ private:
     Vector2 obstacle_avoidance_fov_right_end_position;
     real_t align_target;
     Vector2 arrive_target;
+    Vector2 evade_target;
     Vector2 flee_target;
     Vector2 pursue_target;
     Vector2 seek_target;
@@ -256,6 +262,7 @@ private:
     bool arriving_in_target_radius = false;
     bool did_align = false;
     bool did_arrive = false;
+    bool did_evade = false;
     bool did_flee = false;
     bool did_pursue = false;
     bool did_seek = false;
@@ -415,6 +422,8 @@ private:
   SteeringOutput align(Agent *agent, double target_rotation, double delta);
   SteeringOutput arrive(Agent *agent, double delta);
   SteeringOutput arrive(Agent *agent, Vector2 target, double delta);
+  SteeringOutput evade(Agent *agent);
+  SteeringOutput evade(Agent *agent, Vector2 target_position, Vector2 target_velocity);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput obstacle_avoidance(Agent *agent);
@@ -562,6 +571,7 @@ public:
 
   void setup_agent_with_align(Agent *agent);
   void setup_agent_with_arrive(Agent *agent);
+  void setup_agent_with_evade(Agent *agent);
   void setup_agent_with_obstacle_avoidance(Agent *agent);
   void setup_agent_with_pursue(Agent *agent);
   void setup_agent_with_separate(Agent *agent);
@@ -592,6 +602,8 @@ public:
   Vector2 get_agent_pursue_target(int index);
   bool get_did_agent_seek(int index);
   Vector2 get_agent_seek_target(int index);
+  bool get_did_agent_evade(int index);
+  Vector2 get_agent_evade_target(int index);
   bool get_did_agent_flee(int index);
   Vector2 get_agent_flee_target(int index);
   bool get_did_agent_align(int index);
