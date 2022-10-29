@@ -685,10 +685,11 @@ void AutonomousAgents2D::setup_agent_with_arrive(Agent *agent){
 
 void AutonomousAgents2D::setup_agent_with_pursue(Agent *agent){
   agent->pursue_max_prediction = Math::lerp(parameters_min[PARAM_PURSUE_MAX_PREDICTION], parameters_max[PARAM_PURSUE_MAX_PREDICTION], rand_from_seed(agent->seed));
-  agent->pursue_delegate_steering_behavior = get_pursue_delegate_steering_behavior();
-
-  if (agent->pursue_delegate_steering_behavior == PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE) {
+  if (get_pursue_delegate_steering_behavior() == 0) {
+    agent->pursue_delegate_steering_behavior = STEERING_BEHAVIOR_ARRIVE;
     setup_agent_with_arrive(agent);
+  } else {
+    agent->pursue_delegate_steering_behavior = STEERING_BEHAVIOR_SEEK;
   }
 }
 
@@ -1458,7 +1459,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, Vect
     agent->pursue_target = target_position + target_velocity * prediction;
   }
 #endif
-  if (agent->pursue_delegate_steering_behavior == PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE) {
+  if (agent->pursue_delegate_steering_behavior == STEERING_BEHAVIOR_ARRIVE) {
     return arrive(agent, target_position + target_velocity * prediction, delta);
   }
   return seek(agent, target_position + target_velocity * prediction);
@@ -1879,11 +1880,11 @@ void AutonomousAgents2D::set_agent_align_orientation_to_velocity(int index, bool
   agents_arr[index].align_orientation_to_velocity = is_align;
 }
 
-void AutonomousAgents2D::set_pursue_delegate_steering_behavior(PursueDelegateSteeringBehavior p_behavior) {
+void AutonomousAgents2D::set_pursue_delegate_steering_behavior(int p_behavior) {
   pursue_delegate_steering_behavior = p_behavior;
 }
 
-AutonomousAgents2D::PursueDelegateSteeringBehavior AutonomousAgents2D::get_pursue_delegate_steering_behavior() const {
+int AutonomousAgents2D::get_pursue_delegate_steering_behavior() const {
   return pursue_delegate_steering_behavior;
 }
 
@@ -2367,9 +2368,6 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEPARATE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_VELOCITY_MATCHING);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_WANDER);
-
-  BIND_ENUM_CONSTANT(PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE);
-  BIND_ENUM_CONSTANT(PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK);
 
 #ifdef DEBUG_ENABLED
   ClassDB::bind_method(D_METHOD("is_debugging"), &AutonomousAgents2D::is_debugging);

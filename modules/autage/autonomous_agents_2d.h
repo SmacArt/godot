@@ -91,11 +91,6 @@ public:
     uint32_t value = 0;
   };
 
-  enum PursueDelegateSteeringBehavior {
-    PURSUE_DELEGATE_STEERING_BEHAVIOR_ARRIVE,
-    PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK,
-  };
-
   enum Parameter {
     PARAM_AGENT_MASS,
     PARAM_AGENT_MAX_SPEED,
@@ -224,7 +219,7 @@ private:
     bool obstacle_avoidance_fov_scale_to_size = false;
 
     real_t pursue_max_prediction = 0.0;
-    PursueDelegateSteeringBehavior pursue_delegate_steering_behavior = PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK;
+    SteeringBehavior pursue_delegate_steering_behavior;
 
     real_t separate_neighbourhood_expansion = 0.0;
     real_t separate_decay_coefficient = 0.0;
@@ -399,7 +394,7 @@ private:
   Size2 agent_base_size = Size2(10, 10);
   double agent_aabb_expansion_ratio = 1.2;
 
-  PursueDelegateSteeringBehavior pursue_delegate_steering_behavior = PURSUE_DELEGATE_STEERING_BEHAVIOR_SEEK;
+  int pursue_delegate_steering_behavior = 0;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -573,8 +568,8 @@ public:
   void setup_agent_with_velocity_matching(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
 
-  void set_pursue_delegate_steering_behavior(PursueDelegateSteeringBehavior p_behavior);
-  PursueDelegateSteeringBehavior get_pursue_delegate_steering_behavior() const;
+  void set_pursue_delegate_steering_behavior(int p_behavior);
+  int get_pursue_delegate_steering_behavior() const;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
@@ -644,6 +639,5 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlag)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
-VARIANT_ENUM_CAST(AutonomousAgents2D::PursueDelegateSteeringBehavior)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
