@@ -54,7 +54,7 @@ public:
     STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 7,
     STEERING_BEHAVIOR_PURSUE = 1 << 8,
     STEERING_BEHAVIOR_SEEK = 1 << 9,
-    STEERING_BEHAVIOR_SEPARATE = 1 << 10,
+    STEERING_BEHAVIOR_SEPARATION = 1 << 10,
     STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 11,
     STEERING_BEHAVIOR_WANDER = 1 << 12
   };
@@ -116,25 +116,32 @@ public:
     PARAM_SCALE,
     PARAM_TANGENTIAL_ACCEL,
 
-    // steering behavior params
     PARAM_ALIGN_SLOW_RADIUS,
     PARAM_ALIGN_TARGET_RADIUS,
     PARAM_ALIGN_TIME_TO_TARGET,
+
     PARAM_ARRIVE_SLOW_RADIUS,
     PARAM_ARRIVE_TARGET_RADIUS,
     PARAM_ARRIVE_TIME_TO_TARGET,
+
     PARAM_EVADE_MAX_PREDICTION,
+
     PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
     PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
+
     PARAM_PURSUE_MAX_PREDICTION,
-    PARAM_SEPARATE_DECAY_COEFFICIENT,
-    PARAM_SEPARATE_NEIGHBOURHOOD_EXPANSION,
+
+    PARAM_SEPARATION_DECAY_COEFFICIENT,
+    PARAM_SEPARATION_THRESHOLD,
+
     PARAM_VELOCITY_MATCHING_TIME_TO_TARGET,
-    PARAM_WANDER_CIRCLE_DISTANCE,
-    PARAM_WANDER_CIRCLE_RADIUS,
-    PARAM_WANDER_RATE_OF_CHANGE,
+
+    PARAM_WANDER_OFFSET,
+    PARAM_WANDER_RADIUS,
+    PARAM_WANDER_RATE,
+
     PARAM_MAX,
   };
 
@@ -150,7 +157,7 @@ public:
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_PURSUE,
     AGENT_FLAG_SEEK,
-    AGENT_FLAG_SEPARATE,
+    AGENT_FLAG_SEPARATION,
     AGENT_FLAG_VELOCITY_MATCHING,
     AGENT_FLAG_WANDER,
     AGENT_FLAG_ALIGN_ROTATION_TO_VELOCITY,
@@ -232,19 +239,20 @@ private:
     real_t pursue_max_prediction = 0.0;
     SteeringBehavior pursue_delegate_steering_behavior;
 
-    real_t separate_neighbourhood_expansion = 0.0;
-    real_t separate_decay_coefficient = 0.0;
+    real_t separation_threshold = 0.0;
+    real_t separation_decay_coefficient = 0.0;
 
     real_t velocity_matching_time_to_target = 0.0;
 
-    real_t wander_circle_distance = 0.0;
-    real_t wander_circle_radius = 0.0;
-    real_t wander_rate_of_change = 0.0;
+    real_t wander_offset = 0.0;
+    real_t wander_radius = 0.0;
+    real_t wander_rate = 0.0;
     real_t wander_target_theta = 0.0;
 
     int32_t target_agent = -1;
 
 #ifdef DEBUG_ENABLED
+    Vector2 steering_output_linear;
     Vector2 wander_circle_position;
     Vector2 wander_target;
     bool aabb_culled = false;
@@ -443,7 +451,7 @@ private:
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
   SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
-  SteeringOutput separate(Agent *agent);
+  SteeringOutput separation(Agent *agent);
   SteeringOutput velocity_matching(Agent *agent, double delta);
   SteeringOutput velocity_matching(Agent *agent, Vector2 target, double delta);
   SteeringOutput wander(Agent *agent, double delta);
@@ -587,7 +595,7 @@ public:
   void setup_agent_with_look_where_youre_going(Agent *agent);
   void setup_agent_with_obstacle_avoidance(Agent *agent);
   void setup_agent_with_pursue(Agent *agent);
-  void setup_agent_with_separate(Agent *agent);
+  void setup_agent_with_separation(Agent *agent);
   void setup_agent_with_velocity_matching(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
 
@@ -597,6 +605,7 @@ public:
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
+  Vector2 get_agent_steering_output_linear(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
   AABB get_agent_obstacle_avoidance_fov_aabb(int index);
@@ -606,7 +615,7 @@ public:
   Vector2 get_agent_obstacle_avoidance_fov_left_end_position(int index);
   Vector2 get_agent_obstacle_avoidance_fov_right_end_position(int index);
   Vector2 get_agent_wander_circle_position(int index);
-  real_t get_agent_wander_circle_radius(int index);
+  real_t get_agent_wander_radius(int index);
   Vector2 get_agent_wander_target(int index);
   bool is_agent_aabb_culled(int index);
   int get_agent_ai_phase(int index);
