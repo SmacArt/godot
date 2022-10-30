@@ -43,12 +43,6 @@ public:
     DRAW_ORDER_LIFETIME
   };
 
-  enum LookWhereYoureGoingSpeed {
-    LOOK_WHERE_YOURE_GOING_SPEED_INSTANTLY,
-    LOOK_WHERE_YOURE_GOING_SPEED_GRADUALLY,
-    LOOK_WHERE_YOURE_GOING_SPEED_OFF
-  };
-
   enum SteeringBehavior {
     STEERING_BEHAVIOR_ALIGN = 1 << 0,
     STEERING_BEHAVIOR_ARRIVE = 1 << 1,
@@ -108,6 +102,7 @@ public:
     PARAM_AGENT_MAX_ANGULAR_ACCELERATION,
     PARAM_AGENT_MAX_STEERING_FORCE,
     PARAM_AGENT_MAX_TURN_RATE,
+
     PARAM_ANGLE,
     PARAM_ANGULAR_VELOCITY,
     PARAM_ANIM_OFFSET,
@@ -120,6 +115,8 @@ public:
     PARAM_RADIAL_ACCEL,
     PARAM_SCALE,
     PARAM_TANGENTIAL_ACCEL,
+
+    // steering behavior params
     PARAM_ALIGN_SLOW_RADIUS,
     PARAM_ALIGN_TARGET_RADIUS,
     PARAM_ALIGN_TIME_TO_TARGET,
@@ -149,14 +146,14 @@ public:
     AGENT_FLAG_FLEE,
     AGENT_FLAG_LOOK_WHERE_YOURE_GOING,
     AGENT_FLAG_OBSTACLE_AVOIDANCE,
+    AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_PURSUE,
     AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATE,
     AGENT_FLAG_VELOCITY_MATCHING,
     AGENT_FLAG_WANDER,
-    AGENT_FLAG_ALIGN_ORIENTATION_TO_VELOCITY,
-    AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE,
+    AGENT_FLAG_ALIGN_ROTATION_TO_VELOCITY,
     AGENT_FLAG_MAX
   };
 
@@ -205,8 +202,8 @@ private:
 
     Vector2 velocity;
     real_t rotation_velocity = 0.0;
-
     real_t rotation = 0.0;
+    bool align_rotation_to_velocity = false;
 
     SteeringBehaviorFlag steering_behavior;
 
@@ -231,8 +228,6 @@ private:
     Vector2 obstacle_avoidance_field_of_view_left_angle;
     Vector2 obstacle_avoidance_field_of_view_right_angle;
     bool obstacle_avoidance_fov_scale_to_size = false;
-
-    LookWhereYoureGoingSpeed look_where_your_going_speed = LOOK_WHERE_YOURE_GOING_SPEED_OFF;
 
     real_t pursue_max_prediction = 0.0;
     SteeringBehavior pursue_delegate_steering_behavior;
@@ -378,7 +373,6 @@ private:
   Transform2D inv_emission_transform;
 
   DrawOrder draw_order = DRAW_ORDER_INDEX;
-  LookWhereYoureGoingSpeed look_where_your_going_speed = LOOK_WHERE_YOURE_GOING_SPEED_OFF;
 
   Ref<Texture2D> texture;
 
@@ -599,8 +593,6 @@ public:
 
   void set_pursue_delegate_steering_behavior(int p_behavior);
   int get_pursue_delegate_steering_behavior() const;
-  void set_look_where_youre_going_speed(LookWhereYoureGoingSpeed p_speed);
-  LookWhereYoureGoingSpeed get_look_where_youre_going_speed() const;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
@@ -674,6 +666,5 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlag)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
-VARIANT_ENUM_CAST(AutonomousAgents2D::LookWhereYoureGoingSpeed)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
