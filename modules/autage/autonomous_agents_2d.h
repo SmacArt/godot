@@ -40,21 +40,29 @@ private:
 public:
   enum DrawOrder {
     DRAW_ORDER_INDEX,
-    DRAW_ORDER_LIFETIME,
+    DRAW_ORDER_LIFETIME
+  };
+
+  enum LookWhereYoureGoingSpeed {
+    LOOK_WHERE_YOURE_GOING_SPEED_INSTANTLY,
+    LOOK_WHERE_YOURE_GOING_SPEED_GRADUALLY,
+    LOOK_WHERE_YOURE_GOING_SPEED_OFF
   };
 
   enum SteeringBehavior {
     STEERING_BEHAVIOR_ALIGN = 1 << 0,
     STEERING_BEHAVIOR_ARRIVE = 1 << 1,
     STEERING_BEHAVIOR_EVADE = 1 << 2,
-    STEERING_BEHAVIOR_FLEE = 1 << 3,
-    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 4,
-    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 5,
-    STEERING_BEHAVIOR_PURSUE = 1 << 6,
-    STEERING_BEHAVIOR_SEEK = 1 << 7,
-    STEERING_BEHAVIOR_SEPARATE = 1 << 8,
-    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 9,
-    STEERING_BEHAVIOR_WANDER = 1 << 10
+    STEERING_BEHAVIOR_FACE = 1 << 3,
+    STEERING_BEHAVIOR_FLEE = 1 << 4,
+    STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING = 1 << 5,
+    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 6,
+    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 7,
+    STEERING_BEHAVIOR_PURSUE = 1 << 8,
+    STEERING_BEHAVIOR_SEEK = 1 << 9,
+    STEERING_BEHAVIOR_SEPARATE = 1 << 10,
+    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 11,
+    STEERING_BEHAVIOR_WANDER = 1 << 12
   };
 
   struct SteeringBehaviorFlag
@@ -137,7 +145,9 @@ public:
     AGENT_FLAG_ALIGN,
     AGENT_FLAG_ARRIVE,
     AGENT_FLAG_EVADE,
+    AGENT_FLAG_FACE,
     AGENT_FLAG_FLEE,
+    AGENT_FLAG_LOOK_WHERE_YOURE_GOING,
     AGENT_FLAG_OBSTACLE_AVOIDANCE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_PURSUE,
@@ -189,7 +199,6 @@ private:
     double time = 0.0;
     double lifetime = 0.0;
     Color base_color;
-    bool align_orientation_to_velocity = false;
 
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
@@ -223,6 +232,8 @@ private:
     Vector2 obstacle_avoidance_field_of_view_right_angle;
     bool obstacle_avoidance_fov_scale_to_size = false;
 
+    LookWhereYoureGoingSpeed look_where_your_going_speed = LOOK_WHERE_YOURE_GOING_SPEED_OFF;
+
     real_t pursue_max_prediction = 0.0;
     SteeringBehavior pursue_delegate_steering_behavior;
 
@@ -252,6 +263,7 @@ private:
     real_t align_target;
     Vector2 arrive_target;
     Vector2 evade_target;
+    Vector2 face_target;
     Vector2 flee_target;
     Vector2 pursue_target;
     Vector2 seek_target;
@@ -263,6 +275,7 @@ private:
     bool did_align = false;
     bool did_arrive = false;
     bool did_evade = false;
+    bool did_face = false;
     bool did_flee = false;
     bool did_pursue = false;
     bool did_seek = false;
@@ -365,6 +378,7 @@ private:
   Transform2D inv_emission_transform;
 
   DrawOrder draw_order = DRAW_ORDER_INDEX;
+  LookWhereYoureGoingSpeed look_where_your_going_speed = LOOK_WHERE_YOURE_GOING_SPEED_OFF;
 
   Ref<Texture2D> texture;
 
@@ -402,6 +416,7 @@ private:
   double agent_aabb_expansion_ratio = 1.2;
 
   int pursue_delegate_steering_behavior = 0;
+  int look_where_yourre_going_delegate_steering_behavior = 0;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -424,8 +439,11 @@ private:
   SteeringOutput arrive(Agent *agent, Vector2 target, double delta);
   SteeringOutput evade(Agent *agent);
   SteeringOutput evade(Agent *agent, Vector2 target_position, Vector2 target_velocity);
+  SteeringOutput face(Agent *agent, double delta);
+  SteeringOutput face(Agent *agent, Vector2 target_position, double delta);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
+  SteeringOutput look_where_youre_going(Agent *agent, double delta);
   SteeringOutput obstacle_avoidance(Agent *agent);
   SteeringOutput pursue(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
@@ -567,11 +585,12 @@ public:
   Vector2 get_agent_position(int index);
   void set_agent_position_from_remote(int index, Vector2 position);
   void set_agent_orientation_from_remote(int index, real_t orientation);
-  void set_agent_align_orientation_to_velocity(int index, bool is_align);
 
   void setup_agent_with_align(Agent *agent);
   void setup_agent_with_arrive(Agent *agent);
   void setup_agent_with_evade(Agent *agent);
+  void setup_agent_with_face(Agent *agent);
+  void setup_agent_with_look_where_youre_going(Agent *agent);
   void setup_agent_with_obstacle_avoidance(Agent *agent);
   void setup_agent_with_pursue(Agent *agent);
   void setup_agent_with_separate(Agent *agent);
@@ -580,6 +599,8 @@ public:
 
   void set_pursue_delegate_steering_behavior(int p_behavior);
   int get_pursue_delegate_steering_behavior() const;
+  void set_look_where_youre_going_speed(LookWhereYoureGoingSpeed p_speed);
+  LookWhereYoureGoingSpeed get_look_where_youre_going_speed() const;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
@@ -604,6 +625,8 @@ public:
   Vector2 get_agent_seek_target(int index);
   bool get_did_agent_evade(int index);
   Vector2 get_agent_evade_target(int index);
+  bool get_did_agent_face(int index);
+  Vector2 get_agent_face_target(int index);
   bool get_did_agent_flee(int index);
   Vector2 get_agent_flee_target(int index);
   bool get_did_agent_align(int index);
@@ -651,5 +674,6 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlag)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
 VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
+VARIANT_ENUM_CAST(AutonomousAgents2D::LookWhereYoureGoingSpeed)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
