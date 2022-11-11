@@ -46,11 +46,11 @@ public:
   enum SteeringBehavior {
     STEERING_BEHAVIOR_ALIGN = 1 << 0,
     STEERING_BEHAVIOR_ARRIVE = 1 << 1,
-    STEERING_BEHAVIOR_EVADE = 1 << 2,
-    STEERING_BEHAVIOR_FACE = 1 << 3,
-    STEERING_BEHAVIOR_FLEE = 1 << 4,
-    STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING = 1 << 5,
-    STEERING_BEHAVIOR_OBSTACLE_AVOIDANCE = 1 << 6,
+    STEERING_BEHAVIOR_COLLISION_AVOIDANCE = 1 << 2,
+    STEERING_BEHAVIOR_EVADE = 1 << 3,
+    STEERING_BEHAVIOR_FACE = 1 << 4,
+    STEERING_BEHAVIOR_FLEE = 1 << 5,
+    STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING = 1 << 6,
     STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 7,
     STEERING_BEHAVIOR_PURSUE = 1 << 8,
     STEERING_BEHAVIOR_SEEK = 1 << 9,
@@ -100,8 +100,6 @@ public:
     PARAM_AGENT_MAX_ACCELERATION,
     PARAM_AGENT_MAX_ROTATION_SPEED,
     PARAM_AGENT_MAX_ANGULAR_ACCELERATION,
-    PARAM_AGENT_MAX_STEERING_FORCE,
-    PARAM_AGENT_MAX_TURN_RATE,
 
     PARAM_ANGLE,
     PARAM_ANGULAR_VELOCITY,
@@ -124,12 +122,12 @@ public:
     PARAM_ARRIVE_TARGET_RADIUS,
     PARAM_ARRIVE_TIME_TO_TARGET,
 
-    PARAM_EVADE_MAX_PREDICTION,
+    PARAM_COLLISION_AVOIDANCE_DECAY_COEFFICIENT,
+    PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
+    PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
+    PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
 
-    PARAM_OBSTACLE_AVOIDANCE_DECAY_COEFFICIENT,
-    PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
-    PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
-    PARAM_OBSTACLE_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
+    PARAM_EVADE_MAX_PREDICTION,
 
     PARAM_PURSUE_MAX_PREDICTION,
 
@@ -152,8 +150,8 @@ public:
     AGENT_FLAG_FACE,
     AGENT_FLAG_FLEE,
     AGENT_FLAG_LOOK_WHERE_YOURE_GOING,
-    AGENT_FLAG_OBSTACLE_AVOIDANCE,
-    AGENT_FLAG_OBSTACLE_AVOIDANCE_FOV_SCALE_TO_SIZE,
+    AGENT_FLAG_COLLISION_AVOIDANCE,
+    AGENT_FLAG_COLLISION_AVOIDANCE_FOV_SCALE_TO_SIZE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_PURSUE,
     AGENT_FLAG_SEEK,
@@ -189,8 +187,6 @@ private:
     real_t max_acceleration = 0.0;
     real_t max_rotation_speed = 0.0;
     real_t max_angular_acceleration = 0.0;
-    real_t max_steering_force = 0.0;  // todo - dont think is used by me - max_acceleration might be its replacment
-    real_t max_turn_rate = 0.0;  // todo - dont think is used by me - max_angular_acceleration might be its replacment
     Color color;
     real_t custom[4] = {};
     bool active = false;
@@ -224,17 +220,17 @@ private:
 
     real_t evade_max_prediction = 0.0;
 
-    real_t obstacle_avoidance_decay_coefficient = 0.0;
-    real_t obstacle_avoidance_field_of_view_angle = 0.0;
-    real_t obstacle_avoidance_field_of_view_min_distance = 0.0;
-    real_t obstacle_avoidance_field_of_view_max_distance = 0.0;
-    real_t obstacle_avoidance_field_of_view_distance = 0.0;
-    real_t obstacle_avoidance_field_of_view_base_distance = 0.0;
-    real_t obstacle_avoidance_field_of_view_offset = 0.0;
-    real_t obstacle_avoidance_field_of_view_base_offset = 0.0;
-    Vector2 obstacle_avoidance_field_of_view_left_angle;
-    Vector2 obstacle_avoidance_field_of_view_right_angle;
-    bool obstacle_avoidance_fov_scale_to_size = false;
+    real_t collision_avoidance_decay_coefficient = 0.0;
+    real_t collision_avoidance_field_of_view_angle = 0.0;
+    real_t collision_avoidance_field_of_view_min_distance = 0.0;
+    real_t collision_avoidance_field_of_view_max_distance = 0.0;
+    real_t collision_avoidance_field_of_view_distance = 0.0;
+    real_t collision_avoidance_field_of_view_base_distance = 0.0;
+    real_t collision_avoidance_field_of_view_offset = 0.0;
+    real_t collision_avoidance_field_of_view_base_offset = 0.0;
+    Vector2 collision_avoidance_field_of_view_left_angle;
+    Vector2 collision_avoidance_field_of_view_right_angle;
+    bool collision_avoidance_fov_scale_to_size = false;
 
     real_t pursue_max_prediction = 0.0;
     SteeringBehavior pursue_delegate_steering_behavior;
@@ -257,12 +253,13 @@ private:
     Vector2 wander_target;
     bool aabb_culled = false;
     AABB separation_aabb;
-    AABB obstacle_avoidance_fov_aabb;
-    Vector2 obstacle_avoidance_fov_start_position;
-    Vector2 obstacle_avoidance_fov_left_position;
-    Vector2 obstacle_avoidance_fov_right_position;
-    Vector2 obstacle_avoidance_fov_left_end_position;
-    Vector2 obstacle_avoidance_fov_right_end_position;
+    AABB collision_avoidance_avoiding_aabb;
+    AABB collision_avoidance_fov_aabb;
+    Vector2 collision_avoidance_fov_start_position;
+    Vector2 collision_avoidance_fov_left_position;
+    Vector2 collision_avoidance_fov_right_position;
+    Vector2 collision_avoidance_fov_left_end_position;
+    Vector2 collision_avoidance_fov_right_end_position;
     real_t align_target;
     Vector2 arrive_target;
     Vector2 evade_target;
@@ -446,7 +443,7 @@ private:
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput look_where_youre_going(Agent *agent, double delta);
-  SteeringOutput obstacle_avoidance(Agent *agent);
+  SteeringOutput collision_avoidance(Agent *agent);
   SteeringOutput pursue(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
   SteeringOutput seek(Agent *agent);
@@ -593,7 +590,7 @@ public:
   void setup_agent_with_evade(Agent *agent);
   void setup_agent_with_face(Agent *agent);
   void setup_agent_with_look_where_youre_going(Agent *agent);
-  void setup_agent_with_obstacle_avoidance(Agent *agent);
+  void setup_agent_with_collision_avoidance(Agent *agent);
   void setup_agent_with_pursue(Agent *agent);
   void setup_agent_with_separation(Agent *agent);
   void setup_agent_with_velocity_matching(Agent *agent);
@@ -608,12 +605,13 @@ public:
   Vector2 get_agent_steering_output_linear(int index);
   AABB get_agent_aabb(int index);
   AABB get_agent_separation_aabb(int index);
-  AABB get_agent_obstacle_avoidance_fov_aabb(int index);
-  Vector2 get_agent_obstacle_avoidance_fov_start_position(int index);
-  Vector2 get_agent_obstacle_avoidance_fov_left_position(int index);
-  Vector2 get_agent_obstacle_avoidance_fov_right_position(int index);
-  Vector2 get_agent_obstacle_avoidance_fov_left_end_position(int index);
-  Vector2 get_agent_obstacle_avoidance_fov_right_end_position(int index);
+  AABB get_agent_collision_avoidance_avoiding_aabb(int index);
+  AABB get_agent_collision_avoidance_fov_aabb(int index);
+  Vector2 get_agent_collision_avoidance_fov_start_position(int index);
+  Vector2 get_agent_collision_avoidance_fov_left_position(int index);
+  Vector2 get_agent_collision_avoidance_fov_right_position(int index);
+  Vector2 get_agent_collision_avoidance_fov_left_end_position(int index);
+  Vector2 get_agent_collision_avoidance_fov_right_end_position(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_radius(int index);
   Vector2 get_agent_wander_target(int index);
