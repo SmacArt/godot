@@ -1247,7 +1247,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
       steering_output += arrive(agent, delta);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_COLLISION_AVOIDANCE)) {
-      steering_output += collision_avoidance(agent);
+      steering_output += collision_avoidance(agent, delta);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_EVADE)) {
       steering_output += evade(agent);
@@ -1409,7 +1409,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::arrive(Agent *agent, Vect
   return steering_output;
 }
 
-AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent *agent) {
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent *agent, double delta) {
 
   SteeringOutput steering_output;
 
@@ -1437,7 +1437,12 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
   if ((int)agent_cull_aabb_result.size()>1) {
 
     Vector3 agent_current_position = Vector3(agent->transform[2].x,agent->transform[2].y,0.0);
-    Vector3 agent_future_position = agent_current_position + agent_current_position * Vector3(agent->velocity.x,agent->velocity.y,0.0);
+    Vector3 agent_future_position = agent_current_position + Vector3(agent->velocity.x,agent->velocity.y,0.0) * 0.1;
+#ifdef DEBUG_ENABLED
+    if (is_debug) {
+      agent->collision_avoidance_predicted_position = Vector2(agent_future_position.x, agent_future_position.y);
+    }
+#endif
 
     for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
       Agent *other_agent = agent_cull_aabb_result[i];
@@ -1451,12 +1456,19 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
 
         double time_to_collision = 0.0;
         if (agent->aabb.intersects(other_agent->aabb)) {
-          return evade(agent, Vector2(other_agent->transform[2].x,other_agent->transform[2].y), other_agent->velocity);
+           return evade(agent, Vector2(other_agent->transform[2].x,other_agent->transform[2].y), other_agent->velocity);
         } else {
           AABB other_agent_future_aabb = AABB(other_agent->aabb);
-          other_agent_future_aabb.position += other_agent->aabb.position * Vector3(other_agent->velocity.x,other_agent->velocity.y,0.0);
+          other_agent_future_aabb.position = other_agent_future_aabb.position + Vector3(other_agent->velocity.x,other_agent->velocity.y,0.0) * 0.1;
+          //          add some debug to see where the segment goes from the agent current position to its future position
+          //  might also need to show a debug to show agents future position
           bool will_collide = other_agent_future_aabb.intersects_segment(agent_current_position, agent_future_position);
 
+#ifdef DEBUG_ENABLED
+          if (is_debug) {
+            other_agent->collision_avoidance_avoiding_aabb = other_agent_future_aabb;
+          }
+#endif
           // calculate the time to collision
           if (will_collide) {
             Vector2 relative_position = other_agent->transform[2] - agent->transform[2];
@@ -1470,6 +1482,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
             steering_output.linear += strength * relative_position.normalized();
 #ifdef DEBUG_ENABLED
             if (is_debug) {
+              print_line("willcolide");
               agent->collision_avoidance_avoiding_aabb = other_agent_future_aabb;
             }
 #endif
@@ -2124,6 +2137,9 @@ Vector2 AutonomousAgents2D::get_agent_collision_avoidance_fov_left_end_position(
 Vector2 AutonomousAgents2D::get_agent_collision_avoidance_fov_right_end_position(int index){
   return agents_arr[index].collision_avoidance_fov_right_end_position;
 }
+Vector2 AutonomousAgents2D::get_agent_collision_avoidance_predicted_position(int index){
+  return agents_arr[index].collision_avoidance_predicted_position;
+}
 Vector2 AutonomousAgents2D::get_agent_velocity_matching_target(int index){
   return agents_arr[index].velocity_matching_target;
 }
@@ -2590,6 +2606,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_collision_avoidance_fov_right_end_position"), &AutonomousAgents2D::get_agent_collision_avoidance_fov_right_end_position);
   ClassDB::bind_method(D_METHOD("get_agent_collision_avoidance_fov_left_end_position"), &AutonomousAgents2D::get_agent_collision_avoidance_fov_left_end_position);
   ClassDB::bind_method(D_METHOD("get_agent_collision_avoidance_fov_right_position"), &AutonomousAgents2D::get_agent_collision_avoidance_fov_right_position);
+  ClassDB::bind_method(D_METHOD("get_agent_collision_avoidance_predicted_position"), &AutonomousAgents2D::get_agent_collision_avoidance_predicted_position);
   ClassDB::bind_method(D_METHOD("get_agent_velocity_matching_target"), &AutonomousAgents2D::get_agent_velocity_matching_target);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
   ClassDB::bind_method(D_METHOD("get_agent_wander_radius"), &AutonomousAgents2D::get_agent_wander_radius);

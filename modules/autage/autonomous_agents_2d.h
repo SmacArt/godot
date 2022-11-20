@@ -260,6 +260,7 @@ private:
     Vector2 collision_avoidance_fov_right_position;
     Vector2 collision_avoidance_fov_left_end_position;
     Vector2 collision_avoidance_fov_right_end_position;
+    Vector2 collision_avoidance_predicted_position;
     real_t align_target;
     Vector2 arrive_target;
     Vector2 evade_target;
@@ -443,7 +444,7 @@ private:
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput look_where_youre_going(Agent *agent, double delta);
-  SteeringOutput collision_avoidance(Agent *agent);
+  SteeringOutput collision_avoidance(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
   SteeringOutput seek(Agent *agent);
@@ -612,6 +613,7 @@ public:
   Vector2 get_agent_collision_avoidance_fov_right_position(int index);
   Vector2 get_agent_collision_avoidance_fov_left_end_position(int index);
   Vector2 get_agent_collision_avoidance_fov_right_end_position(int index);
+  Vector2 get_agent_collision_avoidance_predicted_position(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_radius(int index);
   Vector2 get_agent_wander_target(int index);
