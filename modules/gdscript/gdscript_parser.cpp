@@ -147,6 +147,10 @@ GDScriptParser::GDScriptParser() {
 	register_annotation(MethodInfo("@warning_ignore", PropertyInfo(Variant::STRING, "warning")), AnnotationInfo::CLASS | AnnotationInfo::VARIABLE | AnnotationInfo::SIGNAL | AnnotationInfo::CONSTANT | AnnotationInfo::FUNCTION | AnnotationInfo::STATEMENT, &GDScriptParser::warning_annotations, varray(), true);
 	// Networking.
 	register_annotation(MethodInfo("@rpc", PropertyInfo(Variant::STRING, "mode"), PropertyInfo(Variant::STRING, "sync"), PropertyInfo(Variant::STRING, "transfer_mode"), PropertyInfo(Variant::INT, "transfer_channel")), AnnotationInfo::FUNCTION, &GDScriptParser::rpc_annotation, varray("", "", "", 0), true);
+
+#ifdef DEBUG_ENABLED
+	is_ignoring_warnings = !(bool)GLOBAL_GET("debug/gdscript/warnings/enable");
+#endif
 }
 
 GDScriptParser::~GDScriptParser() {
@@ -3735,6 +3739,12 @@ bool GDScriptParser::export_annotations(const AnnotationNode *p_annotation, Node
 
 	// This is called after the analyzer is done finding the type, so this should be set here.
 	DataType export_type = variable->get_datatype();
+
+	if (p_annotation->name == SNAME("@export_range")) {
+		if (export_type.builtin_type == Variant::INT) {
+			variable->export_info.type = Variant::INT;
+		}
+	}
 
 	if (p_annotation->name == SNAME("@export")) {
 		if (variable->datatype_specifier == nullptr && variable->initializer == nullptr) {

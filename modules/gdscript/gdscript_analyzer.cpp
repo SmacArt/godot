@@ -1725,7 +1725,6 @@ void GDScriptAnalyzer::resolve_parameter(GDScriptParser::ParameterNode *p_parame
 		} else {
 			result.type_source = GDScriptParser::DataType::INFERRED;
 		}
-		result.is_constant = false;
 	}
 
 	if (p_parameter->datatype_specifier != nullptr) {
@@ -1745,6 +1744,7 @@ void GDScriptAnalyzer::resolve_parameter(GDScriptParser::ParameterNode *p_parame
 		push_error(vformat(R"(Could not infer the type of the variable "%s" because the initial value is "null".)", p_parameter->identifier->name), p_parameter->default_value);
 	}
 
+	result.is_constant = false;
 	p_parameter->set_datatype(result);
 }
 
@@ -2563,8 +2563,14 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 			parser->push_warning(p_call, GDScriptWarning::RETURN_VALUE_DISCARDED, p_call->function_name);
 		}
 
-		if (is_static && !base_type.is_meta_type && !(callee_type != GDScriptParser::Node::SUBSCRIPT && parser->current_function != nullptr && parser->current_function->is_static)) {
-			parser->push_warning(p_call, GDScriptWarning::STATIC_CALLED_ON_INSTANCE, p_call->function_name, base_type.to_string());
+		if (is_static && !base_type.is_meta_type && !(is_self && parser->current_function != nullptr && parser->current_function->is_static)) {
+			String caller_type = String(base_type.native_type);
+
+			if (caller_type.is_empty()) {
+				caller_type = base_type.to_string();
+			}
+
+			parser->push_warning(p_call, GDScriptWarning::STATIC_CALLED_ON_INSTANCE, p_call->function_name, caller_type);
 		}
 #endif // DEBUG_ENABLED
 
@@ -2865,6 +2871,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 					p_identifier->variable_source = member.variable;
 					member.variable->usages += 1;
 					break;
+				case GDScriptParser::ClassNode::Member::SIGNAL:
+					p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_SIGNAL;
+					break;
 				case GDScriptParser::ClassNode::Member::FUNCTION:
 					resolve_function_signature(member.function);
 					p_identifier->set_datatype(make_callable_type(member.function->info));
@@ -3009,6 +3018,7 @@ void GDScriptAnalyzer::reduce_identifier(GDScriptParser::IdentifierNode *p_ident
 			p_identifier->reduced_value = p_identifier->constant_source->initializer->reduced_value;
 			found_source = true;
 			break;
+		case GDScriptParser::IdentifierNode::MEMBER_SIGNAL:
 		case GDScriptParser::IdentifierNode::INHERITED_VARIABLE:
 			mark_lambda_use_self();
 			break;
@@ -3118,6 +3128,23 @@ void GDScriptAnalyzer::reduce_identifier(GDScriptParser::IdentifierNode *p_ident
 					Error err = singl_parser->raise_status(GDScriptParserRef::INTERFACE_SOLVED);
 					if (err == OK) {
 						result = type_from_metatype(singl_parser->get_parser()->head->get_datatype());
+					}
+				}
+			} else if (ResourceLoader::get_resource_type(autoload.path) == "PackedScene") {
+				if (GDScriptLanguage::get_singleton()->get_named_globals_map().has(name)) {
+					Variant constant = GDScriptLanguage::get_singleton()->get_named_globals_map()[name];
+					Node *node = Object::cast_to<Node>(constant);
+					if (node != nullptr) {
+						Ref<Script> scr = node->get_script();
+						if (scr.is_valid()) {
+							Ref<GDScriptParserRef> singl_parser = get_parser_for(scr->get_path());
+							if (singl_parser.is_valid()) {
+								Error err = singl_parser->raise_status(GDScriptParserRef::INTERFACE_SOLVED);
+								if (err == OK) {
+									result = type_from_metatype(singl_parser->get_parser()->head->get_datatype());
+								}
+							}
+						}
 					}
 				}
 			}

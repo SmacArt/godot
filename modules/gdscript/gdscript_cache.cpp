@@ -122,7 +122,7 @@ GDScriptParserRef::~GDScriptParserRef() {
 GDScriptCache *GDScriptCache::singleton = nullptr;
 
 void GDScriptCache::move_script(const String &p_from, const String &p_to) {
-	if (singleton == nullptr) {
+	if (singleton == nullptr || p_from == p_to) {
 		return;
 	}
 
@@ -236,16 +236,15 @@ Ref<GDScript> GDScriptCache::get_shallow_script(const String &p_path, Error &r_e
 		return singleton->shallow_gdscript_cache[p_path];
 	}
 
-	Ref<GDScriptParserRef> parser_ref = get_parser(p_path, GDScriptParserRef::PARSED, r_error);
-	if (r_error != OK) {
-		return Ref<GDScript>();
-	}
-
 	Ref<GDScript> script;
 	script.instantiate();
 	script->set_path(p_path, true);
 	script->load_source_code(p_path);
-	GDScriptCompiler::make_scripts(script.ptr(), parser_ref->get_parser()->get_tree(), true);
+
+	Ref<GDScriptParserRef> parser_ref = get_parser(p_path, GDScriptParserRef::PARSED, r_error);
+	if (r_error == OK) {
+		GDScriptCompiler::make_scripts(script.ptr(), parser_ref->get_parser()->get_tree(), true);
+	}
 
 	singleton->shallow_gdscript_cache[p_path] = script;
 	return script;
@@ -343,7 +342,12 @@ Ref<PackedScene> GDScriptCache::get_packed_scene(const String &p_path, Error &r_
 		return singleton->packed_scene_cache[p_path];
 	}
 
-	Ref<PackedScene> scene;
+	Ref<PackedScene> scene = ResourceCache::get_ref(p_path);
+	if (scene.is_valid()) {
+		singleton->packed_scene_cache[p_path] = scene;
+		singleton->packed_scene_dependencies[p_path].insert(p_owner);
+		return scene;
+	}
 	scene.instantiate();
 
 	r_error = OK;
