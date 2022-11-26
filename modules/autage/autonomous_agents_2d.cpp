@@ -1437,7 +1437,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
   if ((int)agent_cull_aabb_result.size()>1) {
 
     Vector3 agent_current_position = Vector3(agent->transform[2].x,agent->transform[2].y,0.0);
-    Vector3 agent_future_position = agent_current_position + Vector3(agent->velocity.x,agent->velocity.y,0.0) * 0.1;
+    Vector3 agent_future_position = agent_current_position + Vector3(agent->velocity.x,agent->velocity.y,0.0);
 #ifdef DEBUG_ENABLED
     if (is_debug) {
       agent->collision_avoidance_predicted_position = Vector2(agent_future_position.x, agent_future_position.y);
@@ -1482,7 +1482,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
             steering_output.linear += strength * relative_position.normalized();
 #ifdef DEBUG_ENABLED
             if (is_debug) {
-              print_line("willcolide");
               agent->collision_avoidance_avoiding_aabb = other_agent_future_aabb;
             }
 #endif
