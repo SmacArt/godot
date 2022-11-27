@@ -1142,20 +1142,24 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
     p.color *= p.base_color * p.start_color_rand;
 
-    if (p.align_rotation_to_velocity) {
-      if (p.velocity.length() > 0.0) {
-        p.transform.columns[1] = p.velocity.normalized();
-        p.transform.columns[0] = p.transform.columns[1].orthogonal();
-      }
-      else {
-        p.transform.columns[0] = old_transform.columns[0];
-        p.transform.columns[1] = old_transform.columns[1];
-      }
-    } else {
-      p.rotation += p.rotation_velocity * local_delta;
+    if (p.steering_behavior.has(STEERING_BEHAVIOR_REMOTELY_CONTROLLED)) {
       p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
       p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
-    }
+    } else
+      if (p.align_rotation_to_velocity) {
+        if (p.velocity.length() > 0.0) {
+          p.transform.columns[1] = p.velocity.normalized();
+          p.transform.columns[0] = p.transform.columns[1].orthogonal();
+        }
+        else {
+          p.transform.columns[0] = old_transform.columns[0];
+          p.transform.columns[1] = old_transform.columns[1];
+        }
+      } else {
+        p.rotation += p.rotation_velocity * local_delta;
+        p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
+        p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
+      }
 
     //scale by scale
     Vector2 base_scale = tex_scale * Math::lerp(parameters_min[PARAM_SCALE], parameters_max[PARAM_SCALE], p.scale_rand);
@@ -1196,9 +1200,76 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
     }
 
     if (ai_phase == p.ai_phase || p.is_new) {
-      double width = get_agent_base_size().x * base_scale.x * agent_aabb_expansion_ratio;
-      double height = get_agent_base_size().y * base_scale.y * agent_aabb_expansion_ratio;
+      double width = get_agent_base_size().x * base_scale.x; //* agent_aabb_expansion_ratio;
+      double height = get_agent_base_size().y * base_scale.y;//  * agent_aabb_expansion_ratio;
+
+      Size2 scl = p.transform.get_scale();
       p.aabb = AABB(Vector3(p.transform[2].x-width*0.5,p.transform[2].y-height*0.5,0), Vector3(width,height,1.0));
+
+      /*
+        Vector3 ep0 = p.aabb.get_endpoint(0);
+        Vector3 ep1 = p.aabb.get_endpoint(2);
+        Vector3 ep2 = p.aabb.get_endpoint(4);
+        Vector3 ep3 = p.aabb.get_endpoint(6);
+      */
+       
+      Vector3 ep0 = p.aabb.get_endpoint(0) - p.aabb.get_center();
+      Vector3 ep1 = p.aabb.get_endpoint(2) - p.aabb.get_center();
+      Vector3 ep2 = p.aabb.get_endpoint(4) - p.aabb.get_center();
+      Vector3 ep3 = p.aabb.get_endpoint(6) - p.aabb.get_center();
+      
+      Vector<Vector2> vertices = {
+        Vector2(ep0.x,ep0.y),
+        Vector2(ep1.x,ep1.y),
+        Vector2(ep2.x,ep2.y),
+        Vector2(ep3.x,ep3.y)
+      };
+
+      //      print_line("ep0:", ep0, "ep1:", ep1,"ep2:", ep2,"ep3:", ep3);
+      p.transform.set_scale(Size2(1,1));
+      Vector<Vector2> rv = p.transform.xform(vertices);
+      p.transform.set_scale(scl);
+      //print_line("rv0:", rv[0], "rv1:", rv[1],"rv2:", rv[2],"rv3:", rv[3]);
+
+      //p.aabb.set_position(Vector3(p.transform[2].x, p.transform[2].y,0));
+      // p.aabb.set_size(Vector3(0,0,0));
+      
+      p.aabb.expand_to(Vector3(rv[0].x,rv[0].y,0));
+      p.aabb.expand_to(Vector3(rv[1].x,rv[1].y,0));
+      p.aabb.expand_to(Vector3(rv[2].x,rv[2].y,0));
+      p.aabb.expand_to(Vector3(rv[3].x,rv[3].y,0));
+     
+      /*
+      p.aabb.expand_to(ep0);
+      p.aabb.expand_to(ep1);
+      p.aabb.expand_to(ep2);
+      p.aabb.expand_to(ep3);
+      */
+
+      //p.aabb.position += Vector3(p.transform[2].x,p.transform[2].y,0);
+      //////
+      /*
+        Vector2 normalized_velocity = p.velocity.normalized();
+        Vector2 fov_start_position = p.transform[2];
+
+        Vector2 left_angle = normalized_velocity.rotated(-half_pi);
+        Vector2 fov_left_position = fov_start_position + (left_angle * width * 0.5);
+        Vector2 right_angle = normalized_velocity.rotated(half_pi);
+        Vector2 fov_right_position = fov_start_position + (right_angle * width * 0.5);
+        Vector2 far_distance_point = fov_start_position + normalized_velocity * height * 0.5;
+
+        AABB aabb;
+        //p.aabb.position = Vector3(fov_start_position.x, fov_start_position.y, 1.0);
+
+        Vector3 fpv3 = Vector3(far_distance_point.x, far_distance_point.y, 1.0);
+        Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
+        Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
+        p.aabb.expand_to(fpv3);
+        p.aabb.expand_to(lpv3);
+        p.aabb.expand_to(rpv3);
+      */
+
+      //////
       if (use_bvh) {
         if (p.is_new) {
           p.bvh_leaf = agent_bvh.insert(p.aabb, &p);
@@ -1456,7 +1527,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
 
         double time_to_collision = 0.0;
         if (agent->aabb.intersects(other_agent->aabb)) {
-           return evade(agent, Vector2(other_agent->transform[2].x,other_agent->transform[2].y), other_agent->velocity);
+          return evade(agent, Vector2(other_agent->transform[2].x,other_agent->transform[2].y), other_agent->velocity);
         } else {
           AABB other_agent_future_aabb = AABB(other_agent->aabb);
           other_agent_future_aabb.position = other_agent_future_aabb.position + Vector3(other_agent->velocity.x,other_agent->velocity.y,0.0) * 0.1;
@@ -1768,9 +1839,32 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   aabb.expand_to(fpv3);
   aabb.expand_to(lpv3);
   aabb.expand_to(rpv3);
+  /*
+    Vector2 normalized_velocity = agent->velocity.normalized();
+    Vector2 fov_start_position = agent->transform[2] + normalized_velocity * agent->collision_avoidance_field_of_view_offset;
 
-  // adjust if > 180.  the left and right positions will need to be place to the rear
-  if (agent->collision_avoidance_field_of_view_angle > 180) {
+    double speed = agent->velocity.length_squared() / (agent->max_speed * agent->max_speed);
+    double far_distance = fmax(agent->collision_avoidance_field_of_view_min_distance, agent->collision_avoidance_field_of_view_max_distance * speed);
+
+    double axis_ratio = fmin(agent->collision_avoidance_field_of_view_angle, half_pi) / (half_pi);
+    agent->collision_avoidance_field_of_view_left_angle = normalized_velocity.rotated(-half_pi);
+    Vector2 fov_left_position = fov_start_position + (agent->collision_avoidance_field_of_view_left_angle * far_distance * axis_ratio);
+    agent->collision_avoidance_field_of_view_right_angle = normalized_velocity.rotated(half_pi);
+    Vector2 fov_right_position = fov_start_position + (agent->collision_avoidance_field_of_view_right_angle * far_distance * axis_ratio);
+    Vector2 far_distance_point = fov_start_position + normalized_velocity * far_distance;
+
+    AABB aabb;
+    aabb.position = Vector3(fov_start_position.x, fov_start_position.y, 1.0);
+
+    Vector3 fpv3 = Vector3(far_distance_point.x, far_distance_point.y, 1.0);
+    Vector3 lpv3 = Vector3(fov_left_position.x, fov_left_position.y, 1.0);
+    Vector3 rpv3 = Vector3(fov_right_position.x, fov_right_position.y, 1.0);
+    aabb.expand_to(fpv3);
+    aabb.expand_to(lpv3);
+    aabb.expand_to(rpv3);
+
+    // adjust if > 180.  the left and right positions will need to be place to the rear
+    if (agent->collision_avoidance_field_of_view_angle > 180) {
     double remaining_fov = fmin(Math_PI, agent->collision_avoidance_field_of_view_angle - Math_PI) * 0.5;
     double distance_ratio = far_distance / (half_pi);
     double rear_distance = remaining_fov * distance_ratio;
@@ -1781,7 +1875,8 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
     Vector2 fov_right_back_position = fov_right_position + (normalized_velocity.rotated(Math_PI)).normalized() * rear_distance * axis_ratio;
     Vector3 rbpv3 = Vector3(fov_right_back_position.x, fov_right_back_position.y, 1.0);
     aabb.expand_to(rbpv3);
-  }
+    }
+  */
 
 #ifdef DEBUG_ENABLED
   if (is_debug) {
