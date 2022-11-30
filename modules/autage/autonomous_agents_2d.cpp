@@ -1178,7 +1178,8 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
 
       if (p.steering_behavior.has(STEERING_BEHAVIOR_COLLISION_AVOIDANCE)) {
         if (p.collision_avoidance_fov_scale_to_size){
-          double l = base_scale.length();
+          // double l = base_scale.length();
+          double l = base_scale.y;
           p.collision_avoidance_field_of_view_min_distance = p.collision_avoidance_field_of_view_min_distance * l;
           p.collision_avoidance_field_of_view_max_distance = p.collision_avoidance_field_of_view_max_distance * l;
           p.collision_avoidance_field_of_view_offset = p.collision_avoidance_field_of_view_base_offset * l;
