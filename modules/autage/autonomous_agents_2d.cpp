@@ -1145,7 +1145,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
     if (p.steering_behavior.has(STEERING_BEHAVIOR_REMOTELY_CONTROLLED)) {
       p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
       p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
-    } else
+    } else {
       if (p.align_rotation_to_velocity) {
         if (p.velocity.length() > 0.0) {
           p.transform.columns[1] = p.velocity.normalized();
@@ -1160,6 +1160,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform.columns[0] = Vector2(Math::cos(p.rotation), -Math::sin(p.rotation));
         p.transform.columns[1] = Vector2(Math::sin(p.rotation), Math::cos(p.rotation));
       }
+    }
 
     //scale by scale
     Vector2 base_scale = tex_scale * Math::lerp(parameters_min[PARAM_SCALE], parameters_max[PARAM_SCALE], p.scale_rand);
@@ -1780,7 +1781,13 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::wander(Agent *agent, doub
 }
 
 AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
+  AABB aabb = AABB(agent->aabb);
   Vector2 normalized_velocity = agent->velocity.normalized();
+  Vector2 forwards_view_position = agent->transform[2] + normalized_velocity * agent->collision_avoidance_field_of_view_max_distance;
+  Vector3 fpv3 = Vector3(forwards_view_position.x, forwards_view_position.y, 1.0);
+  aabb.expand_to(fpv3);
+  return aabb;
+  /*
   Vector2 fov_start_position = agent->transform[2] + normalized_velocity * agent->collision_avoidance_field_of_view_offset;
 
   double speed = agent->velocity.length_squared() / (agent->max_speed * agent->max_speed);
@@ -1802,6 +1809,7 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   aabb.expand_to(fpv3);
   aabb.expand_to(lpv3);
   aabb.expand_to(rpv3);
+  */
   /*
     Vector2 normalized_velocity = agent->velocity.normalized();
     Vector2 fov_start_position = agent->transform[2] + normalized_velocity * agent->collision_avoidance_field_of_view_offset;
@@ -1840,7 +1848,7 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
     aabb.expand_to(rbpv3);
     }
   */
-
+  /*
 #ifdef DEBUG_ENABLED
   if (is_debug) {
     agent->collision_avoidance_fov_start_position = fov_start_position;
@@ -1852,6 +1860,7 @@ AABB AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   }
 #endif
   return aabb;
+  */
 }
 
 void AutonomousAgents2D::agent_cull_aabb_query(const AABB &p_aabb) {
