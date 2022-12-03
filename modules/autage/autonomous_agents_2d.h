@@ -123,6 +123,9 @@ public:
     PARAM_ARRIVE_TIME_TO_TARGET,
 
     PARAM_COLLISION_AVOIDANCE_DECAY_COEFFICIENT,
+    PARAM_COLLISION_AVOIDANCE_BACK_VIEW_DISTANCE_RATIO,
+    PARAM_COLLISION_AVOIDANCE_FRONT_VIEW_DISTANCE_RATIO,
+    PARAM_COLLISION_AVOIDANCE_SIDE_VIEW_DISTANCE_RATIO,
     PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_ANGLE,
     PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_DISTANCE,
     PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET,
@@ -202,6 +205,9 @@ private:
 
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
+    AABB aabb_collision_avoidance;
+    real_t current_width;
+    real_t current_height;
 
     Vector2 velocity;
     real_t rotation_velocity = 0.0;
@@ -221,6 +227,10 @@ private:
     real_t evade_max_prediction = 0.0;
 
     real_t collision_avoidance_decay_coefficient = 0.0;
+    real_t collision_avoidance_back_view_distance_ratio = 0.0;
+    real_t collision_avoidance_front_view_distance_ratio = 1.0;
+    real_t collision_avoidance_side_view_distance_ratio = 0.0;
+
     real_t collision_avoidance_field_of_view_angle = 0.0;
     real_t collision_avoidance_field_of_view_min_distance = 0.0;
     real_t collision_avoidance_field_of_view_max_distance = 0.0;
@@ -457,7 +467,7 @@ private:
   DynamicBVH agent_bvh;
   void agent_cull_aabb_query(const AABB &p_aabb);
   void agent_cull_convext_query();
-  AABB create_avoidance_aabb_for_agent(Agent *agent);
+  void create_avoidance_aabb_for_agent(Agent *agent);
 
   template <class QueryResult>
   _FORCE_INLINE_ void aabb_query(const AABB &p_aabb, QueryResult &r_result);
