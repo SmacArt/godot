@@ -424,6 +424,7 @@ private:
   Vector2 gravity = Vector2(0, 980);
   Size2 agent_base_size = Size2(10, 10);
   double agent_aabb_expansion_ratio = 1.2;
+  double agent_collision_base_speed = 100.0;
 
   int pursue_delegate_steering_behavior = 0;
   int look_where_yourre_going_delegate_steering_behavior = 0;
@@ -576,6 +577,9 @@ public:
 
   void set_agent_base_size(const Size2 &p_size);
   Size2 get_agent_base_size() const;
+
+  void set_agent_collision_base_speed(const double p_base_speed);
+  double get_agent_collision_base_speed() const;
 
   void set_agent_aabb_expansion_ratio(const double p_ratio);
   double get_agent_aabb_expansion_ratio() const;
