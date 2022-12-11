@@ -265,6 +265,7 @@ private:
     AABB separation_aabb;
     AABB collision_avoidance_avoiding_aabb;
     AABB collision_avoidance_fov_aabb;
+    AABB predicted_position_aabb;
     Vector2 collision_avoidance_fov_start_position;
     Vector2 collision_avoidance_fov_left_position;
     Vector2 collision_avoidance_fov_right_position;
@@ -622,6 +623,7 @@ public:
   AABB get_agent_separation_aabb(int index);
   AABB get_agent_collision_avoidance_avoiding_aabb(int index);
   AABB get_agent_collision_avoidance_fov_aabb(int index);
+  AABB get_agent_predicted_position_aabb(int index);
   Vector2 get_agent_collision_avoidance_fov_start_position(int index);
   Vector2 get_agent_collision_avoidance_fov_left_position(int index);
   Vector2 get_agent_collision_avoidance_fov_right_position(int index);
