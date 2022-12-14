@@ -684,6 +684,58 @@ public:
     return fmod(2.0 * difference, two_pi) - difference;
   }
 
+  inline bool aabbs_intersect(const AABB &aabb1, const AABB &aabb2) {
+    if (aabb1.position.x >= (aabb2.position.x + aabb2.size.x)) {
+      return false;
+    }
+    if ((aabb1.position.x + aabb1.size.x) <= aabb2.position.x) {
+      return false;
+    }
+    if (aabb1.position.y >= (aabb2.position.y + aabb2.size.y)) {
+      return false;
+    }
+    if ((aabb1.position.y + aabb1.size.y) <= aabb2.position.y) {
+      return false;
+    }
+    return true;
+  }
+
+  inline AABB aabbs_intersection(const AABB &aabb1, const AABB &aabb2) const {
+    Vector3 src_min = aabb1.position;
+    Vector3 src_max = aabb1.position + aabb1.size;
+    Vector3 dst_min = aabb2.position;
+    Vector3 dst_max = aabb2.position +aabb2.size;
+
+    Vector3 min, max;
+
+    if (src_min.x > dst_max.x || src_max.x < dst_min.x) {
+      return AABB();
+    } else {
+      min.x = (src_min.x > dst_min.x) ? src_min.x : dst_min.x;
+      max.x = (src_max.x < dst_max.x) ? src_max.x : dst_max.x;
+    }
+
+    if (src_min.y > dst_max.y || src_max.y < dst_min.y) {
+      return AABB();
+    } else {
+      min.y = (src_min.y > dst_min.y) ? src_min.y : dst_min.y;
+      max.y = (src_max.y < dst_max.y) ? src_max.y : dst_max.y;
+    }
+
+    return AABB(min, max - min);
+  }
+
+  inline double distance_between_aabbs(const AABB &aabb1, const AABB &aabb2) {
+    //    max(|x1−x2|−(w1+w2)/2,|y1−y2|−(b1+b2)/2);
+    Vector3 c1 = aabb1.get_center();
+    Vector3 c2 = aabb2.get_center();
+    double w1 = aabb1.get_size().x;
+    double w2 = aabb2.get_size().x;
+    double h1 = aabb1.get_size().y;
+    double h2 = aabb2.get_size().y;
+
+    return fmax( Math::abs(c1.x-c2.x) - (w1+w2) * 0.5, Math::abs(c1.y-c2.y) - (h1+h2) * 0.5);
+  }
 };
 
 VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)

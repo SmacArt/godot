@@ -1483,11 +1483,10 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
   if (result_size <= 1) {
     return steering_output;
   }
-  // 1. find the agent that is closet to the collision
-  //    store the first collision time
-  double shortest_time = DBL_MAX;
+  double shortest_distance = DBL_MAX;
+  Agent *closest_agent;
+  AABB closest_agent_future_aabb;
 
-  // store the agent that collides and then any other data needed to avoid recalculating
   int first_agent = -1;
   double first_min_separation = 0.0;
   double first_distance = 0.0;
@@ -1503,46 +1502,42 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
       }
 #endif
       double time_to_collision = 0.0;
-      print_line(agent->aabb, " : ", other_agent->aabb);
-      if (agent->aabb.intersects(other_agent->aabb)) {
-        print_line(agent->aabb, " : ", other_agent->aabb);
+      if (aabbs_intersect(agent->aabb,other_agent->aabb)) {
         return evade(agent, Vector2(other_agent->transform[2].x,other_agent->transform[2].y), other_agent->velocity);
       } else {
         AABB other_agent_future_aabb = AABB(other_agent->aabb);
         other_agent_future_aabb.position = other_agent_future_aabb.position + Vector3(other_agent->velocity.x,other_agent->velocity.y,0.0) * 0.2;
-        //          add some debug to see where the segment goes from the agent current position to its future position
-        //  might also need to show a debug to show agents future position
-        //bool will_collide = other_agent_future_aabb.intersects_segment(agent_current_position, agent_future_position);
-#ifdef DEBUG_ENABLED
-        if (is_debug) {
-          agent->collision_avoidance_avoiding_aabb = other_agent_future_aabb;
-        }
-#endif
-        //print_line(agent_future_aabb, " : ", other_agent_future_aabb);
-        // calculate the time to collision
-        if (agent_future_aabb.intersects(other_agent_future_aabb)) {
-          print_line("will collide..");
-          Vector2 relative_position = other_agent->transform[2] - agent->transform[2];
-          Vector2 relative_velocity = other_agent->velocity - agent->velocity;
-          double relative_speed = relative_velocity.length();
-          time_to_collision = relative_position.dot(relative_velocity) / (relative_speed * relative_speed);
-
-          ///////
-          double dist = relative_position.length();
-          double strength = fmin(agent->collision_avoidance_decay_coefficient / (dist * dist), agent->max_acceleration);
-          steering_output.linear += strength * relative_position.normalized();
-#ifdef DEBUG_ENABLED
-          if (is_debug) {
-            agent->collision_avoidance_avoiding_aabb = other_agent_future_aabb;
+        if (aabbs_intersect(agent_future_aabb, other_agent_future_aabb)) {
+          double distance = fabs(distance_between_aabbs(agent_future_aabb, other_agent_future_aabb));
+          if (distance < shortest_distance) {
+            shortest_distance = distance;
+            closest_agent = other_agent;
+            closest_agent_future_aabb = other_agent_future_aabb;
           }
-#endif
         }
-
       }
     }
-    return steering_output;
   }
+  if (shortest_distance < DBL_MAX) {
+    //    print_line("dist=" , shortest_distance, " : ", agent->aabb, " : ", closest_agent_future_aabb );
+#ifdef DEBUG_ENABLED
+    if (is_debug) {
+      agent->collision_avoidance_avoiding_aabb = closest_agent_future_aabb ;
+    }
+#endif
+
+    return evade(agent, Vector2(closest_agent_future_aabb.get_center().x, closest_agent_future_aabb.get_center().y), closest_agent->velocity);
+    /*
+      Vector2 relative_position = Vector2(closest_agent_future_aabb.get_center().x, closest_agent_future_aabb.get_center().y) - agent->transform[2];
+      double dist = relative_position.length();
+      double strength = fmin(agent->collision_avoidance_decay_coefficient / (dist * dist), agent->max_acceleration) * -1.0;
+      steering_output.linear = strength * relative_position.normalized();
+    */
+  }
+
+  return steering_output;
 }
+
 
 /*
   AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance_x(Agent *agent) {
