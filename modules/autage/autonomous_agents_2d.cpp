@@ -1514,7 +1514,15 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
             closest_agent = other_agent;
             closest_agent_future_aabb = other_agent_future_aabb;
           }
+        } else if (aabbs_intersect(agent->aabb, other_agent_future_aabb)) {
+          double distance = fabs(distance_between_aabbs(agent->aabb, other_agent_future_aabb));
+          if (distance < shortest_distance) {
+            shortest_distance = distance;
+            closest_agent = other_agent;
+            closest_agent_future_aabb = other_agent_future_aabb;
+          }
         }
+
       }
     }
   }
