@@ -138,7 +138,7 @@ void GridMap::_get_property_list(List<PropertyInfo> *p_list) const {
 
 void GridMap::set_collision_layer(uint32_t p_layer) {
 	collision_layer = p_layer;
-	_reset_physic_bodies_collision_filters();
+	_update_physics_bodies_collision_properties();
 }
 
 uint32_t GridMap::get_collision_layer() const {
@@ -147,7 +147,7 @@ uint32_t GridMap::get_collision_layer() const {
 
 void GridMap::set_collision_mask(uint32_t p_mask) {
 	collision_mask = p_mask;
-	_reset_physic_bodies_collision_filters();
+	_update_physics_bodies_collision_properties();
 }
 
 uint32_t GridMap::get_collision_mask() const {
@@ -182,6 +182,15 @@ void GridMap::set_collision_mask_value(int p_layer_number, bool p_value) {
 		mask &= ~(1 << (p_layer_number - 1));
 	}
 	set_collision_mask(mask);
+}
+
+void GridMap::set_collision_priority(real_t p_priority) {
+	collision_priority = p_priority;
+	_update_physics_bodies_collision_properties();
+}
+
+real_t GridMap::get_collision_priority() const {
+	return collision_priority;
 }
 
 void GridMap::set_physics_material(Ref<PhysicsMaterial> p_material) {
@@ -230,7 +239,7 @@ void GridMap::set_navigation_map(RID p_navigation_map) {
 	map_override = p_navigation_map;
 	for (const KeyValue<OctantKey, Octant *> &E : octant_map) {
 		Octant &g = *octant_map[E.key];
-		for (KeyValue<IndexKey, Octant::NavMesh> &F : g.navmesh_ids) {
+		for (KeyValue<IndexKey, Octant::NavigationCell> &F : g.navigation_cell_ids) {
 			if (F.value.region.is_valid()) {
 				NavigationServer3D::get_singleton()->region_set_map(F.value.region, map_override);
 			}
@@ -385,6 +394,7 @@ void GridMap::set_cell_item(const Vector3i &p_position, int p_item, int p_rot) {
 		PhysicsServer3D::get_singleton()->body_attach_object_instance_id(g->static_body, get_instance_id());
 		PhysicsServer3D::get_singleton()->body_set_collision_layer(g->static_body, collision_layer);
 		PhysicsServer3D::get_singleton()->body_set_collision_mask(g->static_body, collision_mask);
+		PhysicsServer3D::get_singleton()->body_set_collision_priority(g->static_body, collision_priority);
 		if (physics_material.is_valid()) {
 			PhysicsServer3D::get_singleton()->body_set_param(g->static_body, PhysicsServer3D::BODY_PARAM_FRICTION, physics_material->get_friction());
 			PhysicsServer3D::get_singleton()->body_set_param(g->static_body, PhysicsServer3D::BODY_PARAM_BOUNCE, physics_material->get_bounce());
@@ -542,13 +552,13 @@ void GridMap::_octant_transform(const OctantKey &p_key) {
 	}
 
 	// update transform for NavigationServer regions and navigation debugmesh instances
-	for (const KeyValue<IndexKey, Octant::NavMesh> &E : g.navmesh_ids) {
+	for (const KeyValue<IndexKey, Octant::NavigationCell> &E : g.navigation_cell_ids) {
 		if (bake_navigation) {
 			if (E.value.region.is_valid()) {
 				NavigationServer3D::get_singleton()->region_set_transform(E.value.region, get_global_transform() * E.value.xform);
 			}
-			if (E.value.navmesh_debug_instance.is_valid()) {
-				RS::get_singleton()->instance_set_transform(E.value.navmesh_debug_instance, get_global_transform() * E.value.xform);
+			if (E.value.navigation_mesh_debug_instance.is_valid()) {
+				RS::get_singleton()->instance_set_transform(E.value.navigation_mesh_debug_instance, get_global_transform() * E.value.xform);
 			}
 		}
 	}
@@ -574,13 +584,13 @@ bool GridMap::_octant_update(const OctantKey &p_key) {
 	}
 
 	//erase navigation
-	for (const KeyValue<IndexKey, Octant::NavMesh> &E : g.navmesh_ids) {
+	for (const KeyValue<IndexKey, Octant::NavigationCell> &E : g.navigation_cell_ids) {
 		NavigationServer3D::get_singleton()->free(E.value.region);
-		if (E.value.navmesh_debug_instance.is_valid()) {
-			RS::get_singleton()->free(E.value.navmesh_debug_instance);
+		if (E.value.navigation_mesh_debug_instance.is_valid()) {
+			RS::get_singleton()->free(E.value.navigation_mesh_debug_instance);
 		}
 	}
-	g.navmesh_ids.clear();
+	g.navigation_cell_ids.clear();
 
 	//erase multimeshes
 
@@ -648,17 +658,17 @@ bool GridMap::_octant_update(const OctantKey &p_key) {
 			}
 		}
 
-		// add the item's navmesh at given xform to GridMap's Navigation ancestor
-		Ref<NavigationMesh> navmesh = mesh_library->get_item_navmesh(c.item);
-		if (navmesh.is_valid()) {
-			Octant::NavMesh nm;
-			nm.xform = xform * mesh_library->get_item_navmesh_transform(c.item);
+		// add the item's navigation_mesh at given xform to GridMap's Navigation ancestor
+		Ref<NavigationMesh> navigation_mesh = mesh_library->get_item_navigation_mesh(c.item);
+		if (navigation_mesh.is_valid()) {
+			Octant::NavigationCell nm;
+			nm.xform = xform * mesh_library->get_item_navigation_mesh_transform(c.item);
 
 			if (bake_navigation) {
 				RID region = NavigationServer3D::get_singleton()->region_create();
 				NavigationServer3D::get_singleton()->region_set_owner_id(region, get_instance_id());
 				NavigationServer3D::get_singleton()->region_set_navigation_layers(region, navigation_layers);
-				NavigationServer3D::get_singleton()->region_set_navmesh(region, navmesh);
+				NavigationServer3D::get_singleton()->region_set_navigation_mesh(region, navigation_mesh);
 				NavigationServer3D::get_singleton()->region_set_transform(region, get_global_transform() * nm.xform);
 				if (is_inside_tree()) {
 					if (map_override.is_valid()) {
@@ -673,19 +683,19 @@ bool GridMap::_octant_update(const OctantKey &p_key) {
 				// add navigation debugmesh visual instances if debug is enabled
 				SceneTree *st = SceneTree::get_singleton();
 				if (st && st->is_debugging_navigation_hint()) {
-					if (!nm.navmesh_debug_instance.is_valid()) {
-						RID navmesh_debug_rid = navmesh->get_debug_mesh()->get_rid();
-						nm.navmesh_debug_instance = RS::get_singleton()->instance_create();
-						RS::get_singleton()->instance_set_base(nm.navmesh_debug_instance, navmesh_debug_rid);
+					if (!nm.navigation_mesh_debug_instance.is_valid()) {
+						RID navigation_mesh_debug_rid = navigation_mesh->get_debug_mesh()->get_rid();
+						nm.navigation_mesh_debug_instance = RS::get_singleton()->instance_create();
+						RS::get_singleton()->instance_set_base(nm.navigation_mesh_debug_instance, navigation_mesh_debug_rid);
 					}
 					if (is_inside_tree()) {
-						RS::get_singleton()->instance_set_scenario(nm.navmesh_debug_instance, get_world_3d()->get_scenario());
-						RS::get_singleton()->instance_set_transform(nm.navmesh_debug_instance, get_global_transform() * nm.xform);
+						RS::get_singleton()->instance_set_scenario(nm.navigation_mesh_debug_instance, get_world_3d()->get_scenario());
+						RS::get_singleton()->instance_set_transform(nm.navigation_mesh_debug_instance, get_global_transform() * nm.xform);
 					}
 				}
 #endif // DEBUG_ENABLED
 			}
-			g.navmesh_ids[E] = nm;
+			g.navigation_cell_ids[E] = nm;
 		}
 	}
 
@@ -751,10 +761,11 @@ bool GridMap::_octant_update(const OctantKey &p_key) {
 	return false;
 }
 
-void GridMap::_reset_physic_bodies_collision_filters() {
+void GridMap::_update_physics_bodies_collision_properties() {
 	for (const KeyValue<OctantKey, Octant *> &E : octant_map) {
 		PhysicsServer3D::get_singleton()->body_set_collision_layer(E.value->static_body, collision_layer);
 		PhysicsServer3D::get_singleton()->body_set_collision_mask(E.value->static_body, collision_mask);
+		PhysicsServer3D::get_singleton()->body_set_collision_priority(E.value->static_body, collision_priority);
 	}
 }
 
@@ -775,14 +786,14 @@ void GridMap::_octant_enter_world(const OctantKey &p_key) {
 	}
 
 	if (bake_navigation && mesh_library.is_valid()) {
-		for (KeyValue<IndexKey, Octant::NavMesh> &F : g.navmesh_ids) {
+		for (KeyValue<IndexKey, Octant::NavigationCell> &F : g.navigation_cell_ids) {
 			if (cell_map.has(F.key) && F.value.region.is_valid() == false) {
-				Ref<NavigationMesh> nm = mesh_library->get_item_navmesh(cell_map[F.key].item);
-				if (nm.is_valid()) {
+				Ref<NavigationMesh> navigation_mesh = mesh_library->get_item_navigation_mesh(cell_map[F.key].item);
+				if (navigation_mesh.is_valid()) {
 					RID region = NavigationServer3D::get_singleton()->region_create();
 					NavigationServer3D::get_singleton()->region_set_owner_id(region, get_instance_id());
 					NavigationServer3D::get_singleton()->region_set_navigation_layers(region, navigation_layers);
-					NavigationServer3D::get_singleton()->region_set_navmesh(region, nm);
+					NavigationServer3D::get_singleton()->region_set_navigation_mesh(region, navigation_mesh);
 					NavigationServer3D::get_singleton()->region_set_transform(region, get_global_transform() * F.value.xform);
 					if (map_override.is_valid()) {
 						NavigationServer3D::get_singleton()->region_set_map(region, map_override);
@@ -824,14 +835,14 @@ void GridMap::_octant_exit_world(const OctantKey &p_key) {
 		RS::get_singleton()->instance_set_scenario(g.multimesh_instances[i].instance, RID());
 	}
 
-	for (KeyValue<IndexKey, Octant::NavMesh> &F : g.navmesh_ids) {
+	for (KeyValue<IndexKey, Octant::NavigationCell> &F : g.navigation_cell_ids) {
 		if (F.value.region.is_valid()) {
 			NavigationServer3D::get_singleton()->free(F.value.region);
 			F.value.region = RID();
 		}
-		if (F.value.navmesh_debug_instance.is_valid()) {
-			RS::get_singleton()->free(F.value.navmesh_debug_instance);
-			F.value.navmesh_debug_instance = RID();
+		if (F.value.navigation_mesh_debug_instance.is_valid()) {
+			RS::get_singleton()->free(F.value.navigation_mesh_debug_instance);
+			F.value.navigation_mesh_debug_instance = RID();
 		}
 	}
 
@@ -862,15 +873,15 @@ void GridMap::_octant_clean_up(const OctantKey &p_key) {
 	PhysicsServer3D::get_singleton()->free(g.static_body);
 
 	// Erase navigation
-	for (const KeyValue<IndexKey, Octant::NavMesh> &E : g.navmesh_ids) {
+	for (const KeyValue<IndexKey, Octant::NavigationCell> &E : g.navigation_cell_ids) {
 		if (E.value.region.is_valid()) {
 			NavigationServer3D::get_singleton()->free(E.value.region);
 		}
-		if (E.value.navmesh_debug_instance.is_valid()) {
-			RS::get_singleton()->free(E.value.navmesh_debug_instance);
+		if (E.value.navigation_mesh_debug_instance.is_valid()) {
+			RS::get_singleton()->free(E.value.navigation_mesh_debug_instance);
 		}
 	}
-	g.navmesh_ids.clear();
+	g.navigation_cell_ids.clear();
 
 #ifdef DEBUG_ENABLED
 	if (bake_navigation) {
@@ -1047,6 +1058,9 @@ void GridMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_collision_layer_value", "layer_number", "value"), &GridMap::set_collision_layer_value);
 	ClassDB::bind_method(D_METHOD("get_collision_layer_value", "layer_number"), &GridMap::get_collision_layer_value);
 
+	ClassDB::bind_method(D_METHOD("set_collision_priority", "priority"), &GridMap::set_collision_priority);
+	ClassDB::bind_method(D_METHOD("get_collision_priority"), &GridMap::get_collision_priority);
+
 	ClassDB::bind_method(D_METHOD("set_physics_material", "material"), &GridMap::set_physics_material);
 	ClassDB::bind_method(D_METHOD("get_physics_material"), &GridMap::get_physics_material);
 
@@ -1118,6 +1132,7 @@ void GridMap::_bind_methods() {
 	ADD_GROUP("Collision", "collision_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_layer", "get_collision_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_mask", "get_collision_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "collision_priority"), "set_collision_priority", "get_collision_priority");
 	ADD_GROUP("Navigation", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bake_navigation"), "set_bake_navigation", "is_baking_navigation");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "navigation_layers", PROPERTY_HINT_LAYERS_3D_NAVIGATION), "set_navigation_layers", "get_navigation_layers");
@@ -1390,7 +1405,7 @@ void GridMap::_update_octant_navigation_debug_edge_connections_mesh(const Octant
 
 	Vector<Vector3> vertex_array;
 
-	for (KeyValue<IndexKey, Octant::NavMesh> &F : g.navmesh_ids) {
+	for (KeyValue<IndexKey, Octant::NavigationCell> &F : g.navigation_cell_ids) {
 		if (cell_map.has(F.key) && F.value.region.is_valid()) {
 			int connections_count = NavigationServer3D::get_singleton()->region_get_connections_count(F.value.region);
 			if (connections_count == 0) {
