@@ -33,6 +33,7 @@
 #include "core/object/class_db.h"
 
 #include "autonomous_agents_2d.h"
+#include "autonomous_agents_path_2d.h"
 
 
 void initialize_autage_module(ModuleInitializationLevel p_level) {
@@ -41,6 +42,7 @@ void initialize_autage_module(ModuleInitializationLevel p_level) {
 	}
 
   GDREGISTER_CLASS(AutonomousAgents2D);
+  GDREGISTER_CLASS(AutonomousAgentsPath2D);
 
 }
 
