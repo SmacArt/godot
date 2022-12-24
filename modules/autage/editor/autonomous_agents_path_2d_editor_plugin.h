@@ -5,6 +5,7 @@
 #include "scene/2d/path_2d.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/separator.h"
+#include "../autonomous_agents_path_2d.h"
 
 class CanvasItemEditor;
 class MenuButton;

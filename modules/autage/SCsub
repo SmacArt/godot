@@ -5,3 +5,4 @@ Import("env_modules")
 
 env_autage = env_modules.Clone()
 env_autage.add_source_files(env.modules_sources, "*.cpp")
+env_autage.add_source_files(env.modules_sources, "editor/*.cpp")

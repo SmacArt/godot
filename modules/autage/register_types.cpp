@@ -34,21 +34,25 @@
 
 #include "autonomous_agents_2d.h"
 #include "autonomous_agents_path_2d.h"
+#include "editor/autonomous_agents_path_2d_editor_plugin.h"
 
 
 void initialize_autage_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
-	}
+  if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
+    GDREGISTER_CLASS(AutonomousAgents2D);
+    GDREGISTER_CLASS(AutonomousAgentsPath2D);
+  }
 
-  GDREGISTER_CLASS(AutonomousAgents2D);
-  GDREGISTER_CLASS(AutonomousAgentsPath2D);
+#ifdef TOOLS_ENABLED
+  if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+    EditorPlugins::add_by_type<AutonomousAgentsPath2DEditorPlugin>();
+  }
+#endif
 
 }
 
 void uninitialize_autage_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
-	}
+  if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
+    return;
+  }
 }
-
