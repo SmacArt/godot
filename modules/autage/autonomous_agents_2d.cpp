@@ -1484,14 +1484,8 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
     return steering_output;
   }
   double shortest_distance = DBL_MAX;
-  Agent *closest_agent;
+  Agent *closest_agent = nullptr;
   AABB closest_agent_future_aabb;
-
-  int first_agent = -1;
-  double first_min_separation = 0.0;
-  double first_distance = 0.0;
-  Vector2 first_relative_position;
-  Vector2 first_relative_velocity;
 
   for (int i = 0; i < result_size; i++) {
     Agent *other_agent = agent_cull_aabb_result[i];
@@ -1501,7 +1495,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
         other_agent->aabb_culled = false;
       }
 #endif
-      double time_to_collision = 0.0;
       if (aabbs_intersect(agent->aabb,other_agent->aabb)) {
         return evade(agent, Vector2(other_agent->transform[2].x,other_agent->transform[2].y), other_agent->velocity);
       } else {
@@ -1526,8 +1519,7 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
       }
     }
   }
-  if (shortest_distance < DBL_MAX) {
-    //    print_line("dist=" , shortest_distance, " : ", agent->aabb, " : ", closest_agent_future_aabb );
+  if (closest_agent) {
 #ifdef DEBUG_ENABLED
     if (is_debug) {
       agent->collision_avoidance_avoiding_aabb = closest_agent_future_aabb ;
@@ -1545,58 +1537,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
 
   return steering_output;
 }
-
-
-/*
-  AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance_x(Agent *agent) {
-
-  SteeringOutput steering_output;
-
-  AABB aabb = create_avoidance_aabb_for_agent(agent);
-  agent_cull_aabb_query(aabb);
-
-  #ifdef DEBUG_ENABLED
-  if (is_debug) {
-  agent->collision_avoidance_fov_aabb = aabb;
-  }
-  #endif
-
-  for (int i = 0; i < (int)agent_cull_aabb_result.size(); i++) {
-  Agent *other_agent = agent_cull_aabb_result[i];
-  if (other_agent != agent) {
-
-  Vector2 direction_to_other = other_agent->transform[2]-agent->transform[2];
-  if (direction_to_other.length() > agent->collision_avoidance_field_of_view_distance) {
-  continue;
-
-  }
-  direction_to_other.normalize();
-  // see if in fov
-  double dot = direction_to_other.dot(agent->transform[0]);
-  //print_line(agent->transform[0], ":", dot);
-  if (dot > 0){
-  continue;
-  }
-
-  Vector2 facing_direction = Vector2(0,1).rotated(agent->transform[0].angle());
-  if (abs(direction_to_other.angle_to(facing_direction)) > agent->collision_avoidance_field_of_view_angle * 0.5) {
-  continue;
-  }
-
-  double dist = direction_to_other.length();
-  double strength = fmin(agent->collision_avoidance_decay_coefficient / (dist * dist), agent->max_acceleration);
-  steering_output.linear += strength * direction_to_other.normalized();
-
-  #ifdef DEBUG_ENABLED
-  if (is_debug) {
-  other_agent->aabb_culled = false;
-  }
-  #endif
-  }
-  }
-  return steering_output;
-  }
-*/
 
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::evade(Agent *agent){
   if (agent->target_agent > -1) {
@@ -1801,7 +1741,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::wander(Agent *agent, doub
 void AutonomousAgents2D::create_avoidance_aabb_for_agent(Agent *agent) {
   agent->aabb_collision_avoidance.set_position(agent->aabb.get_position());
   agent->aabb_collision_avoidance.set_size(agent->aabb.get_size());
-  double height = agent->aabb_collision_avoidance.get_size().y;
   Vector2 normalized_velocity = agent->velocity.normalized();
   double speed_ratio = (agent->velocity.length_squared() / (agent_collision_base_speed * agent_collision_base_speed)) + 2.0;
   //print_line("agent_speed:", agent_speed, " : ", base_speed, " : ", speed_ratio);

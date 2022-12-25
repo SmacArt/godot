@@ -175,8 +175,6 @@ public:
     EMISSION_SHAPE_MAX
   };
 
-private:
-
   struct Agent {
 
     uint32_t seed = 0;
@@ -297,6 +295,8 @@ private:
 
   };
 
+private:
+
   struct SteeringOutput {
     Vector2 linear;
     real_t angular;
@@ -343,7 +343,7 @@ private:
   double frame_remainder = 0.0;
   int cycle = 0;
   bool do_redraw = false;
-  int ai_phase = 1;
+  uint32_t ai_phase = 1;
   Transform2D old_transform;
 
   RID mesh;
@@ -353,7 +353,7 @@ private:
   Vector<float> agent_data;
   Vector<int> agent_order;
 
-  Agent *agents_arr;
+  Agent *agents_arr = nullptr;
 
   struct SortLifetime {
     const Agent *agents = nullptr;
@@ -385,7 +385,7 @@ private:
   int fixed_fps = 0;
   bool fractional_delta = true;
   double behaviour_delay = 0.0;
-  int number_of_ai_phases = 1;
+  uint32_t number_of_ai_phases = 1;
 
   Transform2D inv_emission_transform;
 
