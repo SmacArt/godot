@@ -406,7 +406,7 @@ void AutonomousAgentsPath2DEditor::edit(Node *p_path2d) {
 	}
 
 	if (p_path2d) {
-		node = Object::cast_to<AutonomousAgentsPath2D>(p_path2d);
+		node = Object::cast_to<AutonomousAgentsPathNode2D>(p_path2d);
 		if (!node->is_connected("visibility_changed", callable_mp(this, &AutonomousAgentsPath2DEditor::_node_visibility_changed))) {
 			node->connect("visibility_changed", callable_mp(this, &AutonomousAgentsPath2DEditor::_node_visibility_changed));
 		}
@@ -573,7 +573,7 @@ void AutonomousAgentsPath2DEditorPlugin::edit(Object *p_object) {
 }
 
 bool AutonomousAgentsPath2DEditorPlugin::handles(Object *p_object) const {
-	return p_object->is_class("AutonomousAgentsPath2D");
+	return p_object->is_class("AutonomousAgentsPathNode2D");
 }
 
 void AutonomousAgentsPath2DEditorPlugin::make_visible(bool p_visible) {

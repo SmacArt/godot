@@ -34,7 +34,7 @@
 #include "core/templates/paged_array.h"
 #include "autonomous_agents_path_2d.h"
 
-class AutonomousAgentsPath2DResource;
+class AutonomousAgentsPath2D;
 
 class AutonomousAgents2D : public Node2D {
 private:
@@ -432,7 +432,7 @@ private:
 
   int pursue_delegate_steering_behavior = 0;
   int look_where_yourre_going_delegate_steering_behavior = 0;
-  Ref<AutonomousAgentsPath2DResource> path_following_path;
+  Ref<AutonomousAgentsPath2D> path_following_path;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -619,8 +619,8 @@ public:
   void set_pursue_delegate_steering_behavior(int p_behavior);
   int get_pursue_delegate_steering_behavior() const;
 
-  void set_path_following_path(const Ref<AutonomousAgentsPath2DResource> &p_path);
-  Ref<AutonomousAgentsPath2DResource> get_path_following_path() const ;
+  void set_path_following_path(const Ref<AutonomousAgentsPath2D> &p_path);
+  Ref<AutonomousAgentsPath2D> get_path_following_path() const ;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};

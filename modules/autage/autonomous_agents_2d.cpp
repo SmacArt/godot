@@ -168,11 +168,11 @@ AutonomousAgents2D::DrawOrder AutonomousAgents2D::get_draw_order() const {
   return draw_order;
 }
 
-void AutonomousAgents2D::set_path_following_path(const Ref<AutonomousAgentsPath2DResource> &p_path) {
+void AutonomousAgents2D::set_path_following_path(const Ref<AutonomousAgentsPath2D> &p_path) {
   path_following_path=p_path;
 }
 
-Ref<AutonomousAgentsPath2DResource> AutonomousAgents2D::get_path_following_path() const {
+Ref<AutonomousAgentsPath2D> AutonomousAgents2D::get_path_following_path() const {
   return path_following_path;
 }
 
@@ -2393,7 +2393,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "collision_avoidance_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_COLLISION_AVOIDANCE_DECAY_COEFFICIENT);
 
   ADD_GROUP("Path Following", "path_following_");
-  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "path", PROPERTY_HINT_RESOURCE_TYPE, "AutonomousAgentsPath2DResource", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_path_following_path", "get_path_following_path");
+  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "path", PROPERTY_HINT_RESOURCE_TYPE, "AutonomousAgentsPath2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_path_following_path", "get_path_following_path");
 
   ADD_GROUP("Pursue", "pursue_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "pursue_max_prediction_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_PURSUE_MAX_PREDICTION);

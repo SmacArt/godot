@@ -41,7 +41,7 @@ void initialize_autage_module(ModuleInitializationLevel p_level) {
   if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
     GDREGISTER_CLASS(AutonomousAgents2D);
     GDREGISTER_CLASS(AutonomousAgentsPath2D);
-    GDREGISTER_CLASS(AutonomousAgentsPath2DResource);
+    GDREGISTER_CLASS(AutonomousAgentsPathNode2D);
   }
 
 #ifdef TOOLS_ENABLED
