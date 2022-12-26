@@ -32,6 +32,9 @@
 #include "scene/2d/node_2d.h"
 #include "core/math/dynamic_bvh.h"
 #include "core/templates/paged_array.h"
+#include "autonomous_agents_path_2d.h"
+
+class AutonomousAgentsPath2DResource;
 
 class AutonomousAgents2D : public Node2D {
 private:
@@ -429,6 +432,7 @@ private:
 
   int pursue_delegate_steering_behavior = 0;
   int look_where_yourre_going_delegate_steering_behavior = 0;
+  Ref<AutonomousAgentsPath2DResource> path_following_path;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -615,6 +619,9 @@ public:
   void set_pursue_delegate_steering_behavior(int p_behavior);
   int get_pursue_delegate_steering_behavior() const;
 
+  void set_path_following_path(const Ref<AutonomousAgentsPath2DResource> &p_path);
+  Ref<AutonomousAgentsPath2DResource> get_path_following_path() const ;
+
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
   void set_is_debug(bool p_is_debug) {is_debug = p_is_debug;}
@@ -726,14 +733,12 @@ public:
   }
 
   inline double distance_between_aabbs(const AABB &aabb1, const AABB &aabb2) {
-    //    max(|x1−x2|−(w1+w2)/2,|y1−y2|−(b1+b2)/2);
     Vector3 c1 = aabb1.get_center();
     Vector3 c2 = aabb2.get_center();
     double w1 = aabb1.get_size().x;
     double w2 = aabb2.get_size().x;
     double h1 = aabb1.get_size().y;
     double h2 = aabb2.get_size().y;
-
     return fmax( Math::abs(c1.x-c2.x) - (w1+w2) * 0.5, Math::abs(c1.y-c2.y) - (h1+h2) * 0.5);
   }
 };

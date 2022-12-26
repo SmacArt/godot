@@ -38,7 +38,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 		return false;
 	}
 
-	if (!node->get_curve().is_valid()) {
+	if (!node->get_autonomous_agents_path().is_valid()) {
 		return false;
 	}
 
@@ -52,7 +52,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 		Vector2 cpoint = node->to_local(canvas_item_editor->snap_point(canvas_item_editor->get_canvas_transform().affine_inverse().xform(mb->get_position())));
 
 		if (mb->is_pressed() && action == ACTION_NONE) {
-			Ref<Curve2D> curve = node->get_curve();
+			Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 
 			for (int i = 0; i < curve->get_point_count(); i++) {
 				real_t dist_to_p = gpoint.distance_to(xform.xform(curve->get_point_position(i)));
@@ -123,7 +123,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 
 		// Check for point creation.
 		if (mb->is_pressed() && mb->get_button_index() == MouseButton::LEFT && ((mb->is_command_or_control_pressed() && mode == MODE_EDIT) || mode == MODE_CREATE)) {
-			Ref<Curve2D> curve = node->get_curve();
+			Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 
 			Ref<EditorUndoRedoManager> &undo_redo = EditorNode::get_undo_redo();
 			undo_redo->create_action(TTR("Add Point to Curve"));
@@ -146,7 +146,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 		// Check for segment split.
 		if (mb->is_pressed() && mb->get_button_index() == MouseButton::LEFT && mode == MODE_EDIT && on_edge) {
 			Vector2 gpoint2 = mb->get_position();
-			Ref<Curve2D> curve = node->get_curve();
+			Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 
 			int insertion_point = -1;
 			float mbLength = curve->get_closest_offset(xform.affine_inverse().xform(gpoint2));
@@ -183,7 +183,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 
 		// Check for point movement completion.
 		if (!mb->is_pressed() && mb->get_button_index() == MouseButton::LEFT && action != ACTION_NONE) {
-			Ref<Curve2D> curve = node->get_curve();
+			Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 
 			Ref<EditorUndoRedoManager> &undo_redo = EditorNode::get_undo_redo();
 			Vector2 new_pos = moving_from + xform.affine_inverse().basis_xform(gpoint - moving_screen_from);
@@ -249,7 +249,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 			Transform2D xform = canvas_item_editor->get_canvas_transform() * node->get_global_transform();
 			Vector2 gpoint = mm->get_position();
 
-			Ref<Curve2D> curve = node->get_curve();
+			Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 			if (curve == nullptr) {
 				return true;
 			}
@@ -295,7 +295,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 			Vector2 gpoint = mm->get_position();
 			Vector2 cpoint = node->get_global_transform().affine_inverse().xform(canvas_item_editor->snap_point(canvas_item_editor->get_canvas_transform().affine_inverse().xform(mm->get_position())));
 
-			Ref<Curve2D> curve = node->get_curve();
+			Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 
 			Vector2 new_pos = moving_from + xform.affine_inverse().basis_xform(gpoint - moving_screen_from);
 
@@ -334,7 +334,7 @@ bool AutonomousAgentsPath2DEditor::forward_gui_input(const Ref<InputEvent> &p_ev
 }
 
 void AutonomousAgentsPath2DEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
-	if (!node || !node->is_visible_in_tree() || !node->get_curve().is_valid()) {
+	if (!node || !node->is_visible_in_tree() || !node->get_autonomous_agents_path()->get_curve().is_valid()) {
 		return;
 	}
 
@@ -348,7 +348,7 @@ void AutonomousAgentsPath2DEditor::forward_canvas_draw_over_viewport(Control *p_
 	const Ref<Texture2D> curve_handle = get_theme_icon(SNAME("EditorCurveHandle"), SNAME("EditorIcons"));
 	const Size2 curve_handle_size = curve_handle->get_size();
 
-	Ref<Curve2D> curve = node->get_curve();
+	Ref<Curve2D> curve = node->get_autonomous_agents_path()->get_curve();
 
 	int len = curve->get_point_count();
 	Control *vpc = canvas_item_editor->get_viewport_control();
@@ -448,23 +448,26 @@ void AutonomousAgentsPath2DEditor::_mode_selected(int p_mode) {
 	} else if (p_mode == ACTION_CLOSE) {
 		//?
 
-		if (!node->get_curve().is_valid()) {
+		if (!node->get_autonomous_agents_path().is_valid()) {
 			return;
 		}
-		if (node->get_curve()->get_point_count() < 3) {
+		if (!node->get_autonomous_agents_path()->get_curve().is_valid()) {
+			return;
+		}
+		if (node->get_autonomous_agents_path()->get_curve()->get_point_count() < 3) {
 			return;
 		}
 
-		Vector2 begin = node->get_curve()->get_point_position(0);
-		Vector2 end = node->get_curve()->get_point_position(node->get_curve()->get_point_count() - 1);
+		Vector2 begin = node->get_autonomous_agents_path()->get_curve()->get_point_position(0);
+		Vector2 end = node->get_autonomous_agents_path()->get_curve()->get_point_position(node->get_autonomous_agents_path()->get_curve()->get_point_count() - 1);
 		if (begin.is_equal_approx(end)) {
 			return;
 		}
 
 		Ref<EditorUndoRedoManager> &undo_redo = EditorNode::get_undo_redo();
 		undo_redo->create_action(TTR("Remove Point from Curve"));
-		undo_redo->add_do_method(node->get_curve().ptr(), "add_point", begin);
-		undo_redo->add_undo_method(node->get_curve().ptr(), "remove_point", node->get_curve()->get_point_count());
+		undo_redo->add_do_method(node->get_autonomous_agents_path()->get_curve().ptr(), "add_point", begin);
+		undo_redo->add_undo_method(node->get_autonomous_agents_path()->get_curve().ptr(), "remove_point", node->get_autonomous_agents_path()->get_curve()->get_point_count());
 		undo_redo->add_do_method(canvas_item_editor, "update_viewport");
 		undo_redo->add_undo_method(canvas_item_editor, "update_viewport");
 		undo_redo->commit_action();

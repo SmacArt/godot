@@ -5,7 +5,9 @@
 #include "scene/resources/curve.h"
 #include "autonomous_agents_2d.h"
 
-class AutonomousAgentsPath2D : public Node2D {
+class Agent;
+
+class AutonomousAgentsPath2DResource : public Resource {
 public:
 
   enum FollowDirection {
@@ -13,23 +15,45 @@ public:
     FOLLOW_DIRECTION_BACKWARDS
   };
 
+private:
+  GDCLASS(AutonomousAgentsPath2DResource, Resource);
+
+  Ref<Curve2D> curve;
+  int follow_direction = FOLLOW_DIRECTION_FORWARDS;
+
+protected:
+	static void _bind_methods();
+
+public:
+
+	void set_curve(const Ref<Curve2D> &p_curve);
+	Ref<Curve2D> get_curve() const;
+
+  void set_follow_direction(const int p_follow_direction);
+  int get_follow_direction() const;
+
+  AutonomousAgentsPath2DResource();
+
+};
+
+VARIANT_ENUM_CAST(AutonomousAgentsPath2DResource::FollowDirection);
+
+class AutonomousAgentsPath2D : public Node2D {
+public:
+
   struct AgentOnPath {
-    const AutonomousAgents2D::Agent *agent = nullptr;
-    int follow_direction = FOLLOW_DIRECTION_FORWARDS;
+    const Agent *agent = nullptr;
+    int follow_direction = AutonomousAgentsPath2DResource::FOLLOW_DIRECTION_FORWARDS;
   };
 
 private:
   GDCLASS(AutonomousAgentsPath2D, Node2D);
-  Ref<Curve2D> curve;
-  void _curve_changed();
-  bool is_forward = true;
+  Ref<AutonomousAgentsPath2DResource> autonomous_agents_path;
+  void _path_changed();
   Vector<AgentOnPath> agents_on_path;
   AgentOnPath *agents_on_path_arr = nullptr;
   int number_of_agents = 0;
   int add_agent_index = -1;
-  int follow_direction = 0;
-
-todo next: determine the lengths between points
 
 protected:
   void _notification(int p_what);
@@ -42,20 +66,16 @@ public:
   virtual bool _edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const override;
 #endif
 
-  void set_curve(const Ref<Curve2D> &p_curve);
-  Ref<Curve2D> get_curve() const;
+  void set_autonomous_agents_path(const Ref<AutonomousAgentsPath2DResource> &p_path);
+  Ref<AutonomousAgentsPath2DResource> get_autonomous_agents_path() const;
 
   void set_number_of_agents(const int p_number_of_agents);
   int get_number_of_agents();
 
-  void set_follow_direction(const int p_follow_direction);
-  int get_follow_direction() const;
+  void add_agent(const Agent *agent);
 
-  void add_agent(const AutonomousAgents2D::Agent *agent);
-
-  AutonomousAgentsPath2D();
+  AutonomousAgentsPath2D(){};
 };
 
-VARIANT_ENUM_CAST(AutonomousAgentsPath2D::FollowDirection);
 
 #endif

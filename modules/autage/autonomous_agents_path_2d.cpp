@@ -8,6 +8,11 @@
 
 #ifdef TOOLS_ENABLED
 Rect2 AutonomousAgentsPath2D::_edit_get_rect() const {
+  if (!get_autonomous_agents_path().is_valid()) {
+    return Rect2(0, 0, 0, 0);
+  }
+
+  Ref<Curve2D> curve = get_autonomous_agents_path()->get_curve();
   if (!curve.is_valid() || curve->get_point_count() == 0) {
     return Rect2(0, 0, 0, 0);
   }
@@ -26,10 +31,18 @@ Rect2 AutonomousAgentsPath2D::_edit_get_rect() const {
 }
 
 bool AutonomousAgentsPath2D::_edit_use_rect() const {
+  if (!get_autonomous_agents_path().is_valid()) {
+    return false;
+  }
+  Ref<Curve2D> curve = get_autonomous_agents_path()->get_curve();
   return curve.is_valid() && curve->get_point_count() != 0;
 }
 
 bool AutonomousAgentsPath2D::_edit_is_selected_on_click(const Point2 &p_point, double p_tolerance) const {
+  if (!get_autonomous_agents_path().is_valid()) {
+    return false;
+  }
+  Ref<Curve2D> curve = get_autonomous_agents_path()->get_curve();
   if (curve.is_null()) {
     return false;
   }
@@ -56,6 +69,10 @@ bool AutonomousAgentsPath2D::_edit_is_selected_on_click(const Point2 &p_point, d
 #endif
 
 void AutonomousAgentsPath2D::_notification(int p_what) {
+  if (!get_autonomous_agents_path().is_valid()) {
+    return;
+  }
+  Ref<Curve2D> curve = get_autonomous_agents_path()->get_curve();
   switch (p_what) {
     // Draw the curve if path debugging is enabled.
   case NOTIFICATION_DRAW: {
@@ -131,7 +148,8 @@ void AutonomousAgentsPath2D::_notification(int p_what) {
   }
 }
 
-void AutonomousAgentsPath2D::_curve_changed() {
+void AutonomousAgentsPath2D::_path_changed() {
+  queue_redraw();
   if (!is_inside_tree()) {
     return;
   }
@@ -143,11 +161,11 @@ void AutonomousAgentsPath2D::_curve_changed() {
   queue_redraw();
 }
 
-void AutonomousAgentsPath2D::set_follow_direction(const int p_follow_direction) {
+void AutonomousAgentsPath2DResource::set_follow_direction(const int p_follow_direction) {
   follow_direction=p_follow_direction;
 }
 
-int AutonomousAgentsPath2D::get_follow_direction() const {
+int AutonomousAgentsPath2DResource::get_follow_direction() const {
   return follow_direction;
 }
 
@@ -157,11 +175,11 @@ void AutonomousAgentsPath2D::set_number_of_agents(const int p_number_of_agents){
   agents_on_path_arr = agents_on_path.ptrw();
 
   for (int i = 0; i < p_number_of_agents; i++) {
-    agents_on_path_arr[i].follow_direction = follow_direction;
+    agents_on_path_arr[i].follow_direction = get_autonomous_agents_path()->get_follow_direction();
   }
 }
 
-void AutonomousAgentsPath2D::add_agent(const AutonomousAgents2D::Agent *agent) {
+void AutonomousAgentsPath2D::add_agent(const Agent *agent) {
   add_agent_index++;
   agents_on_path_arr[add_agent_index].agent = agent;
 }
@@ -170,37 +188,60 @@ int AutonomousAgentsPath2D::get_number_of_agents() {
   return number_of_agents;
 }
 
-void AutonomousAgentsPath2D::set_curve(const Ref<Curve2D> &p_curve) {
-  if (curve.is_valid()) {
-    curve->disconnect("changed", callable_mp(this, &AutonomousAgentsPath2D::_curve_changed));
+void AutonomousAgentsPath2D::set_autonomous_agents_path(const Ref<AutonomousAgentsPath2DResource> &p_path) {
+  if (autonomous_agents_path.is_valid()) {
+    autonomous_agents_path->disconnect("changed", callable_mp(this, &AutonomousAgentsPath2D::_path_changed));
+    if (autonomous_agents_path->get_curve().is_valid()) {
+      autonomous_agents_path->get_curve()->disconnect("changed", callable_mp(this, &AutonomousAgentsPath2D::_path_changed));
+    }
   }
 
-  curve = p_curve;
+  autonomous_agents_path = p_path;
 
-  if (curve.is_valid()) {
-    curve->connect("changed", callable_mp(this, &AutonomousAgentsPath2D::_curve_changed));
+  if (autonomous_agents_path.is_valid()) {
+    autonomous_agents_path->connect("changed", callable_mp(this, &AutonomousAgentsPath2D::_path_changed));
+    if (autonomous_agents_path->get_curve().is_valid()) {
+      autonomous_agents_path->get_curve()->connect("changed", callable_mp(this, &AutonomousAgentsPath2D::_path_changed));
+    }
   }
 
-  _curve_changed();
+  _path_changed();
 }
 
-Ref<Curve2D> AutonomousAgentsPath2D::get_curve() const {
-  return curve;
+Ref<AutonomousAgentsPath2DResource> AutonomousAgentsPath2D::get_autonomous_agents_path() const {
+  return autonomous_agents_path;
 }
 
 void AutonomousAgentsPath2D::_bind_methods() {
+
+  ClassDB::bind_method(D_METHOD("set_autonomous_agents_path", "path"), &AutonomousAgentsPath2D::set_autonomous_agents_path);
+  ClassDB::bind_method(D_METHOD("get_autonomous_agents_path"), &AutonomousAgentsPath2D::get_autonomous_agents_path);
+
+  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "path", PROPERTY_HINT_RESOURCE_TYPE, "AutonomousAgentsPath2DResource", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_autonomous_agents_path", "get_autonomous_agents_path");
+
+}
+
+AutonomousAgentsPath2DResource::AutonomousAgentsPath2DResource() {
+  set_follow_direction(AutonomousAgentsPath2DResource::FOLLOW_DIRECTION_FORWARDS);
+}
+
+void AutonomousAgentsPath2DResource::set_curve(const Ref<Curve2D> &p_curve) {
+  curve = p_curve;
+}
+
+Ref<Curve2D> AutonomousAgentsPath2DResource::get_curve() const {
+  return curve;
+}
+
+void AutonomousAgentsPath2DResource::_bind_methods() {
   BIND_ENUM_CONSTANT(FOLLOW_DIRECTION_FORWARDS);
   BIND_ENUM_CONSTANT(FOLLOW_DIRECTION_BACKWARDS);
 
-  ClassDB::bind_method(D_METHOD("set_curve", "curve"), &AutonomousAgentsPath2D::set_curve);
-  ClassDB::bind_method(D_METHOD("get_curve"), &AutonomousAgentsPath2D::get_curve);
-  ClassDB::bind_method(D_METHOD("set_follow_direction", "follow_direction"), &AutonomousAgentsPath2D::set_follow_direction);
-  ClassDB::bind_method(D_METHOD("get_follow_direction"), &AutonomousAgentsPath2D::get_follow_direction);
+  ClassDB::bind_method(D_METHOD("set_curve", "curve"), &AutonomousAgentsPath2DResource::set_curve);
+  ClassDB::bind_method(D_METHOD("get_curve"), &AutonomousAgentsPath2DResource::get_curve);
+  ClassDB::bind_method(D_METHOD("set_follow_direction", "follow_direction"), &AutonomousAgentsPath2DResource::set_follow_direction);
+  ClassDB::bind_method(D_METHOD("get_follow_direction"), &AutonomousAgentsPath2DResource::get_follow_direction);
 
-  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_curve", "get_curve");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "follow_direction", PROPERTY_HINT_ENUM, "Forwards,Backwards"), "set_follow_direction", "get_follow_direction");
-}
-
-AutonomousAgentsPath2D::AutonomousAgentsPath2D() {
-  set_follow_direction(FOLLOW_DIRECTION_FORWARDS);
+  ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_curve", "get_curve");
 }
