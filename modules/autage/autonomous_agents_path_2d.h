@@ -15,26 +15,22 @@ public:
     FOLLOW_DIRECTION_BACKWARDS
   };
 
-  struct AgentOnPath {
-    const Agent *agent = nullptr;
-    int follow_direction = FOLLOW_DIRECTION_FORWARDS;
-  };
-
 private:
   GDCLASS(AutonomousAgentsPath2D, Resource);
 
   Ref<Curve2D> curve;
-  int follow_direction = FOLLOW_DIRECTION_FORWARDS;
+  double radius;
+
+  int default_follow_direction = FOLLOW_DIRECTION_FORWARDS;
+  double default_predict_distance = 50.0;
+
   PackedVector2Array baked_points_forward;
   PackedVector2Array baked_directions_forward;
   PackedFloat32Array baked_distances_forward;
+  PackedFloat32Array baked_total_distances_forward;
   PackedVector2Array baked_directions_backward;
   double path_length = 0;
 
-  Vector<AgentOnPath> agents_on_path;
-  AgentOnPath *agents_on_path_arr = nullptr;
-  int number_of_agents = 0;
-  int add_agent_index = -1;
   bool dirty = true;
 
   void bake();
@@ -46,17 +42,18 @@ public:
 
 	void set_curve(const Ref<Curve2D> &p_curve);
 	Ref<Curve2D> get_curve() const;
+  void set_radius(const double p_radius);
+  double get_radius() const;
 
-  void set_follow_direction(const int p_follow_direction);
-  int get_follow_direction() const;
-
-  void set_number_of_agents(const int p_number_of_agents);
-  int get_number_of_agents();
-  void add_agent(const Agent *agent);
+  void set_default_follow_direction(const int p_default_follow_direction);
+  int get_default_follow_direction() const;
+  void set_default_predict_distance(const double p_default_predict_distance);
+  double get_default_predict_distance() const;
 
   PackedVector2Array get_baked_points_forward();
   PackedVector2Array get_baked_directions_forward();
   PackedFloat32Array get_baked_distances_forward();
+  PackedFloat32Array get_baked_total_distances_forward();
 
   AutonomousAgentsPath2D();
 
@@ -88,6 +85,5 @@ public:
 
   AutonomousAgentsPathNode2D(){};
 };
-
 
 #endif
