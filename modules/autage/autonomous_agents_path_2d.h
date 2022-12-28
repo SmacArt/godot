@@ -25,12 +25,19 @@ private:
 
   Ref<Curve2D> curve;
   int follow_direction = FOLLOW_DIRECTION_FORWARDS;
+  PackedVector2Array baked_points_forward;
+  PackedVector2Array baked_directions_forward;
+  PackedFloat32Array baked_distances_forward;
+  PackedVector2Array baked_directions_backward;
+  double path_length = 0;
 
   Vector<AgentOnPath> agents_on_path;
   AgentOnPath *agents_on_path_arr = nullptr;
   int number_of_agents = 0;
   int add_agent_index = -1;
   bool dirty = true;
+
+  void bake();
 
 protected:
 	static void _bind_methods();
@@ -46,6 +53,10 @@ public:
   void set_number_of_agents(const int p_number_of_agents);
   int get_number_of_agents();
   void add_agent(const Agent *agent);
+
+  PackedVector2Array get_baked_points_forward();
+  PackedVector2Array get_baked_directions_forward();
+  PackedFloat32Array get_baked_distances_forward();
 
   AutonomousAgentsPath2D();
 

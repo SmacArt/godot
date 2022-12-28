@@ -235,7 +235,84 @@ Ref<Curve2D> AutonomousAgentsPath2D::get_curve() const {
   return curve;
 }
 
+void AutonomousAgentsPath2D::bake() {
+  // TODO check if more than one points
+  // TODO if not looping don't need to link to the start
+  // TODO backwards
+
+  if (dirty) {
+    PackedVector2Array points = curve->get_baked_points();
+
+    // determine points for the aa path by removing redundant ones from the curve
+    PackedVector2Array aa_points;
+    aa_points.resize(points.size());
+    Vector2 *aap = aa_points.ptrw();
+    int number_of_aa_points = 0;
+    for (int i = 0; i < points.size(); i++) {
+      if (i == 0) {
+        aap[0] = points[0];
+        number_of_aa_points = 1;
+      } else {
+        Vector2 direction = (points[i]-points[i-1]).normalized();
+        Vector2 next_direction;
+        if (i == points.size() - 1) {
+          if (points[0].is_equal_approx(points[i])) {
+            continue;
+          }
+          next_direction = (points[0]-points[i]).normalized();
+        } else {
+          next_direction = (points[i+1]-points[i]).normalized();
+        }
+        if (!direction.is_equal_approx(next_direction)) {
+          number_of_aa_points++;
+          aap[number_of_aa_points-1] = points[i];
+        }
+      }
+    }
+
+    baked_points_forward.resize(number_of_aa_points);
+    baked_directions_forward.resize(number_of_aa_points);
+    baked_distances_forward.resize(number_of_aa_points);
+    Vector2 * bpf = baked_points_forward.ptrw();
+    Vector2 * bdirf = baked_directions_forward.ptrw();
+    float_t * bdistf = baked_distances_forward.ptrw();
+    path_length = 0;
+
+    bpf[0] = aap[0];
+    for (int i = 1; i < number_of_aa_points; i++) {
+      bpf[i] = aap[i];
+      Vector2 p1 = aap[i-1];
+      Vector2 p2 = aap[i];
+      bdirf[i-1] = (p2-p1).normalized();
+      bdistf[i-1] = (p2-p1).length();
+      path_length+= bdistf[i-1];
+      if (i == number_of_aa_points - 1) {
+        bdirf[i] = (aap[0]-p2).normalized();
+        bdistf[i] = (aap[0]-p2).length(); 
+        path_length += bdistf[i];
+      }
+    }
+    dirty=false;
+  }
+}
+
+PackedVector2Array AutonomousAgentsPath2D::get_baked_points_forward() {
+  bake();
+  return baked_points_forward;
+}
+
+PackedVector2Array AutonomousAgentsPath2D::get_baked_directions_forward() {
+  bake();
+  return baked_directions_forward;
+}
+
+PackedFloat32Array AutonomousAgentsPath2D::get_baked_distances_forward() {
+  bake();
+  return baked_distances_forward;
+}
+
 void AutonomousAgentsPath2D::_bind_methods() {
+
   BIND_ENUM_CONSTANT(FOLLOW_DIRECTION_FORWARDS);
   BIND_ENUM_CONSTANT(FOLLOW_DIRECTION_BACKWARDS);
 
@@ -243,6 +320,9 @@ void AutonomousAgentsPath2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_curve"), &AutonomousAgentsPath2D::get_curve);
   ClassDB::bind_method(D_METHOD("set_follow_direction", "follow_direction"), &AutonomousAgentsPath2D::set_follow_direction);
   ClassDB::bind_method(D_METHOD("get_follow_direction"), &AutonomousAgentsPath2D::get_follow_direction);
+  ClassDB::bind_method(D_METHOD("get_baked_directions_forward"), &AutonomousAgentsPath2D::get_baked_directions_forward);
+  ClassDB::bind_method(D_METHOD("get_baked_distances_forward"), &AutonomousAgentsPath2D::get_baked_distances_forward);
+  ClassDB::bind_method(D_METHOD("get_baked_points_forward"), &AutonomousAgentsPath2D::get_baked_points_forward);
 
   ADD_PROPERTY(PropertyInfo(Variant::INT, "follow_direction", PROPERTY_HINT_ENUM, "Forwards,Backwards"), "set_follow_direction", "get_follow_direction");
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_curve", "get_curve");
