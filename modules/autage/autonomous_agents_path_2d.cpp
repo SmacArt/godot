@@ -196,28 +196,12 @@ void AutonomousAgentsPathNode2D::_bind_methods() {
 //
 //
 
-void AutonomousAgentsPath2D::set_default_follow_direction(const int p_default_follow_direction) {
-  default_follow_direction=p_default_follow_direction;
-}
-
-int AutonomousAgentsPath2D::get_default_follow_direction() const {
-  return default_follow_direction;
-}
-
-void AutonomousAgentsPath2D::set_default_predict_distance(const double p_default_predict_distance) {
-  default_predict_distance = p_default_predict_distance;
-}
-
-double AutonomousAgentsPath2D::get_default_predict_distance() const {
-  return default_predict_distance;
-}
-
 AutonomousAgentsPath2D::AutonomousAgentsPath2D() {
-  set_default_follow_direction(FOLLOW_DIRECTION_FORWARDS);
 }
 
 void AutonomousAgentsPath2D::set_curve(const Ref<Curve2D> &p_curve) {
   curve = p_curve;
+  bake();
 }
 
 Ref<Curve2D> AutonomousAgentsPath2D::get_curve() const {
@@ -244,11 +228,11 @@ void AutonomousAgentsPath2D::bake() {
     PackedVector2Array aa_points;
     aa_points.resize(points.size());
     Vector2 *aap = aa_points.ptrw();
-    int number_of_aa_points = 0;
+    number_of_points = 0;
     for (int i = 0; i < points.size(); i++) {
       if (i == 0) {
         aap[0] = points[0];
-        number_of_aa_points = 1;
+        number_of_points = 1;
       } else {
         Vector2 direction = (points[i]-points[i-1]).normalized();
         Vector2 next_direction;
@@ -261,16 +245,16 @@ void AutonomousAgentsPath2D::bake() {
           next_direction = (points[i+1]-points[i]).normalized();
         }
         if (!direction.is_equal_approx(next_direction)) {
-          number_of_aa_points++;
-          aap[number_of_aa_points-1] = points[i];
+          number_of_points++;
+          aap[number_of_points-1] = points[i];
         }
       }
     }
 
-    baked_points_forward.resize(number_of_aa_points);
-    baked_directions_forward.resize(number_of_aa_points);
-    baked_distances_forward.resize(number_of_aa_points);
-    baked_total_distances_forward.resize(number_of_aa_points);
+    baked_points_forward.resize(number_of_points);
+    baked_directions_forward.resize(number_of_points);
+    baked_distances_forward.resize(number_of_points);
+    baked_total_distances_forward.resize(number_of_points);
     Vector2 * bpf = baked_points_forward.ptrw();
     Vector2 * bdirf = baked_directions_forward.ptrw();
     float_t * bdistf = baked_distances_forward.ptrw();
@@ -278,7 +262,7 @@ void AutonomousAgentsPath2D::bake() {
     path_length = 0;
 
     bpf[0] = aap[0];
-    for (int i = 1; i < number_of_aa_points; i++) {
+    for (int i = 1; i < number_of_points; i++) {
       bpf[i] = aap[i];
       Vector2 p1 = aap[i-1];
       Vector2 p2 = aap[i];
@@ -286,9 +270,9 @@ void AutonomousAgentsPath2D::bake() {
       bdistf[i-1] = (p2-p1).length();
       path_length+= bdistf[i-1];
       btotdistf[i-1] = path_length;
-      if (i == number_of_aa_points - 1) {
+      if (i == number_of_points - 1) {
         bdirf[i] = (aap[0]-p2).normalized();
-        bdistf[i] = (aap[0]-p2).length(); 
+        bdistf[i] = (aap[0]-p2).length();
         path_length += bdistf[i];
         btotdistf[i] = path_length;
       }
@@ -317,6 +301,52 @@ PackedFloat32Array AutonomousAgentsPath2D::get_baked_total_distances_forward() {
   return baked_total_distances_forward;
 }
 
+Vector2 AutonomousAgentsPath2D::get_next_point(const int p_index, const FollowDirection p_direction) const {
+  if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
+    if (p_index < number_of_points - 1) {
+      return baked_points_forward[p_index + 1];
+    } else {
+      return baked_points_forward[0];
+    }
+  }
+  return Vector2();
+}
+
+int AutonomousAgentsPath2D::get_index_by_distance(const double p_distance, const FollowDirection p_direction) const {
+  if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
+    double clamped_distance = fmod(p_distance,path_length);
+    for (int i = 0; i < number_of_points; i++) {
+      if (clamped_distance <= baked_total_distances_forward[i]) {
+        return i;
+      }
+    }
+  }
+  return 0;
+}
+
+Vector2 AutonomousAgentsPath2D::get_position_by_distance(const double p_distance, const FollowDirection p_direction) const {
+  if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
+    double clamped_distance = fmod(p_distance,path_length);
+    int index = 0;
+    for (int i = 0; i < number_of_points; i++) {
+      if (clamped_distance <= baked_total_distances_forward[i]) {
+        index=i;
+        break;
+      }
+    }
+
+    double distance_along_segment = clamped_distance;
+    if (index > 0) {
+      int prev_index = index - 1;
+      if (prev_index < 0) {
+        prev_index = number_of_points - 1;
+      }
+      distance_along_segment = clamped_distance - baked_total_distances_forward[prev_index];
+    }
+    return baked_points_forward[index] + baked_directions_forward[index] * distance_along_segment;
+  }
+}
+
 void AutonomousAgentsPath2D::_bind_methods() {
 
   BIND_ENUM_CONSTANT(FOLLOW_DIRECTION_FORWARDS);
@@ -326,17 +356,12 @@ void AutonomousAgentsPath2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_curve"), &AutonomousAgentsPath2D::get_curve);
   ClassDB::bind_method(D_METHOD("set_radius", "curve"), &AutonomousAgentsPath2D::set_radius);
   ClassDB::bind_method(D_METHOD("get_radius"), &AutonomousAgentsPath2D::get_radius);
-  ClassDB::bind_method(D_METHOD("set_default_follow_direction", "default_follow_direction"), &AutonomousAgentsPath2D::set_default_follow_direction);
-  ClassDB::bind_method(D_METHOD("get_default_follow_direction"), &AutonomousAgentsPath2D::get_default_follow_direction);
-  ClassDB::bind_method(D_METHOD("set_default_predict_distance", "default_predict_distance"), &AutonomousAgentsPath2D::set_default_predict_distance);
-  ClassDB::bind_method(D_METHOD("get_default_predict_distance"), &AutonomousAgentsPath2D::get_default_predict_distance);
   ClassDB::bind_method(D_METHOD("get_baked_directions_forward"), &AutonomousAgentsPath2D::get_baked_directions_forward);
   ClassDB::bind_method(D_METHOD("get_baked_distances_forward"), &AutonomousAgentsPath2D::get_baked_distances_forward);
   ClassDB::bind_method(D_METHOD("get_baked_total_distances_forward"), &AutonomousAgentsPath2D::get_baked_total_distances_forward);
   ClassDB::bind_method(D_METHOD("get_baked_points_forward"), &AutonomousAgentsPath2D::get_baked_points_forward);
+  ClassDB::bind_method(D_METHOD("get_position_by_distance"), &AutonomousAgentsPath2D::get_position_by_distance);
 
-  ADD_PROPERTY(PropertyInfo(Variant::INT, "default_follow_direction", PROPERTY_HINT_ENUM, "Forwards,Backwards"), "set_default_follow_direction", "get_default_follow_direction");
-  ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "default_predict_distance"), "set_default_predict_distance", "get_default_predict_distance");
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius"), "set_radius", "get_radius");
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_curve", "get_curve");
 }

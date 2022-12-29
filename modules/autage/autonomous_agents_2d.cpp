@@ -176,6 +176,14 @@ Ref<AutonomousAgentsPath2D> AutonomousAgents2D::get_path_following_path() const 
   return path_following_path;
 }
 
+void AutonomousAgents2D::set_path_following_direction(const AutonomousAgentsPath2D::FollowDirection p_direction) {
+  path_following_direction = p_direction;
+}
+
+AutonomousAgentsPath2D::FollowDirection AutonomousAgents2D::get_path_following_direction() const {
+  return path_following_direction;
+}
+
 void AutonomousAgents2D::_update_mesh_texture() {
   Size2 tex_size;
   if (texture.is_valid()) {
@@ -716,6 +724,15 @@ void AutonomousAgents2D::setup_agent_with_look_where_youre_going(Agent *agent){
   setup_agent_with_align(agent);
 }
 
+void AutonomousAgents2D::setup_agent_with_path_following(Agent *agent){
+  ERR_FAIL_COND(path_following_path == nullptr);
+  agent->path_following_path = path_following_path;
+  agent->path_following_direction = path_following_direction;
+  agent->path_following_prediction_distance = Math::lerp(parameters_min[PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE], parameters_max[PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE], rand_from_seed(agent->seed));
+  agent->path_following_distance = Math::lerp(parameters_min[PARAM_PATH_FOLLOWING_START_DISTANCE], parameters_max[PARAM_PATH_FOLLOWING_START_DISTANCE], rand_from_seed(agent->seed));
+  agent->path_following_distance *= agent->path_following_path->get_path_length();
+}
+
 void AutonomousAgents2D::setup_agent_with_pursue(Agent *agent){
   agent->pursue_max_prediction = Math::lerp(parameters_min[PARAM_PURSUE_MAX_PREDICTION], parameters_max[PARAM_PURSUE_MAX_PREDICTION], rand_from_seed(agent->seed));
   if (get_pursue_delegate_steering_behavior() == 0) {
@@ -881,6 +898,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       if (agent_flags[AGENT_FLAG_LOOK_WHERE_YOURE_GOING]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING);
+      }
+      if (agent_flags[AGENT_FLAG_PATH_FOLLOWING]) {
+        set_agent_behavior(i, STEERING_BEHAVIOR_PATH_FOLLOWING);
       }
       if (agent_flags[AGENT_FLAG_PURSUE]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_PURSUE);
@@ -1289,6 +1309,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     agent->did_evade=false;
     agent->did_face=false;
     agent->did_flee=false;
+    agent->did_path_following=false;
     agent->did_pursue=false;
     agent->did_seek=false;
     agent->did_velocity_matching=false;
@@ -1317,6 +1338,9 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING)) {
       steering_output += look_where_youre_going(agent, delta);
+    }
+    if (agent->steering_behavior.has(STEERING_BEHAVIOR_PATH_FOLLOWING)) {
+      steering_output += path_following(agent, delta);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_PURSUE)) {
       steering_output += pursue(agent, delta);
@@ -1535,12 +1559,6 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::collision_avoidance(Agent
 #endif
 
     return evade(agent, Vector2(closest_agent_future_aabb.get_center().x, closest_agent_future_aabb.get_center().y), closest_agent->velocity);
-    /*
-      Vector2 relative_position = Vector2(closest_agent_future_aabb.get_center().x, closest_agent_future_aabb.get_center().y) - agent->transform[2];
-      double dist = relative_position.length();
-      double strength = fmin(agent->collision_avoidance_decay_coefficient / (dist * dist), agent->max_acceleration) * -1.0;
-      steering_output.linear = strength * relative_position.normalized();
-    */
   }
 
   return steering_output;
@@ -1621,6 +1639,22 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::look_where_youre_going(Ag
     return SteeringOutput();
   }
   return align(agent, Math::atan2(-agent->velocity.x, agent->velocity.y), delta);
+}
+
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::path_following(Agent *agent, double delta){
+  SteeringOutput steering_output;
+
+  Vector2 target_position = agent->path_following_path->get_position_by_distance(agent->path_following_distance + agent->path_following_prediction_distance, agent->path_following_direction);
+
+#ifdef DEBUG_ENABLED
+  if (is_debug) {
+    agent->did_path_following=true;
+    agent->path_following_predicted_position = target_position;
+  }
+#endif
+
+  return seek(agent, target_position);
+  // return steering_output;
 }
 
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::pursue(Agent *agent, double delta){
@@ -1990,6 +2024,9 @@ void AutonomousAgents2D::set_behavior(Agent *agent, SteeringBehavior behavior, b
       if (behavior & STEERING_BEHAVIOR_COLLISION_AVOIDANCE) {
         setup_agent_with_collision_avoidance(agent);
       }
+      if (behavior & STEERING_BEHAVIOR_PATH_FOLLOWING) {
+        setup_agent_with_path_following(agent);
+      }
       if (behavior & STEERING_BEHAVIOR_PURSUE) {
         setup_agent_with_pursue(agent);
       }
@@ -2149,6 +2186,9 @@ bool AutonomousAgents2D::get_did_agent_face(int index){
 bool AutonomousAgents2D::get_did_agent_flee(int index){
   return agents_arr[index].did_flee;
 }
+bool AutonomousAgents2D::get_did_agent_path_following(int index){
+  return agents_arr[index].did_path_following;
+}
 bool AutonomousAgents2D::get_did_agent_pursue(int index){
   return agents_arr[index].did_pursue;
 }
@@ -2181,6 +2221,9 @@ Vector2 AutonomousAgents2D::get_agent_pursue_target(int index){
 }
 Vector2 AutonomousAgents2D::get_agent_seek_target(int index){
   return agents_arr[index].seek_target;
+}
+Vector2 AutonomousAgents2D::get_agent_path_following_predicted_position(int index) {
+  return agents_arr[index].path_following_predicted_position;
 }
 #endif
 
@@ -2227,6 +2270,9 @@ void AutonomousAgents2D::_bind_methods() {
 
   ClassDB::bind_method(D_METHOD("set_path_following_path", "path_following_path"), &AutonomousAgents2D::set_path_following_path);
   ClassDB::bind_method(D_METHOD("get_path_following_path"), &AutonomousAgents2D::get_path_following_path);
+  ClassDB::bind_method(D_METHOD("set_path_following_direction", "following_direction"), &AutonomousAgents2D::set_path_following_direction);
+  ClassDB::bind_method(D_METHOD("get_path_following_direction"), &AutonomousAgents2D::get_path_following_direction);
+
 
   ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "number_of_agents", PROPERTY_HINT_RANGE, "1,1000000,1,exp"), "set_number_of_agents", "get_number_of_agents");
@@ -2346,6 +2392,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flee"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLEE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_collision_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_COLLISION_AVOIDANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_look_where_youre_going"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_LOOK_WHERE_YOURE_GOING);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_path_following"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_PATH_FOLLOWING);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_pursue"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_PURSUE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_remotely_controlled"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_REMOTELY_CONTROLLED);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_seek"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_SEEK);
@@ -2394,6 +2441,11 @@ void AutonomousAgents2D::_bind_methods() {
 
   ADD_GROUP("Path Following", "path_following_");
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "path", PROPERTY_HINT_RESOURCE_TYPE, "AutonomousAgentsPath2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_path_following_path", "get_path_following_path");
+  ADD_PROPERTY(PropertyInfo(Variant::INT, "path_following_direction", PROPERTY_HINT_ENUM, "Forwards,Backwards"), "set_path_following_direction", "get_path_following_direction");
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "path_following_prediction_distance_min", PROPERTY_HINT_RANGE, "0,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "path_following_prediction_distance_max", PROPERTY_HINT_RANGE, "0,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "path_following_start_distance_min", PROPERTY_HINT_RANGE, "0,1.0,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_PATH_FOLLOWING_START_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "path_following_start_distance_max", PROPERTY_HINT_RANGE, "0,1.0,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_PATH_FOLLOWING_START_DISTANCE);
 
   ADD_GROUP("Pursue", "pursue_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "pursue_max_prediction_min", PROPERTY_HINT_RANGE, "0,1000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_PURSUE_MAX_PREDICTION);
@@ -2518,6 +2570,9 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_DISTANCE);
   BIND_ENUM_CONSTANT(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET);
 
+  BIND_ENUM_CONSTANT(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE);
+  BIND_ENUM_CONSTANT(PARAM_PATH_FOLLOWING_START_DISTANCE);
+
   BIND_ENUM_CONSTANT(PARAM_PURSUE_MAX_PREDICTION);
 
   BIND_ENUM_CONSTANT(PARAM_SEPARATION_THRESHOLD);
@@ -2552,6 +2607,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(AGENT_FLAG_COLLISION_AVOIDANCE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_COLLISION_AVOIDANCE_FOV_SCALE_TO_SIZE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_REMOTELY_CONTROLLED);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_PATH_FOLLOWING);
   BIND_ENUM_CONSTANT(AGENT_FLAG_PURSUE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_SEEK);
   BIND_ENUM_CONSTANT(AGENT_FLAG_SEPARATION);
@@ -2576,6 +2632,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_COLLISION_AVOIDANCE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_REMOTELY_CONTROLLED);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_PATH_FOLLOWING);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_PURSUE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEEK);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_SEPARATION);
@@ -2617,6 +2674,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_did_agent_flee"), &AutonomousAgents2D::get_did_agent_flee);
   ClassDB::bind_method(D_METHOD("get_did_agent_align"), &AutonomousAgents2D::get_did_agent_align);
   ClassDB::bind_method(D_METHOD("get_did_agent_arrive"), &AutonomousAgents2D::get_did_agent_arrive);
+  ClassDB::bind_method(D_METHOD("get_did_agent_path_following"), &AutonomousAgents2D::get_did_agent_path_following);
   ClassDB::bind_method(D_METHOD("get_did_agent_pursue"), &AutonomousAgents2D::get_did_agent_pursue);
   ClassDB::bind_method(D_METHOD("get_did_agent_seek"), &AutonomousAgents2D::get_did_agent_seek);
   ClassDB::bind_method(D_METHOD("get_did_agent_velocity_matching"), &AutonomousAgents2D::get_did_agent_velocity_matching);
@@ -2628,6 +2686,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_flee_target"), &AutonomousAgents2D::get_agent_flee_target);
   ClassDB::bind_method(D_METHOD("get_agent_pursue_target"), &AutonomousAgents2D::get_agent_pursue_target);
   ClassDB::bind_method(D_METHOD("get_agent_seek_target"), &AutonomousAgents2D::get_agent_seek_target);
+  ClassDB::bind_method(D_METHOD("get_agent_path_following_predicted_position"), &AutonomousAgents2D::get_agent_path_following_predicted_position);
 #endif
 }
 
@@ -2646,6 +2705,8 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_use_bvh(false);
   set_number_of_ai_phases(1);
+
+  set_path_following_direction(AutonomousAgentsPath2D::FollowDirection::FOLLOW_DIRECTION_FORWARDS);
 
   set_param_min(PARAM_AGENT_MASS, 1);
   set_param_min(PARAM_AGENT_MAX_SPEED, 1);
@@ -2691,6 +2752,11 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_min(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET, 0);
   set_param_max(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET, 0);
   set_agent_collision_base_speed(100.0);
+
+  set_param_min(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE, 50);
+  set_param_max(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE, 50);
+  set_param_min(PARAM_PATH_FOLLOWING_START_DISTANCE, 0);
+  set_param_max(PARAM_PATH_FOLLOWING_START_DISTANCE, 0);
 
   set_param_min(PARAM_PURSUE_MAX_PREDICTION, 50);
   set_param_max(PARAM_PURSUE_MAX_PREDICTION, 50);

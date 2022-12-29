@@ -34,8 +34,6 @@
 #include "core/templates/paged_array.h"
 #include "autonomous_agents_path_2d.h"
 
-class AutonomousAgentsPath2D;
-
 class AutonomousAgents2D : public Node2D {
 private:
   GDCLASS(AutonomousAgents2D, Node2D);
@@ -55,11 +53,12 @@ public:
     STEERING_BEHAVIOR_FLEE = 1 << 5,
     STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING = 1 << 6,
     STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 7,
-    STEERING_BEHAVIOR_PURSUE = 1 << 8,
-    STEERING_BEHAVIOR_SEEK = 1 << 9,
-    STEERING_BEHAVIOR_SEPARATION = 1 << 10,
-    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 11,
-    STEERING_BEHAVIOR_WANDER = 1 << 12
+    STEERING_BEHAVIOR_PATH_FOLLOWING = 1 << 8,
+    STEERING_BEHAVIOR_PURSUE = 1 << 9,
+    STEERING_BEHAVIOR_SEEK = 1 << 10,
+    STEERING_BEHAVIOR_SEPARATION = 1 << 11,
+    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 12,
+    STEERING_BEHAVIOR_WANDER = 1 << 13
   };
 
   struct SteeringBehaviorFlag
@@ -135,6 +134,9 @@ public:
 
     PARAM_EVADE_MAX_PREDICTION,
 
+    PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE,
+    PARAM_PATH_FOLLOWING_START_DISTANCE,
+
     PARAM_PURSUE_MAX_PREDICTION,
 
     PARAM_SEPARATION_DECAY_COEFFICIENT,
@@ -159,6 +161,7 @@ public:
     AGENT_FLAG_COLLISION_AVOIDANCE,
     AGENT_FLAG_COLLISION_AVOIDANCE_FOV_SCALE_TO_SIZE,
     AGENT_FLAG_REMOTELY_CONTROLLED,
+    AGENT_FLAG_PATH_FOLLOWING,
     AGENT_FLAG_PURSUE,
     AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATION,
@@ -243,6 +246,11 @@ public:
     Vector2 collision_avoidance_field_of_view_right_angle;
     bool collision_avoidance_fov_scale_to_size = false;
 
+    Ref<AutonomousAgentsPath2D> path_following_path;
+    real_t path_following_prediction_distance = 0.0;
+    real_t path_following_distance = 0.0;
+    AutonomousAgentsPath2D::FollowDirection path_following_direction = AutonomousAgentsPath2D::FollowDirection::FOLLOW_DIRECTION_FORWARDS;
+
     real_t pursue_max_prediction = 0.0;
     SteeringBehavior pursue_delegate_steering_behavior;
 
@@ -266,6 +274,7 @@ public:
     AABB separation_aabb;
     AABB collision_avoidance_avoiding_aabb;
     AABB collision_avoidance_fov_aabb;
+    Vector2 path_following_predicted_position;
     AABB predicted_position_aabb;
     Vector2 collision_avoidance_fov_start_position;
     Vector2 collision_avoidance_fov_left_position;
@@ -290,6 +299,7 @@ public:
     bool did_evade = false;
     bool did_face = false;
     bool did_flee = false;
+    bool did_path_following = false;
     bool did_pursue = false;
     bool did_seek = false;
     bool did_velocity_matching = false;
@@ -433,6 +443,7 @@ private:
   int pursue_delegate_steering_behavior = 0;
   int look_where_yourre_going_delegate_steering_behavior = 0;
   Ref<AutonomousAgentsPath2D> path_following_path;
+  AutonomousAgentsPath2D::FollowDirection path_following_direction;
 
   void _update_internal();
   void _agents_process(double p_delta);
@@ -461,6 +472,7 @@ private:
   SteeringOutput flee(Agent *agent, Vector2 target);
   SteeringOutput look_where_youre_going(Agent *agent, double delta);
   SteeringOutput collision_avoidance(Agent *agent, double delta);
+  SteeringOutput path_following(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
   SteeringOutput seek(Agent *agent);
@@ -611,6 +623,7 @@ public:
   void setup_agent_with_face(Agent *agent);
   void setup_agent_with_look_where_youre_going(Agent *agent);
   void setup_agent_with_collision_avoidance(Agent *agent);
+  void setup_agent_with_path_following(Agent *agent);
   void setup_agent_with_pursue(Agent *agent);
   void setup_agent_with_separation(Agent *agent);
   void setup_agent_with_velocity_matching(Agent *agent);
@@ -621,6 +634,8 @@ public:
 
   void set_path_following_path(const Ref<AutonomousAgentsPath2D> &p_path);
   Ref<AutonomousAgentsPath2D> get_path_following_path() const ;
+  void set_path_following_direction(const AutonomousAgentsPath2D::FollowDirection p_direction);
+  AutonomousAgentsPath2D::FollowDirection get_path_following_direction() const;
 
 #ifdef DEBUG_ENABLED
   bool is_debugging() {return is_debug;};
@@ -643,6 +658,7 @@ public:
   bool is_agent_aabb_culled(int index);
   int get_agent_ai_phase(int index);
   bool get_did_agent_wander(int index);
+  bool get_did_agent_path_following(int index);
   bool get_did_agent_pursue(int index);
   Vector2 get_agent_pursue_target(int index);
   bool get_did_agent_seek(int index);
@@ -667,6 +683,7 @@ public:
   real_t get_agent_arrive_target_radius(int index);
   bool get_did_agent_velocity_matching(int index);
   Vector2 get_agent_velocity_matching_target(int index);
+  Vector2 get_agent_path_following_predicted_position(int index);
 
 #endif
 

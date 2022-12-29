@@ -3,9 +3,6 @@
 
 #include "scene/2d/node_2d.h"
 #include "scene/resources/curve.h"
-#include "autonomous_agents_2d.h"
-
-class Agent;
 
 class AutonomousAgentsPath2D : public Resource {
 public:
@@ -21,16 +18,13 @@ private:
   Ref<Curve2D> curve;
   double radius;
 
-  int default_follow_direction = FOLLOW_DIRECTION_FORWARDS;
-  double default_predict_distance = 50.0;
-
   PackedVector2Array baked_points_forward;
   PackedVector2Array baked_directions_forward;
   PackedFloat32Array baked_distances_forward;
   PackedFloat32Array baked_total_distances_forward;
   PackedVector2Array baked_directions_backward;
   double path_length = 0;
-
+  int number_of_points;
   bool dirty = true;
 
   void bake();
@@ -40,20 +34,22 @@ protected:
 
 public:
 
+
 	void set_curve(const Ref<Curve2D> &p_curve);
 	Ref<Curve2D> get_curve() const;
   void set_radius(const double p_radius);
   double get_radius() const;
 
-  void set_default_follow_direction(const int p_default_follow_direction);
-  int get_default_follow_direction() const;
-  void set_default_predict_distance(const double p_default_predict_distance);
-  double get_default_predict_distance() const;
-
   PackedVector2Array get_baked_points_forward();
   PackedVector2Array get_baked_directions_forward();
   PackedFloat32Array get_baked_distances_forward();
   PackedFloat32Array get_baked_total_distances_forward();
+
+  double get_path_length() const {return path_length;}
+
+  Vector2 get_next_point(const int p_index, const FollowDirection p_direction) const;
+  int get_index_by_distance(const double p_distance, const FollowDirection p_direction) const;
+  Vector2 get_position_by_distance(const double p_distance, const FollowDirection p_direction) const;
 
   AutonomousAgentsPath2D();
 
