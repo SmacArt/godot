@@ -47,6 +47,7 @@ public:
 
   double get_path_length() const {return path_length;}
 
+  int get_next_index(const int p_index, const FollowDirection p_direction) const;
   Vector2 get_next_point(const int p_index, const FollowDirection p_direction) const;
   int get_index_by_distance(const double p_distance, const FollowDirection p_direction) const;
   Vector2 get_position_by_distance(const double p_distance, const FollowDirection p_direction) const;

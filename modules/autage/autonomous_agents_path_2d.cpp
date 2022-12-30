@@ -301,6 +301,17 @@ PackedFloat32Array AutonomousAgentsPath2D::get_baked_total_distances_forward() {
   return baked_total_distances_forward;
 }
 
+int AutonomousAgentsPath2D::get_next_index(const int p_index, const FollowDirection p_direction) const {
+  if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
+    if (p_index < number_of_points - 1) {
+      return p_index + 1;
+    } else {
+      return 0;
+    }
+  }
+  return 0;
+}
+
 Vector2 AutonomousAgentsPath2D::get_next_point(const int p_index, const FollowDirection p_direction) const {
   if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
     if (p_index < number_of_points - 1) {

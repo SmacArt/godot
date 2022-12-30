@@ -275,6 +275,7 @@ public:
     AABB collision_avoidance_avoiding_aabb;
     AABB collision_avoidance_fov_aabb;
     Vector2 path_following_predicted_position;
+    Vector2 path_following_normal_position;
     AABB predicted_position_aabb;
     Vector2 collision_avoidance_fov_start_position;
     Vector2 collision_avoidance_fov_left_position;
@@ -652,6 +653,7 @@ public:
   Vector2 get_agent_collision_avoidance_fov_left_end_position(int index);
   Vector2 get_agent_collision_avoidance_fov_right_end_position(int index);
   Vector2 get_agent_collision_avoidance_predicted_position(int index);
+  Vector2 get_agent_collision_avoidance_normal_position(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_radius(int index);
   Vector2 get_agent_wander_target(int index);
@@ -684,6 +686,7 @@ public:
   bool get_did_agent_velocity_matching(int index);
   Vector2 get_agent_velocity_matching_target(int index);
   Vector2 get_agent_path_following_predicted_position(int index);
+  Vector2 get_agent_path_following_normal_position(int index);
 
 #endif
 
@@ -757,6 +760,11 @@ public:
     double h1 = aabb1.get_size().y;
     double h2 = aabb2.get_size().y;
     return fmax( Math::abs(c1.x-c2.x) - (w1+w2) * 0.5, Math::abs(c1.y-c2.y) - (h1+h2) * 0.5);
+  }
+
+  inline Vector2 get_normal_point(const Vector2 p, const Vector2 a, const Vector2 b) const {
+    Vector2 ab = (b - a).normalized();
+    return a + (ab * ((p-a).dot(ab)));
   }
 };
 
