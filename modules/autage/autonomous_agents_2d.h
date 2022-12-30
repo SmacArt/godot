@@ -276,6 +276,8 @@ public:
     AABB collision_avoidance_fov_aabb;
     Vector2 path_following_predicted_position;
     Vector2 path_following_normal_position;
+    Vector2 path_following_segment_start;
+    Vector2 path_following_segment_end;
     AABB predicted_position_aabb;
     Vector2 collision_avoidance_fov_start_position;
     Vector2 collision_avoidance_fov_left_position;
@@ -687,6 +689,8 @@ public:
   Vector2 get_agent_velocity_matching_target(int index);
   Vector2 get_agent_path_following_predicted_position(int index);
   Vector2 get_agent_path_following_normal_position(int index);
+  Vector2 get_agent_path_following_segment_start(int index);
+  Vector2 get_agent_path_following_segment_end(int index);
 
 #endif
 
@@ -763,6 +767,12 @@ public:
   }
 
   inline Vector2 get_normal_point(const Vector2 p, const Vector2 a, const Vector2 b) const {
+    /*
+    Vector2 ap = p -a;
+    Vector2 ab = (b-a).normalized();
+    ab = ab * (ap.dot(ab));
+    return a + ab;
+    */
     Vector2 ab = (b - a).normalized();
     return a + (ab * ((p-a).dot(ab)));
   }

@@ -197,11 +197,14 @@ void AutonomousAgentsPathNode2D::_bind_methods() {
 //
 
 AutonomousAgentsPath2D::AutonomousAgentsPath2D() {
+  set_radius(50.0);
 }
 
 void AutonomousAgentsPath2D::set_curve(const Ref<Curve2D> &p_curve) {
   curve = p_curve;
-  bake();
+  if (curve != nullptr) {
+    bake();
+  }
 }
 
 Ref<Curve2D> AutonomousAgentsPath2D::get_curve() const {
@@ -221,7 +224,7 @@ void AutonomousAgentsPath2D::bake() {
   // TODO if not looping don't need to link to the start
   // TODO backwards
 
-  if (dirty) {
+  if (dirty && curve != nullptr && curve->get_baked_points().size() > 0) {
     PackedVector2Array points = curve->get_baked_points();
 
     // determine points for the aa path by removing redundant ones from the curve
@@ -323,9 +326,9 @@ Vector2 AutonomousAgentsPath2D::get_next_point(const int p_index, const FollowDi
   return Vector2();
 }
 
-int AutonomousAgentsPath2D::get_index_by_distance(const double p_distance, const FollowDirection p_direction) const {
+int AutonomousAgentsPath2D::get_point_index_for_distance_on_path(const double p_distance, const FollowDirection p_direction) {
   if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
-    double clamped_distance = fmod(p_distance,path_length);
+    double clamped_distance = fmod(p_distance, path_length);
     for (int i = 0; i < number_of_points; i++) {
       if (clamped_distance <= baked_total_distances_forward[i]) {
         return i;
@@ -335,26 +338,14 @@ int AutonomousAgentsPath2D::get_index_by_distance(const double p_distance, const
   return 0;
 }
 
-Vector2 AutonomousAgentsPath2D::get_position_by_distance(const double p_distance, const FollowDirection p_direction) const {
+Vector2 AutonomousAgentsPath2D::get_position_for_distance_from_point(const int p_point_index, const double p_distance, const FollowDirection p_direction) {
   if (p_direction == FOLLOW_DIRECTION_FORWARDS) {
-    double clamped_distance = fmod(p_distance,path_length);
-    int index = 0;
-    for (int i = 0; i < number_of_points; i++) {
-      if (clamped_distance <= baked_total_distances_forward[i]) {
-        index=i;
-        break;
-      }
+    double clamped_distance = fmax(0,fmod(p_distance, path_length));
+    double dist_along_segment = clamped_distance;
+    if (p_point_index > 0) {
+      dist_along_segment = clamped_distance - baked_total_distances_forward[p_point_index-1];
     }
-
-    double distance_along_segment = clamped_distance;
-    if (index > 0) {
-      int prev_index = index - 1;
-      if (prev_index < 0) {
-        prev_index = number_of_points - 1;
-      }
-      distance_along_segment = clamped_distance - baked_total_distances_forward[prev_index];
-    }
-    return baked_points_forward[index] + baked_directions_forward[index] * distance_along_segment;
+    return baked_points_forward[p_point_index] + baked_directions_forward[p_point_index] * dist_along_segment;
   }
 }
 
@@ -371,7 +362,11 @@ void AutonomousAgentsPath2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_baked_distances_forward"), &AutonomousAgentsPath2D::get_baked_distances_forward);
   ClassDB::bind_method(D_METHOD("get_baked_total_distances_forward"), &AutonomousAgentsPath2D::get_baked_total_distances_forward);
   ClassDB::bind_method(D_METHOD("get_baked_points_forward"), &AutonomousAgentsPath2D::get_baked_points_forward);
-  ClassDB::bind_method(D_METHOD("get_position_by_distance"), &AutonomousAgentsPath2D::get_position_by_distance);
+  ClassDB::bind_method(D_METHOD("get_path_length"), &AutonomousAgentsPath2D::get_path_length);
+  ClassDB::bind_method(D_METHOD("get_point_index_for_distance_on_path"), &AutonomousAgentsPath2D::get_point_index_for_distance_on_path);
+  ClassDB::bind_method(D_METHOD("get_position_for_distance_from_point"), &AutonomousAgentsPath2D::get_position_for_distance_from_point);
+  ClassDB::bind_method(D_METHOD("get_next_index"), &AutonomousAgentsPath2D::get_next_index);
+  ClassDB::bind_method(D_METHOD("get_next_point"), &AutonomousAgentsPath2D::get_next_point);
 
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius"), "set_radius", "get_radius");
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_curve", "get_curve");

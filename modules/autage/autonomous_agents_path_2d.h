@@ -24,7 +24,7 @@ private:
   PackedFloat32Array baked_total_distances_forward;
   PackedVector2Array baked_directions_backward;
   double path_length = 0;
-  int number_of_points;
+  int number_of_points = 0;
   bool dirty = true;
 
   void bake();
@@ -47,10 +47,10 @@ public:
 
   double get_path_length() const {return path_length;}
 
+  int get_point_index_for_distance_on_path(const double p_distance, const FollowDirection p_direction);
+  Vector2 get_position_for_distance_from_point(const int p_point_index, const double p_distance, const FollowDirection p_direction);
   int get_next_index(const int p_index, const FollowDirection p_direction) const;
   Vector2 get_next_point(const int p_index, const FollowDirection p_direction) const;
-  int get_index_by_distance(const double p_distance, const FollowDirection p_direction) const;
-  Vector2 get_position_by_distance(const double p_distance, const FollowDirection p_direction) const;
 
   AutonomousAgentsPath2D();
 

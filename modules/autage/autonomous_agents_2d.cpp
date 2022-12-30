@@ -1644,27 +1644,33 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::look_where_youre_going(Ag
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::path_following(Agent *agent, double delta){
   SteeringOutput steering_output;
 
-  int first_point_index = agent->path_following_path->get_index_by_distance(agent->path_following_distance, agent->path_following_direction);
+  Ref<AutonomousAgentsPath2D> path = agent->path_following_path;
 
-  Vector2 path_target = agent->path_following_path->get_position_by_distance(agent->path_following_distance + agent->path_following_prediction_distance, agent->path_following_direction);
+  int point_a = path->get_point_index_for_distance_on_path(agent->path_following_distance, agent->path_following_direction);
+
+  Vector2 path_target = path->get_position_for_distance_from_point(point_a, agent->path_following_distance, agent->path_following_direction);
 
   if (agent->transform[2].distance_to(path_target) < agent->path_following_prediction_distance) {
     agent->path_following_distance += agent->path_following_prediction_distance;
   }
+
+  // get normal for future position on the current path
   Vector2 predict_location = agent->transform[2] + agent->velocity.normalized() * agent->path_following_prediction_distance;
 
-  Vector2 normal_position = get_normal_point(predict_location, agent->path_following_path->get_baked_points_forward()[first_point_index], agent->path_following_path->get_baked_points_forward()[agent->path_following_path->get_next_index(first_point_index, agent->path_following_direction)]);
+  Vector2 normal_position = get_normal_point(predict_location, path->get_baked_points_forward()[point_a], path->get_baked_points_forward()[path->get_next_index(point_a, agent->path_following_direction)]);
 
 #ifdef DEBUG_ENABLED
   if (is_debug) {
     agent->did_path_following=true;
-    agent->path_following_predicted_position = path_target;
+    agent->path_following_predicted_position = predict_location;
     agent->path_following_normal_position = normal_position;
+    agent->path_following_segment_start =path->get_baked_points_forward()[point_a];
+    agent->path_following_segment_end =path->get_baked_points_forward()[path->get_next_index(point_a, agent->path_following_direction)];
   }
 #endif
   // TODO - doesnt seem to have the correct behavior compared to my other project
 
-  if (predict_location.distance_to(normal_position) > agent->path_following_path->get_radius() * 0.5) {
+  if (predict_location.distance_to(normal_position) > path->get_radius() * 0.5) {
     return seek(agent, path_target);
   }
   // TODO - shouldnt it still seek to a position in front of it
@@ -2263,9 +2269,16 @@ Vector2 AutonomousAgents2D::get_agent_path_following_predicted_position(int inde
 Vector2 AutonomousAgents2D::get_agent_path_following_normal_position(int index) {
   return agents_arr[index].path_following_normal_position;
 }
+Vector2 AutonomousAgents2D::get_agent_path_following_segment_start(int index) {
+  return agents_arr[index].path_following_segment_start;
+}
+Vector2 AutonomousAgents2D::get_agent_path_following_segment_end(int index) {
+  return agents_arr[index].path_following_segment_end;
+}
 #endif
 
 void AutonomousAgents2D::_bind_methods() {
+  ClassDB::bind_method(D_METHOD("get_normal_point"), &AutonomousAgents2D::get_normal_point);
   ClassDB::bind_method(D_METHOD("set_running", "running"), &AutonomousAgents2D::set_running);
   ClassDB::bind_method(D_METHOD("set_number_of_agents", "number_of_agents"), &AutonomousAgents2D::set_number_of_agents);
   ClassDB::bind_method(D_METHOD("set_behaviour_delay", "behaviour_delay"), &AutonomousAgents2D::set_behaviour_delay);
@@ -2725,7 +2738,9 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_pursue_target"), &AutonomousAgents2D::get_agent_pursue_target);
   ClassDB::bind_method(D_METHOD("get_agent_seek_target"), &AutonomousAgents2D::get_agent_seek_target);
   ClassDB::bind_method(D_METHOD("get_agent_path_following_predicted_position"), &AutonomousAgents2D::get_agent_path_following_predicted_position);
-  ClassDB::bind_method(D_METHOD("get_agent_path_following_normal_position"), &AutonomousAgents2D::get_agent_path_following_predicted_position);
+  ClassDB::bind_method(D_METHOD("get_agent_path_following_normal_position"), &AutonomousAgents2D::get_agent_path_following_normal_position);
+  ClassDB::bind_method(D_METHOD("get_agent_path_following_segment_start"), &AutonomousAgents2D::get_agent_path_following_segment_start);
+  ClassDB::bind_method(D_METHOD("get_agent_path_following_segment_end"), &AutonomousAgents2D::get_agent_path_following_segment_end);
 #endif
 }
 
