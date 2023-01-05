@@ -1,32 +1,32 @@
-/*************************************************************************/
-/*  gdscript_analyzer.cpp                                                */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  gdscript_analyzer.cpp                                                 */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 #include "gdscript_analyzer.h"
 
@@ -937,6 +937,7 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 				const GDScriptParser::EnumNode *prev_enum = current_enum;
 				current_enum = member.m_enum;
 
+				Dictionary dictionary;
 				for (int j = 0; j < member.m_enum->values.size(); j++) {
 					GDScriptParser::EnumNode::Value &element = member.m_enum->values.write[j];
 
@@ -960,11 +961,13 @@ void GDScriptAnalyzer::resolve_class_member(GDScriptParser::ClassNode *p_class, 
 					}
 
 					enum_type.enum_values[element.identifier->name] = element.value;
+					dictionary[String(element.identifier->name)] = element.value;
 				}
 
 				current_enum = prev_enum;
 
 				member.m_enum->set_datatype(enum_type);
+				member.m_enum->dictionary = dictionary;
 
 				// Apply annotations.
 				for (GDScriptParser::AnnotationNode *&E : member.m_enum->annotations) {
@@ -1748,12 +1751,6 @@ void GDScriptAnalyzer::resolve_variable(GDScriptParser::VariableNode *p_variable
 
 		type = p_variable->initializer->get_datatype();
 
-#ifdef DEBUG_ENABLED
-		if (p_variable->initializer->type == GDScriptParser::Node::CALL && type.is_hard_type() && type.kind == GDScriptParser::DataType::BUILTIN && type.builtin_type == Variant::NIL) {
-			parser->push_warning(p_variable->initializer, GDScriptWarning::VOID_ASSIGNMENT, static_cast<GDScriptParser::CallNode *>(p_variable->initializer)->function_name);
-		}
-#endif
-
 		if (p_variable->infer_datatype) {
 			type.type_source = GDScriptParser::DataType::ANNOTATED_INFERRED;
 
@@ -1843,12 +1840,6 @@ void GDScriptAnalyzer::resolve_constant(GDScriptParser::ConstantNode *p_constant
 		}
 
 		type = p_constant->initializer->get_datatype();
-
-#ifdef DEBUG_ENABLED
-		if (p_constant->initializer->type == GDScriptParser::Node::CALL && type.is_hard_type() && type.kind == GDScriptParser::DataType::BUILTIN && type.builtin_type == Variant::NIL) {
-			parser->push_warning(p_constant->initializer, GDScriptWarning::VOID_ASSIGNMENT, static_cast<GDScriptParser::CallNode *>(p_constant->initializer)->function_name);
-		}
-#endif
 	}
 
 	if (p_constant->datatype_specifier != nullptr) {
@@ -2043,6 +2034,9 @@ void GDScriptAnalyzer::resolve_return(GDScriptParser::ReturnNode *p_return) {
 			if (has_expected_type && expected_type.has_container_element_type() && p_return->return_value->type == GDScriptParser::Node::ARRAY) {
 				update_array_literal_element_type(expected_type, static_cast<GDScriptParser::ArrayNode *>(p_return->return_value));
 			}
+		}
+		if (has_expected_type && expected_type.is_hard_type() && expected_type.kind == GDScriptParser::DataType::BUILTIN && expected_type.builtin_type == Variant::NIL) {
+			push_error("A void function cannot return a value.", p_return);
 		}
 		result = p_return->return_value->get_datatype();
 	} else {
@@ -2259,30 +2253,26 @@ void GDScriptAnalyzer::reduce_assignment(GDScriptParser::AssignmentNode *p_assig
 	}
 	p_assignment->set_datatype(op_type);
 
-	if (!assignee_type.is_variant() && assigned_value_type.is_hard_type()) {
+	if (assignee_type.is_hard_type() && !assignee_type.is_variant() && op_type.is_hard_type()) {
 		if (compatible) {
 			compatible = is_type_compatible(assignee_type, op_type, true, p_assignment->assigned_value);
 			if (!compatible) {
-				if (assignee_type.is_hard_type()) {
-					// Try reverse test since it can be a masked subtype.
-					if (!is_type_compatible(op_type, assignee_type, true, p_assignment->assigned_value)) {
-						push_error(vformat(R"(Cannot assign a value of type "%s" to a target of type "%s".)", assigned_value_type.to_string(), assignee_type.to_string()), p_assignment->assigned_value);
-					} else {
-						// TODO: Add warning.
-						mark_node_unsafe(p_assignment);
-						p_assignment->use_conversion_assign = true;
-					}
+				// Try reverse test since it can be a masked subtype.
+				if (!is_type_compatible(op_type, assignee_type, true)) {
+					push_error(vformat(R"(Cannot assign a value of type "%s" to a target of type "%s".)", assigned_value_type.to_string(), assignee_type.to_string()), p_assignment->assigned_value);
 				} else {
-					// TODO: Warning in this case.
+					// TODO: Add warning.
 					mark_node_unsafe(p_assignment);
+					p_assignment->use_conversion_assign = true;
 				}
 			}
 		} else {
 			push_error(vformat(R"(Invalid operands "%s" and "%s" for assignment operator.)", assignee_type.to_string(), assigned_value_type.to_string()), p_assignment);
 		}
-	}
-
-	if (assignee_type.has_no_type() || assigned_value_type.is_variant()) {
+	} else if (assignee_type.is_hard_type() && !assignee_type.is_variant()) {
+		mark_node_unsafe(p_assignment);
+		p_assignment->use_conversion_assign = true;
+	} else {
 		mark_node_unsafe(p_assignment);
 		if (assignee_type.is_hard_type() && !assignee_type.is_variant()) {
 			p_assignment->use_conversion_assign = true;
@@ -2333,9 +2323,7 @@ void GDScriptAnalyzer::reduce_assignment(GDScriptParser::AssignmentNode *p_assig
 	}
 
 #ifdef DEBUG_ENABLED
-	if (p_assignment->assigned_value->type == GDScriptParser::Node::CALL && assigned_value_type.is_hard_type() && assigned_value_type.kind == GDScriptParser::DataType::BUILTIN && assigned_value_type.builtin_type == Variant::NIL) {
-		parser->push_warning(p_assignment->assigned_value, GDScriptWarning::VOID_ASSIGNMENT, static_cast<GDScriptParser::CallNode *>(p_assignment->assigned_value)->function_name);
-	} else if (assignee_type.is_hard_type() && assignee_type.builtin_type == Variant::INT && assigned_value_type.builtin_type == Variant::FLOAT) {
+	if (assignee_type.is_hard_type() && assignee_type.builtin_type == Variant::INT && assigned_value_type.builtin_type == Variant::FLOAT) {
 		parser->push_warning(p_assignment->assigned_value, GDScriptWarning::NARROWING_CONVERSION);
 	}
 #endif
@@ -2650,6 +2638,10 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 		} else if (GDScriptUtilityFunctions::function_exists(function_name)) {
 			MethodInfo function_info = GDScriptUtilityFunctions::get_function_info(function_name);
 
+			if (!p_is_root && function_info.return_val.type == Variant::NIL && ((function_info.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) == 0)) {
+				push_error(vformat(R"*(Cannot get return value of call to "%s()" because it returns "void".)*", function_name), p_call);
+			}
+
 			if (all_is_constant && GDScriptUtilityFunctions::is_function_constant(function_name)) {
 				// Can call on compilation.
 				Vector<const Variant *> args;
@@ -2692,6 +2684,10 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 			return;
 		} else if (Variant::has_utility_function(function_name)) {
 			MethodInfo function_info = info_from_utility_func(function_name);
+
+			if (!p_is_root && function_info.return_val.type == Variant::NIL && ((function_info.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) == 0)) {
+				push_error(vformat(R"*(Cannot get return value of call to "%s()" because it returns "void".)*", function_name), p_call);
+			}
 
 			if (all_is_constant && Variant::get_utility_function_type(function_name) == Variant::UTILITY_FUNC_TYPE_MATH) {
 				// Can call on compilation.
@@ -2833,6 +2829,10 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 			push_error(vformat(R"*(Cannot call non-static function "%s()" on the class "%s" directly. Make an instance instead.)*", p_call->function_name, base_type.to_string()), p_call);
 		} else if (is_self && !is_static) {
 			mark_lambda_use_self();
+		}
+
+		if (!p_is_root && return_type.is_hard_type() && return_type.kind == GDScriptParser::DataType::BUILTIN && return_type.builtin_type == Variant::NIL) {
+			push_error(vformat(R"*(Cannot get return value of call to "%s()" because it returns "void".)*", p_call->function_name), p_call);
 		}
 
 #ifdef DEBUG_ENABLED
@@ -3140,10 +3140,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 					p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_CONSTANT;
 					break;
 				case GDScriptParser::ClassNode::Member::ENUM:
-					if (p_base != nullptr && p_base->is_constant) {
-						p_identifier->is_constant = true;
-						p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_CONSTANT;
-					}
+					p_identifier->is_constant = true;
+					p_identifier->reduced_value = member.m_enum->dictionary;
+					p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_CONSTANT;
 					break;
 				case GDScriptParser::ClassNode::Member::VARIABLE:
 					p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_VARIABLE;
@@ -3197,7 +3196,8 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 							return;
 						case GDScriptParser::ClassNode::Member::ENUM:
 							p_identifier->set_datatype(member.get_datatype());
-							p_identifier->is_constant = false;
+							p_identifier->is_constant = true;
+							p_identifier->reduced_value = member.m_enum->dictionary;
 							return;
 						case GDScriptParser::ClassNode::Member::CLASS:
 							p_identifier->set_datatype(member.get_datatype());
@@ -3998,10 +3998,8 @@ GDScriptParser::DataType GDScriptAnalyzer::type_from_variant(const Variant &p_va
 			scr = obj->get_script();
 		}
 		if (scr.is_valid()) {
-			result.script_path = scr->get_path();
 			Ref<GDScript> gds = scr;
 			if (gds.is_valid()) {
-				result.kind = GDScriptParser::DataType::CLASS;
 				// This might be an inner class, so we want to get the parser for the root.
 				// But still get the inner class from that tree.
 				String script_path = gds->get_script_path();
@@ -4027,11 +4025,14 @@ GDScriptParser::DataType GDScriptAnalyzer::type_from_variant(const Variant &p_va
 					return error_type;
 				}
 
+				result.kind = GDScriptParser::DataType::CLASS;
+				result.native_type = found->get_datatype().native_type;
 				result.class_type = found;
 				result.script_path = ref->get_parser()->script_path;
 			} else {
 				result.kind = GDScriptParser::DataType::SCRIPT;
 				result.native_type = scr->get_instance_base_type();
+				result.script_path = scr->get_path();
 			}
 			result.script_type = scr;
 		} else {
@@ -4174,7 +4175,7 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 				r_default_arg_count++;
 			}
 		}
-		r_return_type = found_function->get_datatype();
+		r_return_type = p_is_constructor ? p_base_type : found_function->get_datatype();
 		r_return_type.is_meta_type = false;
 		r_return_type.is_coroutine = found_function->is_coroutine;
 
