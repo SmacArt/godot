@@ -493,16 +493,16 @@ void EditorNode::_update_from_settings() {
 	tree->set_debug_collision_contact_color(GLOBAL_GET("debug/shapes/collision/contact_color"));
 
 #ifdef DEBUG_ENABLED
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_edge_connection_color(GLOBAL_GET("debug/shapes/navigation/edge_connection_color"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_geometry_edge_color(GLOBAL_GET("debug/shapes/navigation/geometry_edge_color"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_geometry_face_color(GLOBAL_GET("debug/shapes/navigation/geometry_face_color"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_geometry_edge_disabled_color(GLOBAL_GET("debug/shapes/navigation/geometry_edge_disabled_color"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_geometry_face_disabled_color(GLOBAL_GET("debug/shapes/navigation/geometry_face_disabled_color"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_enable_edge_connections(GLOBAL_GET("debug/shapes/navigation/enable_edge_connections"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_enable_edge_connections_xray(GLOBAL_GET("debug/shapes/navigation/enable_edge_connections_xray"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_enable_edge_lines(GLOBAL_GET("debug/shapes/navigation/enable_edge_lines"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_enable_edge_lines_xray(GLOBAL_GET("debug/shapes/navigation/enable_edge_lines_xray"));
-	NavigationServer3D::get_singleton_mut()->set_debug_navigation_enable_geometry_face_random_color(GLOBAL_GET("debug/shapes/navigation/enable_geometry_face_random_color"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_edge_connection_color(GLOBAL_GET("debug/shapes/navigation/edge_connection_color"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_geometry_edge_color(GLOBAL_GET("debug/shapes/navigation/geometry_edge_color"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_geometry_face_color(GLOBAL_GET("debug/shapes/navigation/geometry_face_color"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_geometry_edge_disabled_color(GLOBAL_GET("debug/shapes/navigation/geometry_edge_disabled_color"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_geometry_face_disabled_color(GLOBAL_GET("debug/shapes/navigation/geometry_face_disabled_color"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_enable_edge_connections(GLOBAL_GET("debug/shapes/navigation/enable_edge_connections"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_enable_edge_connections_xray(GLOBAL_GET("debug/shapes/navigation/enable_edge_connections_xray"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_enable_edge_lines(GLOBAL_GET("debug/shapes/navigation/enable_edge_lines"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_enable_edge_lines_xray(GLOBAL_GET("debug/shapes/navigation/enable_edge_lines_xray"));
+	NavigationServer3D::get_singleton()->set_debug_navigation_enable_geometry_face_random_color(GLOBAL_GET("debug/shapes/navigation/enable_geometry_face_random_color"));
 #endif // DEBUG_ENABLED
 }
 
@@ -608,6 +608,9 @@ void EditorNode::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
+			if (progress_dialog) {
+				progress_dialog->queue_free();
+			}
 			editor_data.save_editor_external_data();
 			FileAccess::set_file_close_fail_notify_callback(nullptr);
 			log->deinit(); // Do not get messages anymore.
@@ -688,6 +691,7 @@ void EditorNode::_notification(int p_what) {
 
 			if (theme_changed) {
 				theme = create_custom_theme(theme_base->get_theme());
+				DisplayServer::set_early_window_clear_color_override(true, theme->get_color(SNAME("background"), SNAME("Editor")));
 
 				theme_base->set_theme(theme);
 				gui_base->set_theme(theme);
@@ -1121,6 +1125,12 @@ void EditorNode::_titlebar_resized() {
 
 void EditorNode::_version_button_pressed() {
 	DisplayServer::get_singleton()->clipboard_set(version_btn->get_meta(META_TEXT_TO_COPY));
+}
+
+void EditorNode::_update_undo_redo_allowed() {
+	Ref<EditorUndoRedoManager> undo_redo = get_undo_redo();
+	file_menu->set_item_disabled(file_menu->get_item_index(EDIT_UNDO), !undo_redo->has_undo());
+	file_menu->set_item_disabled(file_menu->get_item_index(EDIT_REDO), !undo_redo->has_redo());
 }
 
 void EditorNode::_node_renamed() {
@@ -2041,18 +2051,6 @@ void EditorNode::_dialog_action(String p_file) {
 	}
 }
 
-bool EditorNode::item_has_editor(Object *p_object) {
-	if (_is_class_editor_disabled_by_feature_profile(p_object->get_class())) {
-		return false;
-	}
-
-	return editor_data.get_subeditors(p_object).size() > 0;
-}
-
-void EditorNode::edit_item_resource(Ref<Resource> p_resource) {
-	edit_item(p_resource.ptr());
-}
-
 bool EditorNode::_is_class_editor_disabled_by_feature_profile(const StringName &p_class) {
 	Ref<EditorFeatureProfile> profile = EditorFeatureProfileManager::get_singleton()->get_current_profile();
 	if (profile.is_null()) {
@@ -2075,35 +2073,41 @@ bool EditorNode::_is_class_editor_disabled_by_feature_profile(const StringName &
 }
 
 void EditorNode::edit_item(Object *p_object) {
-	Vector<EditorPlugin *> sub_plugins;
-
-	if (p_object) {
-		if (_is_class_editor_disabled_by_feature_profile(p_object->get_class())) {
-			return;
-		}
-		sub_plugins = editor_data.get_subeditors(p_object);
+	if (p_object && _is_class_editor_disabled_by_feature_profile(p_object->get_class())) {
+		return;
 	}
 
-	if (!sub_plugins.is_empty()) {
+	Vector<EditorPlugin *> top_plugins = editor_plugins_over->get_plugins_list();
+	Vector<EditorPlugin *> item_plugins;
+	if (p_object) {
+		item_plugins = editor_data.get_subeditors(p_object);
+	}
+
+	if (!item_plugins.is_empty()) {
 		bool same = true;
-		if (sub_plugins.size() == editor_plugins_over->get_plugins_list().size()) {
-			for (int i = 0; i < sub_plugins.size(); i++) {
-				if (sub_plugins[i] != editor_plugins_over->get_plugins_list()[i]) {
+		if (item_plugins.size() == top_plugins.size()) {
+			for (int i = 0; i < item_plugins.size(); i++) {
+				if (item_plugins[i] != top_plugins[i]) {
 					same = false;
 				}
 			}
 		} else {
 			same = false;
 		}
+
 		if (!same) {
 			_display_top_editors(false);
-			_set_top_editors(sub_plugins);
+			_set_top_editors(item_plugins);
 		}
 		_set_editing_top_editors(p_object);
 		_display_top_editors(true);
-	} else {
+	} else if (!top_plugins.is_empty()) {
 		hide_top_editors();
 	}
+}
+
+void EditorNode::edit_item_resource(Ref<Resource> p_resource) {
+	edit_item(p_resource.ptr());
 }
 
 void EditorNode::push_item(Object *p_object, const String &p_property, bool p_inspector_only) {
@@ -2336,7 +2340,7 @@ void EditorNode::_edit_current(bool p_skip_foreign) {
 		if (main_plugin && !skip_main_plugin) {
 			// Special case if use of external editor is true.
 			Resource *current_res = Object::cast_to<Resource>(current_obj);
-			if (main_plugin->get_name() == "Script" && !current_obj->is_class("VisualScript") && current_res && !current_res->is_built_in() && (bool(EDITOR_GET("text_editor/external/use_external_editor")) || overrides_external_editor(current_obj))) {
+			if (main_plugin->get_name() == "Script" && current_res && !current_res->is_built_in() && (bool(EDITOR_GET("text_editor/external/use_external_editor")) || overrides_external_editor(current_obj))) {
 				if (!changing_scene) {
 					main_plugin->edit(current_obj);
 				}
@@ -2351,21 +2355,7 @@ void EditorNode::_edit_current(bool p_skip_foreign) {
 			}
 		}
 
-		Vector<EditorPlugin *> sub_plugins;
-
-		if (!_is_class_editor_disabled_by_feature_profile(current_obj->get_class())) {
-			sub_plugins = editor_data.get_subeditors(current_obj);
-		}
-
-		if (!sub_plugins.is_empty()) {
-			_display_top_editors(false);
-
-			_set_top_editors(sub_plugins);
-			_set_editing_top_editors(current_obj);
-			_display_top_editors(true);
-		} else if (!editor_plugins_over->get_plugins_list().is_empty()) {
-			hide_top_editors();
-		}
+		edit_item(current_obj);
 	}
 
 	InspectorDock::get_singleton()->update(current_obj);
@@ -3265,16 +3255,8 @@ void EditorNode::_discard_changes(const String &p_str) {
 }
 
 void EditorNode::_update_file_menu_opened() {
-	Ref<Shortcut> close_scene_sc = ED_GET_SHORTCUT("editor/close_scene");
-	close_scene_sc->set_name(TTR("Close Scene"));
-	Ref<Shortcut> reopen_closed_scene_sc = ED_GET_SHORTCUT("editor/reopen_closed_scene");
-	reopen_closed_scene_sc->set_name(TTR("Reopen Closed Scene"));
-
 	file_menu->set_item_disabled(file_menu->get_item_index(FILE_OPEN_PREV), previous_scenes.is_empty());
-
-	Ref<EditorUndoRedoManager> undo_redo = editor_data.get_undo_redo();
-	file_menu->set_item_disabled(file_menu->get_item_index(EDIT_UNDO), !undo_redo->has_undo());
-	file_menu->set_item_disabled(file_menu->get_item_index(EDIT_REDO), !undo_redo->has_redo());
+	_update_undo_redo_allowed();
 }
 
 void EditorNode::_update_file_menu_closed() {
@@ -4329,7 +4311,7 @@ bool EditorNode::is_object_of_custom_type(const Object *p_object, const StringNa
 void EditorNode::progress_add_task(const String &p_task, const String &p_label, int p_steps, bool p_can_cancel) {
 	if (singleton->cmdline_export_mode) {
 		print_line(p_task + ": begin: " + p_label + " steps: " + itos(p_steps));
-	} else {
+	} else if (singleton->progress_dialog) {
 		singleton->progress_dialog->add_task(p_task, p_label, p_steps, p_can_cancel);
 	}
 }
@@ -4338,15 +4320,17 @@ bool EditorNode::progress_task_step(const String &p_task, const String &p_state,
 	if (singleton->cmdline_export_mode) {
 		print_line("\t" + p_task + ": step " + itos(p_step) + ": " + p_state);
 		return false;
-	} else {
+	} else if (singleton->progress_dialog) {
 		return singleton->progress_dialog->task_step(p_task, p_state, p_step, p_force_refresh);
+	} else {
+		return false;
 	}
 }
 
 void EditorNode::progress_end_task(const String &p_task) {
 	if (singleton->cmdline_export_mode) {
 		print_line(p_task + ": end");
-	} else {
+	} else if (singleton->progress_dialog) {
 		singleton->progress_dialog->end_task(p_task);
 	}
 }
@@ -5301,12 +5285,10 @@ void EditorNode::_scene_tab_input(const Ref<InputEvent> &p_input) {
 				scene_tabs_context_menu->add_item(TTR("Play This Scene"), RUN_PLAY_SCENE);
 
 				scene_tabs_context_menu->add_separator();
-				Ref<Shortcut> close_tab_sc = ED_GET_SHORTCUT("editor/close_scene");
-				close_tab_sc->set_name(TTR("Close Tab"));
-				scene_tabs_context_menu->add_shortcut(close_tab_sc, FILE_CLOSE);
-				Ref<Shortcut> undo_close_tab_sc = ED_GET_SHORTCUT("editor/reopen_closed_scene");
-				undo_close_tab_sc->set_name(TTR("Undo Close Tab"));
-				scene_tabs_context_menu->add_shortcut(undo_close_tab_sc, FILE_OPEN_PREV);
+				scene_tabs_context_menu->add_shortcut(ED_GET_SHORTCUT("editor/close_scene"), FILE_CLOSE);
+				scene_tabs_context_menu->set_item_text(scene_tabs_context_menu->get_item_index(FILE_CLOSE), TTR("Close Tab"));
+				scene_tabs_context_menu->add_shortcut(ED_GET_SHORTCUT("editor/reopen_closed_scene"), FILE_OPEN_PREV);
+				scene_tabs_context_menu->set_item_text(scene_tabs_context_menu->get_item_index(FILE_OPEN_PREV), TTR("Undo Close Tab"));
 				if (previous_scenes.is_empty()) {
 					scene_tabs_context_menu->set_item_disabled(scene_tabs_context_menu->get_item_index(FILE_OPEN_PREV), true);
 				}
@@ -5846,10 +5828,14 @@ void EditorNode::_bottom_panel_raise_toggled(bool p_pressed) {
 }
 
 void EditorNode::_update_renderer_color() {
-	if (renderer->get_text() == "gl_compatibility") {
+	if (renderer->get_text() == "Forward+") {
+		renderer->add_theme_color_override("font_color", Color::hex(0x5d8c3fff));
+	}
+	if (renderer->get_text() == "Mobile") {
+		renderer->add_theme_color_override("font_color", Color::hex(0xa5557dff));
+	}
+	if (renderer->get_text() == "Compatibility") {
 		renderer->add_theme_color_override("font_color", Color::hex(0x5586a4ff));
-	} else if (renderer->get_text() == "forward_plus" || renderer->get_text() == "mobile") {
-		renderer->add_theme_color_override("font_color", theme_base->get_theme_color(SNAME("highend_color"), SNAME("Editor")));
 	}
 }
 
@@ -5920,8 +5906,7 @@ void EditorNode::_feature_profile_changed() {
 }
 
 void EditorNode::_bind_methods() {
-	GLOBAL_DEF("editor/scene/scene_naming", SCENE_NAME_CASING_SNAKE_CASE);
-	ProjectSettings::get_singleton()->set_custom_property_info("editor/scene/scene_naming", PropertyInfo(Variant::INT, "editor/scene/scene_naming", PROPERTY_HINT_ENUM, "Auto,PascalCase,snake_case"));
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "editor/scene/scene_naming", PROPERTY_HINT_ENUM, "Auto,PascalCase,snake_case"), SCENE_NAME_CASING_SNAKE_CASE);
 	ClassDB::bind_method("edit_current", &EditorNode::edit_current);
 	ClassDB::bind_method("edit_node", &EditorNode::edit_node);
 
@@ -5938,8 +5923,6 @@ void EditorNode::_bind_methods() {
 	ClassDB::bind_method("_thumbnail_done", &EditorNode::_thumbnail_done);
 	ClassDB::bind_method("_set_main_scene_state", &EditorNode::_set_main_scene_state);
 	ClassDB::bind_method("_update_recent_scenes", &EditorNode::_update_recent_scenes);
-
-	ClassDB::bind_method("edit_item_resource", &EditorNode::edit_item_resource);
 
 	ClassDB::bind_method(D_METHOD("get_gui_base"), &EditorNode::get_gui_base);
 
@@ -6072,6 +6055,9 @@ EditorNode::EditorNode() {
 
 	singleton = this;
 
+	get_undo_redo()->connect("version_changed", callable_mp(this, &EditorNode::_update_undo_redo_allowed));
+	get_undo_redo()->connect("history_changed", callable_mp(this, &EditorNode::_update_undo_redo_allowed));
+
 	TranslationServer::get_singleton()->set_enabled(false);
 	// Load settings.
 	if (!EditorSettings::get_singleton()) {
@@ -6113,7 +6099,10 @@ EditorNode::EditorNode() {
 	}
 
 	// Define a minimum window size to prevent UI elements from overlapping or being cut off.
-	DisplayServer::get_singleton()->window_set_min_size(Size2(1024, 600) * EDSCALE);
+	Window *w = Object::cast_to<Window>(SceneTree::get_singleton()->get_root());
+	if (w) {
+		w->set_min_size(Size2(1024, 600) * EDSCALE);
+	}
 
 	FileDialog::set_default_show_hidden_files(EDITOR_GET("filesystem/file_dialog/show_hidden_files"));
 	EditorFileDialog::set_default_show_hidden_files(EDITOR_GET("filesystem/file_dialog/show_hidden_files"));
@@ -6252,6 +6241,7 @@ EditorNode::EditorNode() {
 	// Exporters might need the theme.
 	EditorColorMap::create();
 	theme = create_custom_theme();
+	DisplayServer::set_early_window_clear_color_override(true, theme->get_color(SNAME("background"), SNAME("Editor")));
 
 	register_exporters();
 
@@ -6306,7 +6296,6 @@ EditorNode::EditorNode() {
 	resource_preview = memnew(EditorResourcePreview);
 	add_child(resource_preview);
 	progress_dialog = memnew(ProgressDialog);
-	gui_base->add_child(progress_dialog);
 
 	// Take up all screen.
 	gui_base->set_anchor(SIDE_RIGHT, Control::ANCHOR_END);
@@ -6937,14 +6926,14 @@ EditorNode::EditorNode() {
 	menu_hb->add_child(right_menu_hb);
 
 	renderer = memnew(OptionButton);
-	// Hide the renderer selection dropdown until OpenGL support is more mature.
-	// The renderer can still be changed in the project settings or using `--rendering-driver opengl3`.
-	renderer->set_visible(false);
+	renderer->set_visible(true);
 	renderer->set_flat(true);
+	renderer->set_fit_to_longest_item(false);
 	renderer->set_focus_mode(Control::FOCUS_NONE);
 	renderer->connect("item_selected", callable_mp(this, &EditorNode::_renderer_selected));
 	renderer->add_theme_font_override("font", gui_base->get_theme_font(SNAME("bold"), SNAME("EditorFonts")));
 	renderer->add_theme_font_size_override("font_size", gui_base->get_theme_font_size(SNAME("bold_size"), SNAME("EditorFonts")));
+	renderer->set_tooltip_text(TTR("Choose a renderer."));
 
 	right_menu_hb->add_child(renderer);
 
@@ -6967,7 +6956,15 @@ EditorNode::EditorNode() {
 		String rendering_method = renderers[i];
 
 		// Add the renderers name to the UI.
-		renderer->add_item(rendering_method);
+		if (rendering_method == "forward_plus") {
+			renderer->add_item(TTR("Forward+"));
+		}
+		if (rendering_method == "mobile") {
+			renderer->add_item(TTR("Mobile"));
+		}
+		if (rendering_method == "gl_compatibility") {
+			renderer->add_item(TTR("Compatibility"));
+		}
 		renderer->set_item_metadata(i, rendering_method);
 
 		// Lowercase for standard comparison.

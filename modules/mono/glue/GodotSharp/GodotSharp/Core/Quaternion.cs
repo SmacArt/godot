@@ -194,7 +194,7 @@ namespace Godot
                 0);
             Quaternion q2 = toQ * ln.Exp();
 
-            // To cancel error made by Expmap ambiguity, do blends.
+            // To cancel error made by Expmap ambiguity, do blending.
             return q1.Slerp(q2, weight);
         }
 
@@ -263,7 +263,7 @@ namespace Godot
                 0);
             Quaternion q2 = toQ * ln.Exp();
 
-            // To cancel error made by Expmap ambiguity, do blends.
+            // To cancel error made by Expmap ambiguity, do blending.
             return q1.Slerp(q2, weight);
         }
 
@@ -337,6 +337,16 @@ namespace Godot
             }
 #endif
             return new Quaternion(-x, -y, -z, w);
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if this quaternion is finite, by calling
+        /// <see cref="Mathf.IsFinite"/> on each component.
+        /// </summary>
+        /// <returns>Whether this vector is finite or not.</returns>
+        public readonly bool IsFinite()
+        {
+            return Mathf.IsFinite(x) && Mathf.IsFinite(y) && Mathf.IsFinite(z) && Mathf.IsFinite(w);
         }
 
         /// <summary>

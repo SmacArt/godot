@@ -1219,7 +1219,7 @@ GDScriptParser::ParameterNode *GDScriptParser::parse_parameter() {
 
 	if (match(GDScriptTokenizer::Token::EQUAL)) {
 		// Default value.
-		parameter->default_value = parse_expression(false);
+		parameter->initializer = parse_expression(false);
 	}
 
 	complete_extents(parameter);
@@ -1250,7 +1250,7 @@ GDScriptParser::SignalNode *GDScriptParser::parse_signal() {
 				push_error("Expected signal parameter name.");
 				break;
 			}
-			if (parameter->default_value != nullptr) {
+			if (parameter->initializer != nullptr) {
 				push_error(R"(Signal parameters cannot have a default value.)");
 			}
 			if (signal->parameters_indices.has(parameter->identifier->name)) {
@@ -1299,15 +1299,17 @@ GDScriptParser::EnumNode *GDScriptParser::parse_enum() {
 			EnumNode::Value item;
 			GDScriptParser::IdentifierNode *identifier = parse_identifier();
 #ifdef DEBUG_ENABLED
-			for (MethodInfo &info : gdscript_funcs) {
-				if (info.name == identifier->name) {
-					push_warning(identifier, GDScriptWarning::SHADOWED_GLOBAL_IDENTIFIER, "enum member", identifier->name, "built-in function");
+			if (!named) { // Named enum identifiers do not shadow anything since you can only access them with NamedEnum.ENUM_VALUE
+				for (MethodInfo &info : gdscript_funcs) {
+					if (info.name == identifier->name) {
+						push_warning(identifier, GDScriptWarning::SHADOWED_GLOBAL_IDENTIFIER, "enum member", identifier->name, "built-in function");
+					}
 				}
-			}
-			if (Variant::has_utility_function(identifier->name)) {
-				push_warning(identifier, GDScriptWarning::SHADOWED_GLOBAL_IDENTIFIER, "enum member", identifier->name, "built-in function");
-			} else if (ClassDB::class_exists(identifier->name)) {
-				push_warning(identifier, GDScriptWarning::SHADOWED_GLOBAL_IDENTIFIER, "enum member", identifier->name, "global class");
+				if (Variant::has_utility_function(identifier->name)) {
+					push_warning(identifier, GDScriptWarning::SHADOWED_GLOBAL_IDENTIFIER, "enum member", identifier->name, "built-in function");
+				} else if (ClassDB::class_exists(identifier->name)) {
+					push_warning(identifier, GDScriptWarning::SHADOWED_GLOBAL_IDENTIFIER, "enum member", identifier->name, "global class");
+				}
 			}
 #endif
 			item.identifier = identifier;
@@ -1319,14 +1321,8 @@ GDScriptParser::EnumNode *GDScriptParser::parse_enum() {
 			if (elements.has(item.identifier->name)) {
 				push_error(vformat(R"(Name "%s" was already in this enum (at line %d).)", item.identifier->name, elements[item.identifier->name]), item.identifier);
 			} else if (!named) {
-				// TODO: Abstract this recursive member check.
-				ClassNode *parent = current_class;
-				while (parent != nullptr) {
-					if (parent->members_indices.has(item.identifier->name)) {
-						push_error(vformat(R"(Name "%s" is already used as a class %s.)", item.identifier->name, parent->get_member(item.identifier->name).get_type_name()));
-						break;
-					}
-					parent = parent->outer;
+				if (current_class->members_indices.has(item.identifier->name)) {
+					push_error(vformat(R"(Name "%s" is already used as a class %s.)", item.identifier->name, current_class->get_member(item.identifier->name).get_type_name()));
 				}
 			}
 
@@ -1395,7 +1391,7 @@ void GDScriptParser::parse_function_signature(FunctionNode *p_function, SuiteNod
 			if (parameter == nullptr) {
 				break;
 			}
-			if (parameter->default_value != nullptr) {
+			if (parameter->initializer != nullptr) {
 				default_used = true;
 			} else {
 				if (default_used) {
@@ -1799,24 +1795,29 @@ GDScriptParser::AssertNode *GDScriptParser::parse_assert() {
 	// TODO: Add assert message.
 	AssertNode *assert = alloc_node<AssertNode>();
 
+	push_multiline(true);
 	consume(GDScriptTokenizer::Token::PARENTHESIS_OPEN, R"(Expected "(" after "assert".)");
+
 	assert->condition = parse_expression(false);
 	if (assert->condition == nullptr) {
 		push_error("Expected expression to assert.");
+		pop_multiline();
 		complete_extents(assert);
 		return nullptr;
 	}
 
-	if (match(GDScriptTokenizer::Token::COMMA)) {
-		// Error message.
+	if (match(GDScriptTokenizer::Token::COMMA) && !check(GDScriptTokenizer::Token::PARENTHESIS_CLOSE)) {
 		assert->message = parse_expression(false);
 		if (assert->message == nullptr) {
 			push_error(R"(Expected error message for assert after ",".)");
+			pop_multiline();
 			complete_extents(assert);
 			return nullptr;
 		}
+		match(GDScriptTokenizer::Token::COMMA);
 	}
 
+	pop_multiline();
 	consume(GDScriptTokenizer::Token::PARENTHESIS_CLOSE, R"*(Expected ")" after assert expression.)*");
 
 	complete_extents(assert);
@@ -3793,6 +3794,26 @@ bool GDScriptParser::export_annotations(const AnnotationNode *p_annotation, Node
 			variable->export_info.type = Variant::INT;
 		}
 	}
+	if (p_annotation->name == SNAME("@export_multiline")) {
+		if (export_type.builtin_type == Variant::ARRAY && export_type.has_container_element_type()) {
+			DataType inner_type = export_type.get_container_element_type();
+			if (inner_type.builtin_type != Variant::STRING) {
+				push_error(vformat(R"("%s" annotation on arrays requires a string type but type "%s" was given instead.)", p_annotation->name.operator String(), inner_type.to_string()), variable);
+				return false;
+			}
+
+			String hint_prefix = itos(inner_type.builtin_type) + "/" + itos(variable->export_info.hint);
+			variable->export_info.hint = PROPERTY_HINT_TYPE_STRING;
+			variable->export_info.hint_string = hint_prefix + ":" + variable->export_info.hint_string;
+			variable->export_info.type = Variant::ARRAY;
+
+			return true;
+		} else if (export_type.builtin_type == Variant::DICTIONARY) {
+			variable->export_info.type = Variant::DICTIONARY;
+
+			return true;
+		}
+	}
 
 	if (p_annotation->name == SNAME("@export")) {
 		if (variable->datatype_specifier == nullptr && variable->initializer == nullptr) {
@@ -4087,8 +4108,11 @@ String GDScriptParser::DataType::to_string() const {
 			}
 			return native_type.operator String();
 		}
-		case ENUM:
-			return enum_type.operator String() + " (enum)";
+		case ENUM: {
+			// native_type contains either the native class defining the enum
+			// or the fully qualified class name of the script defining the enum
+			return String(native_type).get_file(); // Remove path, keep filename
+		}
 		case RESOLVING:
 		case UNRESOLVED:
 			return "<unresolved type>";
@@ -4776,9 +4800,9 @@ void GDScriptParser::TreePrinter::print_parameter(ParameterNode *p_parameter) {
 		push_text(" : ");
 		print_type(p_parameter->datatype_specifier);
 	}
-	if (p_parameter->default_value != nullptr) {
+	if (p_parameter->initializer != nullptr) {
 		push_text(" = ");
-		print_expression(p_parameter->default_value);
+		print_expression(p_parameter->initializer);
 	}
 }
 

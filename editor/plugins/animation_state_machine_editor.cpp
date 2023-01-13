@@ -337,7 +337,7 @@ void AnimationNodeStateMachineEditor::_state_machine_gui_input(const Ref<InputEv
 	Ref<InputEventMouseMotion> mm = p_event;
 
 	// Pan window
-	if (mm.is_valid() && (mm->get_button_mask() & MouseButton::MASK_MIDDLE) != MouseButton::NONE) {
+	if (mm.is_valid() && mm->get_button_mask().has_flag(MouseButtonMask::MIDDLE)) {
 		h_scroll->set_value(h_scroll->get_value() - mm->get_relative().x);
 		v_scroll->set_value(v_scroll->get_value() - mm->get_relative().y);
 	}
@@ -1760,10 +1760,6 @@ void AnimationNodeStateMachineEditor::_open_editor(const String &p_name) {
 	AnimationTreeEditor::get_singleton()->enter_editor(p_name);
 }
 
-void AnimationNodeStateMachineEditor::_removed_from_graph() {
-	EditorNode::get_singleton()->edit_item(nullptr);
-}
-
 void AnimationNodeStateMachineEditor::_name_edited(const String &p_text) {
 	const String &new_name = p_text;
 
@@ -1942,7 +1938,6 @@ void AnimationNodeStateMachineEditor::_update_mode() {
 
 void AnimationNodeStateMachineEditor::_bind_methods() {
 	ClassDB::bind_method("_update_graph", &AnimationNodeStateMachineEditor::_update_graph);
-	ClassDB::bind_method("_removed_from_graph", &AnimationNodeStateMachineEditor::_removed_from_graph);
 	ClassDB::bind_method("_open_editor", &AnimationNodeStateMachineEditor::_open_editor);
 	ClassDB::bind_method("_connect_to", &AnimationNodeStateMachineEditor::_connect_to);
 	ClassDB::bind_method("_stop_connecting", &AnimationNodeStateMachineEditor::_stop_connecting);

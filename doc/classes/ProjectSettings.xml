@@ -84,6 +84,25 @@
 				GD.Print(ProjectSettings.GetSetting("application/config/custom_description", "No description specified."));
 				[/csharp]
 				[/codeblocks]
+				[b]Note:[/b] This method doesn't take potential feature overrides into account automatically. Use [method get_setting_with_override] to handle seamlessly.
+			</description>
+		</method>
+		<method name="get_setting_with_override" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Similar to [method get_setting], but applies feature tag overrides if any exists and is valid.
+				[b]Example:[/b]
+				If the following setting override exists "application/config/name.windows", and the following code is executed:
+				[codeblocks]
+				[gdscript]
+				print(ProjectSettings.get_setting_with_override("application/config/name"))
+				[/gdscript]
+				[csharp]
+				GD.Print(ProjectSettings.GetSettingWithOverride("application/config/name"));
+				[/csharp]
+				[/codeblocks]
+				Then the overridden setting will be returned instead if the project is running on the [i]Windows[/i] operating system.
 			</description>
 		</method>
 		<method name="globalize_path" qualifiers="const">
@@ -595,6 +614,9 @@
 		<member name="display/window/size/extend_to_title" type="bool" setter="" getter="" default="false">
 			Main window content is expanded to the full size of the window. Unlike a borderless window, the frame is left intact and can be used to resize the window, and the title bar is transparent, but has minimize/maximize/close buttons.
 			[b]Note:[/b] This setting is implemented only on macOS.
+		</member>
+		<member name="display/window/size/initial_screen" type="int" setter="" getter="" default="-2">
+			Main window initial screen.
 		</member>
 		<member name="display/window/size/mode" type="int" setter="" getter="" default="0">
 			Main window mode. See [enum DisplayServer.WindowMode] for possible values and how each mode behaves.

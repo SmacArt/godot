@@ -51,6 +51,7 @@ class InspectorDock : public VBoxContainer {
 		RESOURCE_LOAD,
 		RESOURCE_SAVE,
 		RESOURCE_SAVE_AS,
+		RESOURCE_SHOW_IN_FILESYSTEM,
 		RESOURCE_MAKE_BUILT_IN,
 		RESOURCE_COPY,
 		RESOURCE_EDIT_CLIPBOARD,
@@ -99,6 +100,7 @@ class InspectorDock : public VBoxContainer {
 
 	int current_option = -1;
 	ConfirmationDialog *unique_resources_confirmation = nullptr;
+	Label *unique_resources_label = nullptr;
 	Tree *unique_resources_list_tree = nullptr;
 
 	EditorPropertyNameProcessor::Style property_name_style;
@@ -118,6 +120,7 @@ class InspectorDock : public VBoxContainer {
 	void _copy_resource();
 	void _paste_resource();
 	void _prepare_resource_extra_popup();
+	Ref<Resource> _get_current_resource() const;
 
 	void _info_pressed();
 	void _resource_created();

@@ -683,37 +683,37 @@ static String _make_arguments_hint(const GDScriptParser::FunctionNode *p_functio
 			arghint += par->identifier->name.operator String() + ": " + par->get_datatype().to_string();
 		}
 
-		if (par->default_value) {
+		if (par->initializer) {
 			String def_val = "<unknown>";
-			switch (par->default_value->type) {
+			switch (par->initializer->type) {
 				case GDScriptParser::Node::LITERAL: {
-					const GDScriptParser::LiteralNode *literal = static_cast<const GDScriptParser::LiteralNode *>(par->default_value);
+					const GDScriptParser::LiteralNode *literal = static_cast<const GDScriptParser::LiteralNode *>(par->initializer);
 					def_val = literal->value.get_construct_string();
 				} break;
 				case GDScriptParser::Node::IDENTIFIER: {
-					const GDScriptParser::IdentifierNode *id = static_cast<const GDScriptParser::IdentifierNode *>(par->default_value);
+					const GDScriptParser::IdentifierNode *id = static_cast<const GDScriptParser::IdentifierNode *>(par->initializer);
 					def_val = id->name.operator String();
 				} break;
 				case GDScriptParser::Node::CALL: {
-					const GDScriptParser::CallNode *call = static_cast<const GDScriptParser::CallNode *>(par->default_value);
+					const GDScriptParser::CallNode *call = static_cast<const GDScriptParser::CallNode *>(par->initializer);
 					if (call->is_constant && call->reduced) {
 						def_val = call->function_name.operator String() + call->reduced_value.operator String();
 					}
 				} break;
 				case GDScriptParser::Node::ARRAY: {
-					const GDScriptParser::ArrayNode *arr = static_cast<const GDScriptParser::ArrayNode *>(par->default_value);
+					const GDScriptParser::ArrayNode *arr = static_cast<const GDScriptParser::ArrayNode *>(par->initializer);
 					if (arr->is_constant && arr->reduced) {
 						def_val = arr->reduced_value.operator String();
 					}
 				} break;
 				case GDScriptParser::Node::DICTIONARY: {
-					const GDScriptParser::DictionaryNode *dict = static_cast<const GDScriptParser::DictionaryNode *>(par->default_value);
+					const GDScriptParser::DictionaryNode *dict = static_cast<const GDScriptParser::DictionaryNode *>(par->initializer);
 					if (dict->is_constant && dict->reduced) {
 						def_val = dict->reduced_value.operator String();
 					}
 				} break;
 				case GDScriptParser::Node::SUBSCRIPT: {
-					const GDScriptParser::SubscriptNode *sub = static_cast<const GDScriptParser::SubscriptNode *>(par->default_value);
+					const GDScriptParser::SubscriptNode *sub = static_cast<const GDScriptParser::SubscriptNode *>(par->initializer);
 					if (sub->is_constant) {
 						if (sub->datatype.kind == GDScriptParser::DataType::ENUM) {
 							def_val = sub->get_datatype().to_string();
@@ -995,9 +995,8 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 	ERR_FAIL_COND(p_recursion_depth > COMPLETION_RECURSION_LIMIT);
 
 	GDScriptParser::DataType base_type = p_base.type;
-	bool _static = base_type.is_meta_type;
 
-	if (_static && base_type.kind != GDScriptParser::DataType::BUILTIN) {
+	if (base_type.is_meta_type && base_type.kind != GDScriptParser::DataType::BUILTIN && base_type.kind != GDScriptParser::DataType::ENUM) {
 		ScriptLanguage::CodeCompletionOption option("new", ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION, ScriptLanguage::LOCATION_LOCAL);
 		option.insert_text += "(";
 		r_result.insert(option.display, option);
@@ -1006,7 +1005,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 	while (!base_type.has_no_type()) {
 		switch (base_type.kind) {
 			case GDScriptParser::DataType::CLASS: {
-				_find_identifiers_in_class(base_type.class_type, p_only_functions, _static, false, r_result, p_recursion_depth + 1);
+				_find_identifiers_in_class(base_type.class_type, p_only_functions, base_type.is_meta_type, false, r_result, p_recursion_depth + 1);
 				// This already finds all parent identifiers, so we are done.
 				base_type = GDScriptParser::DataType();
 			} break;
@@ -1014,7 +1013,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 				Ref<Script> scr = base_type.script_type;
 				if (scr.is_valid()) {
 					if (!p_only_functions) {
-						if (!_static) {
+						if (!base_type.is_meta_type) {
 							List<PropertyInfo> members;
 							scr->get_script_property_list(&members);
 							for (const PropertyInfo &E : members) {
@@ -1090,7 +1089,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 						r_result.insert(option.display, option);
 					}
 
-					if (!_static || Engine::get_singleton()->has_singleton(type)) {
+					if (!base_type.is_meta_type || Engine::get_singleton()->has_singleton(type)) {
 						List<PropertyInfo> pinfo;
 						ClassDB::get_property_list(type, &pinfo);
 						for (const PropertyInfo &E : pinfo) {
@@ -1107,7 +1106,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 					}
 				}
 
-				bool only_static = _static && !Engine::get_singleton()->has_singleton(type);
+				bool only_static = base_type.is_meta_type && !Engine::get_singleton()->has_singleton(type);
 
 				List<MethodInfo> methods;
 				ClassDB::get_method_list(type, &methods, false, true);
@@ -1129,6 +1128,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 				}
 				return;
 			} break;
+			case GDScriptParser::DataType::ENUM:
 			case GDScriptParser::DataType::BUILTIN: {
 				Callable::CallError err;
 				Variant tmp;
@@ -1156,6 +1156,10 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 				List<MethodInfo> methods;
 				tmp.get_method_list(&methods);
 				for (const MethodInfo &E : methods) {
+					if (base_type.kind == GDScriptParser::DataType::ENUM && base_type.is_meta_type && !(E.flags & METHOD_FLAG_CONST)) {
+						// Enum types are static and cannot change, therefore we skip non-const dictionary methods.
+						continue;
+					}
 					ScriptLanguage::CodeCompletionOption option(E.name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
 					if (E.arguments.size()) {
 						option.insert_text += "(";
@@ -1364,6 +1368,9 @@ static bool _guess_expression_type(GDScriptParser::CompletionContext &p_context,
 	if (p_expression->is_constant) {
 		// Already has a value, so just use that.
 		r_type = _type_from_variant(p_expression->reduced_value);
+		if (p_expression->get_datatype().kind == GDScriptParser::DataType::ENUM) {
+			r_type.type = p_expression->get_datatype();
+		}
 		found = true;
 	} else {
 		switch (p_expression->type) {
@@ -1856,9 +1863,9 @@ static bool _guess_identifier_type(GDScriptParser::CompletionContext &p_context,
 					}
 					break;
 				case GDScriptParser::SuiteNode::Local::PARAMETER:
-					if (local.parameter->default_value) {
-						last_assign_line = local.parameter->default_value->end_line;
-						last_assigned_expression = local.parameter->default_value;
+					if (local.parameter->initializer) {
+						last_assign_line = local.parameter->initializer->end_line;
+						last_assigned_expression = local.parameter->initializer;
 					}
 					is_function_parameter = true;
 					break;
@@ -1939,12 +1946,12 @@ static bool _guess_identifier_type(GDScriptParser::CompletionContext &p_context,
 						if ((!id_type.is_set() || id_type.is_variant()) && parameter->get_datatype().is_hard_type()) {
 							id_type = parameter->get_datatype();
 						}
-						if (parameter->default_value) {
+						if (parameter->initializer) {
 							GDScriptParser::CompletionContext c = p_context;
 							c.current_function = parent_function;
 							c.current_class = base_type.class_type;
 							c.base = nullptr;
-							if (_guess_expression_type(c, parameter->default_value, r_type)) {
+							if (_guess_expression_type(c, parameter->initializer, r_type)) {
 								return true;
 							}
 						}
@@ -2977,7 +2984,9 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 					// The path needs quotes if it's not a valid identifier (with an exception
 					// for "/" as path separator, which also doesn't require quotes).
 					if (!opt.replace("/", "_").is_valid_identifier()) {
-						opt = opt.quote(quote_style); // Handle user preference.
+						// Ignore quote_style and just use double quotes for paths with apostrophes.
+						// Double quotes don't need to be checked because they're not valid in node and property names.
+						opt = opt.quote(opt.contains("'") ? "\"" : quote_style); // Handle user preference.
 					}
 					ScriptLanguage::CodeCompletionOption option(opt, ScriptLanguage::CODE_COMPLETION_KIND_NODE_PATH);
 					options.insert(option.display, option);
