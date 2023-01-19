@@ -1736,11 +1736,11 @@ String AnimationPlayer::get_assigned_animation() const {
 }
 
 void AnimationPlayer::pause() {
-	_stop_internal(false);
+	_stop_internal(false, false);
 }
 
-void AnimationPlayer::stop() {
-	_stop_internal(true);
+void AnimationPlayer::stop(bool p_keep_state) {
+	_stop_internal(true, p_keep_state);
 }
 
 void AnimationPlayer::set_speed_scale(float p_speed) {
@@ -1960,14 +1960,18 @@ void AnimationPlayer::_set_process(bool p_process, bool p_force) {
 	processing = p_process;
 }
 
-void AnimationPlayer::_stop_internal(bool p_reset) {
+void AnimationPlayer::_stop_internal(bool p_reset, bool p_keep_state) {
 	_stop_playing_caches(p_reset);
 	Playback &c = playback;
 	c.blend.clear();
 	if (p_reset) {
-		is_stopping = true;
-		seek(0, true);
-		is_stopping = false;
+		if (p_keep_state) {
+			c.current.pos = 0;
+		} else {
+			is_stopping = true;
+			seek(0, true);
+			is_stopping = false;
+		}
 		c.current.from = nullptr;
 		c.current.speed_scale = 1;
 	}
@@ -2100,7 +2104,7 @@ Ref<AnimatedValuesBackup> AnimationPlayer::apply_reset(bool p_user_initiated) {
 		Ref<AnimatedValuesBackup> new_values = aux_player->backup_animated_values();
 		old_values->restore();
 
-		Ref<EditorUndoRedoManager> &ur = EditorNode::get_undo_redo();
+		EditorUndoRedoManager *ur = EditorUndoRedoManager::get_singleton();
 		ur->create_action(TTR("Animation Apply Reset"));
 		ur->add_do_method(new_values.ptr(), "restore");
 		ur->add_undo_method(old_values.ptr(), "restore");
@@ -2139,7 +2143,7 @@ void AnimationPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("play", "name", "custom_blend", "custom_speed", "from_end"), &AnimationPlayer::play, DEFVAL(""), DEFVAL(-1), DEFVAL(1.0), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("play_backwards", "name", "custom_blend"), &AnimationPlayer::play_backwards, DEFVAL(""), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("pause"), &AnimationPlayer::pause);
-	ClassDB::bind_method(D_METHOD("stop"), &AnimationPlayer::stop);
+	ClassDB::bind_method(D_METHOD("stop", "keep_state"), &AnimationPlayer::stop, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("is_playing"), &AnimationPlayer::is_playing);
 
 	ClassDB::bind_method(D_METHOD("set_current_animation", "anim"), &AnimationPlayer::set_current_animation);

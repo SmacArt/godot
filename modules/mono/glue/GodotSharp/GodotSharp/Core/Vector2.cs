@@ -390,24 +390,6 @@ namespace Godot
         }
 
         /// <summary>
-        /// Returns the result of the linear interpolation between
-        /// this vector and <paramref name="to"/> by the vector amount <paramref name="weight"/>.
-        /// </summary>
-        /// <param name="to">The destination vector for interpolation.</param>
-        /// <param name="weight">
-        /// A vector with components on the range of 0.0 to 1.0, representing the amount of interpolation.
-        /// </param>
-        /// <returns>The resulting vector of the interpolation.</returns>
-        public readonly Vector2 Lerp(Vector2 to, Vector2 weight)
-        {
-            return new Vector2
-            (
-                Mathf.Lerp(x, to.x, weight.x),
-                Mathf.Lerp(y, to.y, weight.y)
-            );
-        }
-
-        /// <summary>
         /// Returns the vector with a maximum length by limiting its length to <paramref name="length"/>.
         /// </summary>
         /// <param name="length">The length to limit to.</param>
@@ -539,11 +521,12 @@ namespace Godot
         /// <returns>The rotated vector.</returns>
         public readonly Vector2 Rotated(real_t angle)
         {
-            real_t sine = Mathf.Sin(angle);
-            real_t cosi = Mathf.Cos(angle);
-            return new Vector2(
-                x * cosi - y * sine,
-                x * sine + y * cosi);
+            (real_t sin, real_t cos) = Mathf.SinCos(angle);
+            return new Vector2
+            (
+                x * cos - y * sin,
+                x * sin + y * cos
+            );
         }
 
         /// <summary>
@@ -693,7 +676,8 @@ namespace Godot
         /// <returns>The resulting vector.</returns>
         public static Vector2 FromAngle(real_t angle)
         {
-            return new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            (real_t sin, real_t cos) = Mathf.SinCos(angle);
+            return new Vector2(cos, sin);
         }
 
         /// <summary>
