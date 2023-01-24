@@ -212,7 +212,7 @@ StringName AnimationNodeStateMachinePlayback::get_current_node() const {
 	return current;
 }
 
-StringName AnimationNodeStateMachinePlayback::get_blend_from_node() const {
+StringName AnimationNodeStateMachinePlayback::get_fading_from_node() const {
 	return fading_from;
 }
 
@@ -411,9 +411,11 @@ double AnimationNodeStateMachinePlayback::_process(AnimationNodeStateMachine *p_
 				// can't travel, then teleport
 				if (p_state_machine->states.has(travel_request)) {
 					path.clear();
-					current = travel_request;
-					play_start = true;
-					reset_request = reset_request_on_teleport;
+					if (current != travel_request || reset_request_on_teleport) {
+						current = travel_request;
+						play_start = true;
+						reset_request = reset_request_on_teleport;
+					}
 				} else {
 					StringName node = travel_request;
 					travel_request = StringName();
@@ -703,6 +705,7 @@ void AnimationNodeStateMachinePlayback::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_current_node"), &AnimationNodeStateMachinePlayback::get_current_node);
 	ClassDB::bind_method(D_METHOD("get_current_play_position"), &AnimationNodeStateMachinePlayback::get_current_play_pos);
 	ClassDB::bind_method(D_METHOD("get_current_length"), &AnimationNodeStateMachinePlayback::get_current_length);
+	ClassDB::bind_method(D_METHOD("get_fading_from_node"), &AnimationNodeStateMachinePlayback::get_fading_from_node);
 	ClassDB::bind_method(D_METHOD("get_travel_path"), &AnimationNodeStateMachinePlayback::get_travel_path);
 }
 
