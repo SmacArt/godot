@@ -34,6 +34,7 @@
 
 #include "autonomous_agents_2d.h"
 #include "autonomous_agents_path_2d.h"
+#include "autonomous_agents_steering_behavior_group.h"
 #include "editor/autonomous_agents_path_2d_editor_plugin.h"
 
 
@@ -42,6 +43,7 @@ void initialize_autage_module(ModuleInitializationLevel p_level) {
     GDREGISTER_CLASS(AutonomousAgents2D);
     GDREGISTER_CLASS(AutonomousAgentsPath2D);
     GDREGISTER_CLASS(AutonomousAgentsPathNode2D);
+    GDREGISTER_CLASS(AutonomousAgentsSteeringBehaviorGroup);
   }
 
 #ifdef TOOLS_ENABLED

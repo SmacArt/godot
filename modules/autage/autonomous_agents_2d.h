@@ -33,6 +33,7 @@
 #include "core/math/dynamic_bvh.h"
 #include "core/templates/paged_array.h"
 #include "autonomous_agents_path_2d.h"
+#include "autonomous_agents_steering_behavior.h"
 
 class AutonomousAgents2D : public Node2D {
 private:
@@ -42,58 +43,6 @@ public:
   enum DrawOrder {
     DRAW_ORDER_INDEX,
     DRAW_ORDER_LIFETIME
-  };
-
-  enum SteeringBehavior {
-    STEERING_BEHAVIOR_ALIGN = 1 << 0,
-    STEERING_BEHAVIOR_ARRIVE = 1 << 1,
-    STEERING_BEHAVIOR_COLLISION_AVOIDANCE = 1 << 2,
-    STEERING_BEHAVIOR_EVADE = 1 << 3,
-    STEERING_BEHAVIOR_FACE = 1 << 4,
-    STEERING_BEHAVIOR_FLEE = 1 << 5,
-    STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING = 1 << 6,
-    STEERING_BEHAVIOR_REMOTELY_CONTROLLED = 1 << 7,
-    STEERING_BEHAVIOR_PATH_FOLLOWING = 1 << 8,
-    STEERING_BEHAVIOR_PURSUE = 1 << 9,
-    STEERING_BEHAVIOR_SEEK = 1 << 10,
-    STEERING_BEHAVIOR_SEPARATION = 1 << 11,
-    STEERING_BEHAVIOR_VELOCITY_MATCHING = 1 << 12,
-    STEERING_BEHAVIOR_WANDER = 1 << 13
-  };
-
-  struct SteeringBehaviorFlag
-  {
-    void set(SteeringBehavior flag)
-    {
-      value |= (int)flag;
-    }
-
-    void unset(SteeringBehavior flag)
-    {
-      value &= ~(int)flag;
-    }
-
-    void flip(SteeringBehavior flag)
-    {
-      value ^= (int)flag;
-    }
-
-    //Check whether a flag is set to true
-    inline bool has(SteeringBehavior flag)
-    {
-      return (value & (int)flag) == (int)flag;
-    }
-
-    bool has_any(SteeringBehavior multi_flag)
-    {
-      return (value & (int)multi_flag) != 0;
-    }
-
-    void clear() {
-      value = 0;
-    }
-
-    uint32_t value = 0;
   };
 
   enum Parameter {
@@ -782,6 +731,6 @@ VARIANT_ENUM_CAST(AutonomousAgents2D::DrawOrder)
 VARIANT_ENUM_CAST(AutonomousAgents2D::Parameter)
 VARIANT_ENUM_CAST(AutonomousAgents2D::AgentFlag)
 VARIANT_ENUM_CAST(AutonomousAgents2D::EmissionShape)
-VARIANT_ENUM_CAST(AutonomousAgents2D::SteeringBehavior)
+VARIANT_ENUM_CAST(SteeringBehavior)
 
 #endif // AUTONOMOUS_AGENTS_2D_H
