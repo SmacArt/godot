@@ -899,10 +899,6 @@ void EditorExportPlatformAndroid::_fix_manifest(const Ref<EditorExportPreset> &p
 	bool screen_support_large = p_preset->get("screen/support_large");
 	bool screen_support_xlarge = p_preset->get("screen/support_xlarge");
 
-	int xr_mode_index = p_preset->get("xr_features/xr_mode");
-	int hand_tracking_index = p_preset->get("xr_features/hand_tracking");
-	int hand_tracking_frequency_index = p_preset->get("xr_features/hand_tracking_frequency");
-
 	bool backup_allowed = p_preset->get("user_data_backup/allow");
 	int app_category = p_preset->get("package/app_category");
 	bool retain_data_on_uninstall = p_preset->get("package/retain_data_on_uninstall");
@@ -1027,6 +1023,10 @@ void EditorExportPlatformAndroid::_fix_manifest(const Ref<EditorExportPreset> &p
 						encode_uint32(is_resizeable, &p_manifest.write[iofs + 16]);
 					}
 
+					if (tname == "provider" && attrname == "authorities") {
+						string_table.write[attr_value] = get_package_name(package_name) + String(".fileprovider");
+					}
+
 					if (tname == "supports-screens") {
 						if (attrname == "smallScreens") {
 							encode_uint32(screen_support_small ? 0xFFFFFFFF : 0, &p_manifest.write[iofs + 16]);
@@ -1039,25 +1039,6 @@ void EditorExportPlatformAndroid::_fix_manifest(const Ref<EditorExportPreset> &p
 
 						} else if (attrname == "xlargeScreens") {
 							encode_uint32(screen_support_xlarge ? 0xFFFFFFFF : 0, &p_manifest.write[iofs + 16]);
-						}
-					}
-
-					// Hand tracking related configurations
-					if (xr_mode_index == XR_MODE_OPENXR && hand_tracking_index > XR_HAND_TRACKING_NONE) {
-						if (tname == "meta-data" && attrname == "name" && value == "xr_hand_tracking_metadata_name") {
-							string_table.write[attr_value] = "com.oculus.handtracking.frequency";
-						}
-
-						if (tname == "meta-data" && attrname == "value" && value == "xr_hand_tracking_metadata_value") {
-							string_table.write[attr_value] = (hand_tracking_frequency_index == XR_HAND_TRACKING_FREQUENCY_LOW ? "LOW" : "HIGH");
-						}
-
-						if (tname == "meta-data" && attrname == "name" && value == "xr_hand_tracking_version_name") {
-							string_table.write[attr_value] = "com.oculus.handtracking.version";
-						}
-
-						if (tname == "meta-data" && attrname == "value" && value == "xr_hand_tracking_version_value") {
-							string_table.write[attr_value] = "V2.0";
 						}
 					}
 
@@ -1074,28 +1055,6 @@ void EditorExportPlatformAndroid::_fix_manifest(const Ref<EditorExportPreset> &p
 					Vector<String> feature_names;
 					Vector<bool> feature_required_list;
 					Vector<int> feature_versions;
-
-					if (xr_mode_index == XR_MODE_OPENXR) {
-						// Set degrees of freedom
-						feature_names.push_back("android.hardware.vr.headtracking");
-						feature_required_list.push_back(true);
-						feature_versions.push_back(1);
-
-						// Check for hand tracking
-						if (hand_tracking_index > XR_HAND_TRACKING_NONE) {
-							feature_names.push_back("oculus.software.handtracking");
-							feature_required_list.push_back(hand_tracking_index == XR_HAND_TRACKING_REQUIRED);
-							feature_versions.push_back(-1); // no version attribute should be added.
-						}
-
-						// Check for passthrough
-						int passthrough_mode = p_preset->get("xr_features/passthrough");
-						if (passthrough_mode > XR_PASSTHROUGH_NONE) {
-							feature_names.push_back("com.oculus.feature.PASSTHROUGH");
-							feature_required_list.push_back(passthrough_mode == XR_PASSTHROUGH_REQUIRED);
-							feature_versions.push_back(-1);
-						}
-					}
 
 					if (feature_names.size() > 0) {
 						ofs += 24; // skip over end tag
@@ -1716,6 +1675,7 @@ Vector<EditorExportPlatformAndroid::ABI> EditorExportPlatformAndroid::get_enable
 
 void EditorExportPlatformAndroid::get_preset_features(const Ref<EditorExportPreset> &p_preset, List<String> *r_features) const {
 	r_features->push_back("etc2");
+	r_features->push_back("astc");
 
 	Vector<ABI> abis = get_enabled_abis(p_preset);
 	for (int i = 0; i < abis.size(); ++i) {
@@ -2334,6 +2294,12 @@ bool EditorExportPlatformAndroid::has_valid_project_configuration(const Ref<Edit
 	int xr_mode_index = p_preset->get("xr_features/xr_mode");
 	int hand_tracking = p_preset->get("xr_features/hand_tracking");
 	int passthrough_mode = p_preset->get("xr_features/passthrough");
+	if (xr_mode_index == XR_MODE_OPENXR && !custom_build_enabled) {
+		valid = false;
+		err += TTR("OpenXR requires \"Use Custom Build\" to be enabled");
+		err += "\n";
+	}
+
 	if (xr_mode_index != XR_MODE_OPENXR) {
 		if (hand_tracking > XR_HAND_TRACKING_NONE) {
 			valid = false;

@@ -782,6 +782,7 @@ static void _find_annotation_arguments(const GDScriptParser::AnnotationNode *p_a
 		}
 	} else if (p_annotation->name == SNAME("@export_node_path")) {
 		ScriptLanguage::CodeCompletionOption node("Node", ScriptLanguage::CODE_COMPLETION_KIND_CLASS);
+		node.insert_text = node.display.quote(p_quote_style);
 		r_result.insert(node.display, node);
 		List<StringName> node_types;
 		ClassDB::get_inheriters_from_class("Node", &node_types);
@@ -790,11 +791,13 @@ static void _find_annotation_arguments(const GDScriptParser::AnnotationNode *p_a
 				continue;
 			}
 			ScriptLanguage::CodeCompletionOption option(E, ScriptLanguage::CODE_COMPLETION_KIND_CLASS);
+			option.insert_text = option.display.quote(p_quote_style);
 			r_result.insert(option.display, option);
 		}
 	} else if (p_annotation->name == SNAME("@warning_ignore")) {
 		for (int warning_code = 0; warning_code < GDScriptWarning::WARNING_MAX; warning_code++) {
 			ScriptLanguage::CodeCompletionOption warning(GDScriptWarning::get_name_from_code((GDScriptWarning::Code)warning_code).to_lower(), ScriptLanguage::CODE_COMPLETION_KIND_PLAIN_TEXT);
+			warning.insert_text = warning.display.quote(p_quote_style);
 			r_result.insert(warning.display, warning);
 		}
 	}
@@ -1950,17 +1953,19 @@ static bool _guess_identifier_type(GDScriptParser::CompletionContext &p_context,
 				case GDScriptParser::DataType::CLASS:
 					if (base_type.class_type->has_function(p_context.current_function->identifier->name)) {
 						GDScriptParser::FunctionNode *parent_function = base_type.class_type->get_member(p_context.current_function->identifier->name).function;
-						const GDScriptParser::ParameterNode *parameter = parent_function->parameters[parent_function->parameters_indices[p_identifier]];
-						if ((!id_type.is_set() || id_type.is_variant()) && parameter->get_datatype().is_hard_type()) {
-							id_type = parameter->get_datatype();
-						}
-						if (parameter->initializer) {
-							GDScriptParser::CompletionContext c = p_context;
-							c.current_function = parent_function;
-							c.current_class = base_type.class_type;
-							c.base = nullptr;
-							if (_guess_expression_type(c, parameter->initializer, r_type)) {
-								return true;
+						if (parent_function->parameters_indices.has(p_identifier)) {
+							const GDScriptParser::ParameterNode *parameter = parent_function->parameters[parent_function->parameters_indices[p_identifier]];
+							if ((!id_type.is_set() || id_type.is_variant()) && parameter->get_datatype().is_hard_type()) {
+								id_type = parameter->get_datatype();
+							}
+							if (parameter->initializer) {
+								GDScriptParser::CompletionContext c = p_context;
+								c.current_function = parent_function;
+								c.current_class = base_type.class_type;
+								c.base = nullptr;
+								if (_guess_expression_type(c, parameter->initializer, r_type)) {
+									return true;
+								}
 							}
 						}
 					}

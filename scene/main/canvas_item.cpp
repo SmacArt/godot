@@ -154,17 +154,7 @@ Transform2D CanvasItem::get_global_transform_with_canvas() const {
 
 Transform2D CanvasItem::get_screen_transform() const {
 	ERR_FAIL_COND_V(!is_inside_tree(), Transform2D());
-	Transform2D xform = get_global_transform_with_canvas();
-
-	Window *w = Object::cast_to<Window>(get_viewport());
-	if (w && !w->is_embedding_subwindows()) {
-		Transform2D s;
-		s.set_origin(w->get_position());
-
-		xform = s * xform;
-	}
-
-	return xform;
+	return get_viewport()->get_popup_base_transform() * get_global_transform_with_canvas();
 }
 
 Transform2D CanvasItem::get_global_transform() const {
@@ -195,7 +185,7 @@ void CanvasItem::_top_level_raise_self() {
 }
 
 void CanvasItem::_enter_canvas() {
-	// Resolves to nullptr if the node is toplevel.
+	// Resolves to nullptr if the node is top_level.
 	CanvasItem *parent_item = get_parent_item();
 
 	if (parent_item) {
@@ -410,9 +400,26 @@ void CanvasItem::set_as_top_level(bool p_top_level) {
 
 	_exit_canvas();
 	top_level = p_top_level;
+	_top_level_changed();
 	_enter_canvas();
 
 	_notify_transform();
+}
+
+void CanvasItem::_top_level_changed() {
+	// Inform children that top_level status has changed on a parent.
+	int children = get_child_count();
+	for (int i = 0; i < children; i++) {
+		CanvasItem *child = Object::cast_to<CanvasItem>(get_child(i));
+		if (child) {
+			child->_top_level_changed_on_parent();
+		}
+	}
+}
+
+void CanvasItem::_top_level_changed_on_parent() {
+	// Inform children that top_level status has changed on a parent.
+	_top_level_changed();
 }
 
 bool CanvasItem::is_set_as_top_level() const {
@@ -925,6 +932,12 @@ void CanvasItem::force_update_transform() {
 	get_tree()->xform_change_list.remove(&xform_change);
 
 	notification(NOTIFICATION_TRANSFORM_CHANGED);
+}
+
+void CanvasItem::_validate_property(PropertyInfo &p_property) const {
+	if (hide_clip_children && p_property.name == "clip_children") {
+		p_property.usage = PROPERTY_USAGE_NONE;
+	}
 }
 
 void CanvasItem::_bind_methods() {

@@ -581,6 +581,7 @@ void EditorNode::_notification(int p_what) {
 
 			ResourceImporterTexture::get_singleton()->update_imports();
 
+			bottom_panel_updating = false;
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
@@ -643,7 +644,7 @@ void EditorNode::_notification(int p_what) {
 			}
 
 			RenderingServer::get_singleton()->viewport_set_disable_2d(get_scene_root()->get_viewport_rid(), true);
-			RenderingServer::get_singleton()->viewport_set_disable_environment(get_viewport()->get_viewport_rid(), true);
+			RenderingServer::get_singleton()->viewport_set_environment_mode(get_viewport()->get_viewport_rid(), RenderingServer::VIEWPORT_ENVIRONMENT_DISABLED);
 
 			feature_profile_manager->notify_changed();
 
@@ -2096,14 +2097,25 @@ void EditorNode::edit_item(Object *p_object, Object *p_editing_owner) {
 	if (!item_plugins.is_empty()) {
 		ObjectID owner_id = p_editing_owner->get_instance_id();
 
+		List<EditorPlugin *> to_remove;
 		for (EditorPlugin *plugin : active_plugins[owner_id]) {
 			if (!item_plugins.has(plugin)) {
+				// Remove plugins no longer used by this editing owner.
+				to_remove.push_back(plugin);
 				plugin->make_visible(false);
 				plugin->edit(nullptr);
 			}
 		}
 
+		for (EditorPlugin *plugin : to_remove) {
+			active_plugins[owner_id].erase(plugin);
+		}
+
 		for (EditorPlugin *plugin : item_plugins) {
+			if (active_plugins[owner_id].has(plugin)) {
+				continue;
+			}
+
 			for (KeyValue<ObjectID, HashSet<EditorPlugin *>> &kv : active_plugins) {
 				if (kv.key != owner_id) {
 					EditorPropertyResource *epres = Object::cast_to<EditorPropertyResource>(ObjectDB::get_instance(kv.key));
@@ -2121,6 +2133,13 @@ void EditorNode::edit_item(Object *p_object, Object *p_editing_owner) {
 		}
 	} else {
 		hide_unused_editors(p_editing_owner);
+	}
+}
+
+void EditorNode::push_node_item(Node *p_node) {
+	if (p_node || Object::cast_to<Node>(InspectorDock::get_inspector_singleton()->get_edited_object())) {
+		// Don't push null if the currently edited object is not a Node.
+		push_item(p_node);
 	}
 }
 
@@ -3902,7 +3921,7 @@ Error EditorNode::load_scene(const String &p_scene, bool p_ignore_broken_deps, b
 		Ref<SceneState> state = sdata->get_state();
 		state->set_path(lpath);
 		new_scene->set_scene_inherited_state(state);
-		new_scene->set_scene_file_path(lpath);
+		new_scene->set_scene_file_path(String());
 	}
 
 	new_scene->set_scene_instance_state(Ref<SceneState>());
@@ -5590,12 +5609,16 @@ void EditorNode::remove_bottom_panel_item(Control *p_item) {
 }
 
 void EditorNode::_bottom_panel_switch(bool p_enable, int p_idx) {
+	if (bottom_panel_updating) {
+		return;
+	}
 	ERR_FAIL_INDEX(p_idx, bottom_panel_items.size());
 
 	if (bottom_panel_items[p_idx].control->is_visible() == p_enable) {
 		return;
 	}
 
+	bottom_panel_updating = true;
 	if (p_enable) {
 		for (int i = 0; i < bottom_panel_items.size(); i++) {
 			bottom_panel_items[i].button->set_pressed(i == p_idx);
@@ -6113,6 +6136,7 @@ void EditorNode::reload_instances_with_path_in_edited_scenes(const String &p_ins
 						Ref<SceneState> state = current_packed_scene->get_state();
 						state->set_path(current_packed_scene->get_path());
 						instantiated_node->set_scene_inherited_state(state);
+						instantiated_node->set_scene_file_path(String());
 					}
 					editor_data.set_edited_scene_root(instantiated_node);
 					current_edited_scene = instantiated_node;
@@ -6194,7 +6218,7 @@ void EditorNode::reload_instances_with_path_in_edited_scenes(const String &p_ins
 						List<PropertyInfo> pinfo;
 						modifiable_node->get_property_list(&pinfo);
 
-						// Get names of all valid property names (TODO: make this more efficent).
+						// Get names of all valid property names (TODO: make this more efficient).
 						List<String> property_names;
 						for (const PropertyInfo &E2 : pinfo) {
 							if (E2.usage & PROPERTY_USAGE_STORAGE) {
@@ -6212,7 +6236,7 @@ void EditorNode::reload_instances_with_path_in_edited_scenes(const String &p_ins
 						for (const ConnectionWithNodePath &E2 : E.value.connections_to) {
 							Connection conn = E2.connection;
 
-							// Get the node the callable is targetting.
+							// Get the node the callable is targeting.
 							Node *target_node = cast_to<Node>(conn.callable.get_object());
 
 							// If the callable object no longer exists or is marked for deletion,
@@ -6450,7 +6474,6 @@ void EditorNode::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_gui_base"), &EditorNode::get_gui_base);
 
 	ADD_SIGNAL(MethodInfo("play_pressed"));
-	ADD_SIGNAL(MethodInfo("pause_pressed"));
 	ADD_SIGNAL(MethodInfo("stop_pressed"));
 	ADD_SIGNAL(MethodInfo("request_help_search"));
 	ADD_SIGNAL(MethodInfo("script_add_function_request", PropertyInfo(Variant::OBJECT, "obj"), PropertyInfo(Variant::STRING, "function"), PropertyInfo(Variant::PACKED_STRING_ARRAY, "args")));
@@ -7261,6 +7284,7 @@ EditorNode::EditorNode() {
 		project_title->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
 		project_title->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
 		project_title->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		project_title->set_mouse_filter(Control::MOUSE_FILTER_PASS);
 		left_spacer->add_child(project_title);
 	}
 

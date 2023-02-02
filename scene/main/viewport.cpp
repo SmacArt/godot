@@ -524,7 +524,12 @@ void Viewport::_process_picking() {
 	if (!physics_object_picking) {
 		return;
 	}
-	if (to_screen_rect != Rect2i() && Input::get_singleton()->get_mouse_mode() == Input::MOUSE_MODE_CAPTURED) {
+	if (Object::cast_to<Window>(this) && Input::get_singleton()->get_mouse_mode() == Input::MOUSE_MODE_CAPTURED) {
+		return;
+	}
+	if (!gui.mouse_in_viewport) {
+		// Clear picking events if mouse has left viewport.
+		physics_picking_events.clear();
 		return;
 	}
 
@@ -704,25 +709,15 @@ void Viewport::_process_picking() {
 		}
 
 #ifndef _3D_DISABLED
-		bool captured = false;
-
+		CollisionObject3D *capture_object = nullptr;
 		if (physics_object_capture.is_valid()) {
-			CollisionObject3D *co = Object::cast_to<CollisionObject3D>(ObjectDB::get_instance(physics_object_capture));
-			if (co && camera_3d) {
-				_collision_object_3d_input_event(co, camera_3d, ev, Vector3(), Vector3(), 0);
-				captured = true;
-				if (mb.is_valid() && mb->get_button_index() == MouseButton::LEFT && !mb->is_pressed()) {
-					physics_object_capture = ObjectID();
-				}
-
-			} else {
+			capture_object = Object::cast_to<CollisionObject3D>(ObjectDB::get_instance(physics_object_capture));
+			if (!capture_object || !camera_3d || (mb.is_valid() && mb->get_button_index() == MouseButton::LEFT && !mb->is_pressed())) {
 				physics_object_capture = ObjectID();
 			}
 		}
 
-		if (captured) {
-			// None.
-		} else if (pos == last_pos) {
+		if (pos == last_pos) {
 			if (last_id.is_valid()) {
 				if (ObjectDB::get_instance(last_id) && last_object) {
 					// Good, exists.
@@ -748,13 +743,12 @@ void Viewport::_process_picking() {
 
 					bool col = space->intersect_ray(ray_params, result);
 					ObjectID new_collider;
-					if (col) {
-						CollisionObject3D *co = Object::cast_to<CollisionObject3D>(result.collider);
-						if (co && co->can_process()) {
-							_collision_object_3d_input_event(co, camera_3d, ev, result.position, result.normal, result.shape);
+					CollisionObject3D *co = col ? Object::cast_to<CollisionObject3D>(result.collider) : nullptr;
+					if (co && co->can_process()) {
+						new_collider = result.collider_id;
+						if (!capture_object) {
 							last_object = co;
 							last_id = result.collider_id;
-							new_collider = last_id;
 							if (co->get_capture_input_on_drag() && mb.is_valid() && mb->get_button_index() == MouseButton::LEFT && mb->is_pressed()) {
 								physics_object_capture = last_id;
 							}
@@ -763,20 +757,23 @@ void Viewport::_process_picking() {
 
 					if (is_mouse && new_collider != physics_object_over) {
 						if (physics_object_over.is_valid()) {
-							CollisionObject3D *co = Object::cast_to<CollisionObject3D>(ObjectDB::get_instance(physics_object_over));
-							if (co) {
-								co->_mouse_exit();
+							CollisionObject3D *previous_co = Object::cast_to<CollisionObject3D>(ObjectDB::get_instance(physics_object_over));
+							if (previous_co) {
+								previous_co->_mouse_exit();
 							}
 						}
 
 						if (new_collider.is_valid()) {
-							CollisionObject3D *co = Object::cast_to<CollisionObject3D>(ObjectDB::get_instance(new_collider));
-							if (co) {
-								co->_mouse_enter();
-							}
+							DEV_ASSERT(co);
+							co->_mouse_enter();
 						}
 
 						physics_object_over = new_collider;
+					}
+					if (capture_object) {
+						_collision_object_3d_input_event(capture_object, camera_3d, ev, result.position, result.normal, result.shape);
+					} else if (new_collider.is_valid()) {
+						_collision_object_3d_input_event(co, camera_3d, ev, result.position, result.normal, result.shape);
 					}
 				}
 
@@ -799,16 +796,21 @@ void Viewport::update_canvas_items() {
 	_update_canvas_items(this);
 }
 
-void Viewport::_set_size(const Size2i &p_size, const Size2i &p_size_2d_override, const Rect2i &p_to_screen_rect, const Transform2D &p_stretch_transform, bool p_allocated) {
-	if (size == p_size && size_allocated == p_allocated && stretch_transform == p_stretch_transform && p_size_2d_override == size_2d_override && to_screen_rect == p_to_screen_rect) {
+void Viewport::_set_size(const Size2i &p_size, const Size2i &p_size_2d_override, bool p_allocated) {
+	Transform2D stretch_transform_new = Transform2D();
+	if (is_size_2d_override_stretch_enabled() && p_size_2d_override.width > 0 && p_size_2d_override.height > 0) {
+		Size2 scale = Size2(p_size) / Size2(p_size_2d_override);
+		stretch_transform_new.scale(scale);
+	}
+
+	if (size == p_size && size_allocated == p_allocated && stretch_transform == stretch_transform_new && p_size_2d_override == size_2d_override) {
 		return;
 	}
 
 	size = p_size;
 	size_allocated = p_allocated;
 	size_2d_override = p_size_2d_override;
-	stretch_transform = p_stretch_transform;
-	to_screen_rect = p_to_screen_rect;
+	stretch_transform = stretch_transform_new;
 
 #ifndef _3D_DISABLED
 	if (!use_xr) {
@@ -1050,7 +1052,26 @@ Camera2D *Viewport::get_camera_2d() const {
 }
 
 Transform2D Viewport::get_final_transform() const {
-	return stretch_transform * global_canvas_transform;
+	return _get_input_pre_xform().affine_inverse() * stretch_transform * global_canvas_transform;
+}
+
+void Viewport::assign_next_enabled_camera_2d(const StringName &p_camera_group) {
+	List<Node *> camera_list;
+	get_tree()->get_nodes_in_group(p_camera_group, &camera_list);
+
+	Camera2D *new_camera = nullptr;
+	for (Node *E : camera_list) {
+		Camera2D *cam = Object::cast_to<Camera2D>(E);
+		if (cam->is_enabled()) {
+			new_camera = cam;
+			break;
+		}
+	}
+
+	_camera_2d_set(new_camera);
+	if (!camera_2d) {
+		set_canvas_transform(Transform2D());
+	}
 }
 
 void Viewport::_update_canvas_items(Node *p_node) {
@@ -1118,14 +1139,11 @@ Viewport::PositionalShadowAtlasQuadrantSubdiv Viewport::get_positional_shadow_at
 }
 
 Transform2D Viewport::_get_input_pre_xform() const {
-	Transform2D pre_xf;
-
-	if (to_screen_rect.size.x != 0 && to_screen_rect.size.y != 0) {
-		pre_xf.columns[2] = -to_screen_rect.position;
-		pre_xf.scale(Vector2(size) / to_screen_rect.size);
+	const Window *this_window = Object::cast_to<Window>(this);
+	if (this_window) {
+		return this_window->window_transform.affine_inverse();
 	}
-
-	return pre_xf;
+	return Transform2D();
 }
 
 Ref<InputEvent> Viewport::_make_input_local(const Ref<InputEvent> &ev) {
@@ -1133,7 +1151,7 @@ Ref<InputEvent> Viewport::_make_input_local(const Ref<InputEvent> &ev) {
 		return ev; // No transformation defined for null event
 	}
 
-	Transform2D ai = get_final_transform().affine_inverse() * _get_input_pre_xform();
+	Transform2D ai = get_final_transform().affine_inverse();
 	return ev->xformed_by(ai);
 }
 
@@ -1795,9 +1813,7 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 					if (w->is_embedded()) {
 						embedder = w->_get_embedder();
 
-						Transform2D ai = (get_final_transform().affine_inverse() * _get_input_pre_xform()).affine_inverse();
-
-						viewport_pos = ai.xform(mpos) + w->get_position(); // To parent coords.
+						viewport_pos = get_final_transform().xform(mpos) + w->get_position(); // To parent coords.
 					}
 				}
 			}
@@ -1847,7 +1863,7 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 
 			if (viewport_under) {
 				if (viewport_under != this) {
-					Transform2D ai = (viewport_under->get_final_transform().affine_inverse() * viewport_under->_get_input_pre_xform());
+					Transform2D ai = viewport_under->get_final_transform().affine_inverse();
 					viewport_pos = ai.xform(viewport_pos);
 				}
 				// Find control under at position.
@@ -2853,7 +2869,7 @@ bool Viewport::get_physics_object_picking() {
 }
 
 Vector2 Viewport::get_camera_coords(const Vector2 &p_viewport_coords) const {
-	Transform2D xf = get_final_transform();
+	Transform2D xf = stretch_transform * global_canvas_transform;
 	return xf.xform(p_viewport_coords);
 }
 
@@ -3245,7 +3261,7 @@ Viewport::SDFScale Viewport::get_sdf_scale() const {
 }
 
 Transform2D Viewport::get_screen_transform() const {
-	return _get_input_pre_xform().affine_inverse() * get_final_transform();
+	return get_final_transform();
 }
 
 void Viewport::set_canvas_cull_mask(uint32_t p_canvas_cull_mask) {
@@ -4108,9 +4124,26 @@ Viewport::~Viewport() {
 /////////////////////////////////
 
 void SubViewport::set_size(const Size2i &p_size) {
-	_set_size(p_size, _get_size_2d_override(), Rect2i(), _stretch_transform(), true);
+	_internal_set_size(p_size);
+}
 
+void SubViewport::set_size_force(const Size2i &p_size) {
+	// Use only for setting the size from the parent SubViewportContainer with enabled stretch mode.
+	// Don't expose function to scripting.
+	_internal_set_size(p_size, true);
+}
+
+void SubViewport::_internal_set_size(const Size2i &p_size, bool p_force) {
 	SubViewportContainer *c = Object::cast_to<SubViewportContainer>(get_parent());
+	if (!p_force && c && c->is_stretch_enabled()) {
+#ifdef DEBUG_ENABLED
+		WARN_PRINT("Can't change the size of a `SubViewport` with a `SubViewportContainer` parent that has `stretch` enabled. Set `SubViewportContainer.stretch` to `false` to allow changing the size manually.");
+#endif // DEBUG_ENABLED
+		return;
+	}
+
+	_set_size(p_size, _get_size_2d_override(), true);
+
 	if (c) {
 		c->update_minimum_size();
 	}
@@ -4121,7 +4154,7 @@ Size2i SubViewport::get_size() const {
 }
 
 void SubViewport::set_size_2d_override(const Size2i &p_size) {
-	_set_size(_get_size(), p_size, Rect2i(), _stretch_transform(), true);
+	_set_size(_get_size(), p_size, true);
 }
 
 Size2i SubViewport::get_size_2d_override() const {
@@ -4134,7 +4167,7 @@ void SubViewport::set_size_2d_override_stretch(bool p_enable) {
 	}
 
 	size_2d_override_stretch = p_enable;
-	_set_size(_get_size(), _get_size_2d_override(), Rect2i(), _stretch_transform(), true);
+	_set_size(_get_size(), _get_size_2d_override(), true);
 }
 
 bool SubViewport::is_size_2d_override_stretch_enabled() const {
@@ -4163,17 +4196,6 @@ DisplayServer::WindowID SubViewport::get_window_id() const {
 	return DisplayServer::INVALID_WINDOW_ID;
 }
 
-Transform2D SubViewport::_stretch_transform() {
-	Transform2D transform;
-	Size2i view_size_2d_override = _get_size_2d_override();
-	if (size_2d_override_stretch && view_size_2d_override.width > 0 && view_size_2d_override.height > 0) {
-		Size2 scale = Size2(_get_size()) / Size2(view_size_2d_override);
-		transform.scale(scale);
-	}
-
-	return transform;
-}
-
 Transform2D SubViewport::get_screen_transform() const {
 	Transform2D container_transform;
 	SubViewportContainer *c = Object::cast_to<SubViewportContainer>(get_parent());
@@ -4186,6 +4208,21 @@ Transform2D SubViewport::get_screen_transform() const {
 		WARN_PRINT_ONCE("SubViewport is not a child of a SubViewportContainer. get_screen_transform doesn't return the actual screen position.");
 	}
 	return container_transform * Viewport::get_screen_transform();
+}
+
+Transform2D SubViewport::get_popup_base_transform() const {
+	if (is_embedding_subwindows()) {
+		return Transform2D();
+	}
+	SubViewportContainer *c = Object::cast_to<SubViewportContainer>(get_parent());
+	if (!c) {
+		return Viewport::get_screen_transform();
+	}
+	Transform2D container_transform;
+	if (c->is_stretch_enabled()) {
+		container_transform.scale(Vector2(c->get_stretch_shrink(), c->get_stretch_shrink()));
+	}
+	return c->get_screen_transform() * container_transform * Viewport::get_screen_transform();
 }
 
 void SubViewport::_notification(int p_what) {

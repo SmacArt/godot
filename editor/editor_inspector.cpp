@@ -886,7 +886,7 @@ void EditorProperty::_update_pin_flags() {
 
 static Control *make_help_bit(const String &p_text, bool p_property) {
 	EditorHelpBit *help_bit = memnew(EditorHelpBit);
-	help_bit->get_rich_text()->set_fixed_size_to_width(360 * EDSCALE);
+	help_bit->get_rich_text()->set_custom_minimum_size(Size2(360 * EDSCALE, 1));
 
 	PackedStringArray slices = p_text.split("::", false);
 	if (slices.is_empty()) {
@@ -1084,7 +1084,7 @@ void EditorInspectorPlugin::parse_group(Object *p_object, const String &p_group)
 	GDVIRTUAL_CALL(_parse_group, p_object, p_group);
 }
 
-bool EditorInspectorPlugin::parse_property(Object *p_object, const Variant::Type p_type, const String &p_path, const PropertyHint p_hint, const String &p_hint_text, const uint32_t p_usage, const bool p_wide) {
+bool EditorInspectorPlugin::parse_property(Object *p_object, const Variant::Type p_type, const String &p_path, const PropertyHint p_hint, const String &p_hint_text, const BitField<PropertyUsageFlags> p_usage, const bool p_wide) {
 	bool ret = false;
 	GDVIRTUAL_CALL(_parse_property, p_object, p_type, p_path, p_hint, p_hint_text, p_usage, p_wide, ret);
 	return ret;

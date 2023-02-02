@@ -349,8 +349,8 @@ float Input::get_axis(const StringName &p_negative_action, const StringName &p_p
 
 Vector2 Input::get_vector(const StringName &p_negative_x, const StringName &p_positive_x, const StringName &p_negative_y, const StringName &p_positive_y, float p_deadzone) const {
 	Vector2 vector = Vector2(
-			get_action_raw_strength(p_positive_x) - get_action_raw_strength(p_negative_x),
-			get_action_raw_strength(p_positive_y) - get_action_raw_strength(p_negative_y));
+			get_action_strength(p_positive_x) - get_action_strength(p_negative_x),
+			get_action_strength(p_positive_y) - get_action_strength(p_negative_y));
 
 	if (p_deadzone < 0.0f) {
 		// If the deadzone isn't specified, get it from the average of the actions.
@@ -890,6 +890,31 @@ void Input::parse_input_event(const Ref<InputEvent> &p_event) {
 	_THREAD_SAFE_METHOD_
 
 	ERR_FAIL_COND(p_event.is_null());
+
+#ifdef DEBUG_ENABLED
+	uint64_t curr_frame = Engine::get_singleton()->get_process_frames();
+	if (curr_frame != last_parsed_frame) {
+		frame_parsed_events.clear();
+		last_parsed_frame = curr_frame;
+		frame_parsed_events.insert(p_event);
+	} else if (frame_parsed_events.has(p_event)) {
+		// It would be technically safe to send the same event in cases such as:
+		// - After an explicit flush.
+		// - In platforms using buffering when agile flushing is enabled, after one of the mid-frame flushes.
+		// - If platform doesn't use buffering and event accumulation is disabled.
+		// - If platform doesn't use buffering and the event type is not accumulable.
+		// However, it wouldn't be reasonable to ask users to remember the full ruleset and be aware at all times
+		// of the possibilities of the target platform, project settings and engine internals, which may change
+		// without prior notice.
+		// Therefore, the guideline is, "don't send the same event object more than once per frame".
+		WARN_PRINT_ONCE(
+				"An input event object is being parsed more than once in the same frame, which is unsafe.\n"
+				"If you are generating events in a script, you have to instantiate a new event instead of sending the same one more than once, unless the original one was sent on an earlier frame.\n"
+				"You can call duplicate() on the event to get a new instance with identical values.");
+	} else {
+		frame_parsed_events.insert(p_event);
+	}
+#endif
 
 	if (use_accumulated_input) {
 		if (buffered_events.is_empty() || !buffered_events.back()->get()->accumulate(p_event)) {

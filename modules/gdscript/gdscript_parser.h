@@ -122,6 +122,7 @@ public:
 		TypeSource type_source = UNDETECTED;
 
 		bool is_constant = false;
+		bool is_read_only = false;
 		bool is_meta_type = false;
 		bool is_coroutine = false; // For function calls.
 
@@ -190,7 +191,7 @@ public:
 				case SCRIPT:
 					return script_type == p_other.script_type;
 				case CLASS:
-					return class_type == p_other.class_type;
+					return class_type == p_other.class_type || class_type->fqcn == p_other.class_type->fqcn;
 				case RESOLVING:
 				case UNRESOLVED:
 					break;
@@ -206,6 +207,7 @@ public:
 		void operator=(const DataType &p_other) {
 			kind = p_other.kind;
 			type_source = p_other.type_source;
+			is_read_only = p_other.is_read_only;
 			is_constant = p_other.is_constant;
 			is_meta_type = p_other.is_meta_type;
 			is_coroutine = p_other.is_coroutine;
@@ -970,6 +972,7 @@ public:
 
 	struct ReturnNode : public Node {
 		ExpressionNode *return_value = nullptr;
+		bool void_return = false;
 
 		ReturnNode() {
 			type = RETURN;

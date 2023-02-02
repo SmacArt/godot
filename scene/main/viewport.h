@@ -275,7 +275,6 @@ private:
 
 	Ref<World2D> world_2d;
 
-	Rect2i to_screen_rect;
 	StringName input_group;
 	StringName gui_input_group;
 	StringName shortcut_input_group;
@@ -471,7 +470,7 @@ private:
 	uint64_t event_count = 0;
 
 protected:
-	void _set_size(const Size2i &p_size, const Size2i &p_size_2d_override, const Rect2i &p_to_screen_rect, const Transform2D &p_stretch_transform, bool p_allocated);
+	void _set_size(const Size2i &p_size, const Size2i &p_size_2d_override, bool p_allocated);
 
 	Size2i _get_size() const;
 	Size2i _get_size_2d_override() const;
@@ -511,6 +510,7 @@ public:
 	Transform2D get_global_canvas_transform() const;
 
 	Transform2D get_final_transform() const;
+	void assign_next_enabled_camera_2d(const StringName &p_camera_group);
 
 	void gui_set_root_order_dirty();
 
@@ -648,7 +648,10 @@ public:
 	void set_canvas_cull_mask_bit(uint32_t p_layer, bool p_enable);
 	bool get_canvas_cull_mask_bit(uint32_t p_layer) const;
 
+	virtual bool is_size_2d_override_stretch_enabled() const { return true; }
+
 	virtual Transform2D get_screen_transform() const;
+	virtual Transform2D get_popup_base_transform() const { return Transform2D(); }
 
 #ifndef _3D_DISABLED
 	bool use_xr = false;
@@ -752,21 +755,23 @@ private:
 	ClearMode clear_mode = CLEAR_MODE_ALWAYS;
 	bool size_2d_override_stretch = false;
 
+	void _internal_set_size(const Size2i &p_size, bool p_force = false);
+
 protected:
 	static void _bind_methods();
 	virtual DisplayServer::WindowID get_window_id() const override;
-	Transform2D _stretch_transform();
 	void _notification(int p_what);
 
 public:
 	void set_size(const Size2i &p_size);
 	Size2i get_size() const;
+	void set_size_force(const Size2i &p_size);
 
 	void set_size_2d_override(const Size2i &p_size);
 	Size2i get_size_2d_override() const;
 
 	void set_size_2d_override_stretch(bool p_enable);
-	bool is_size_2d_override_stretch_enabled() const;
+	bool is_size_2d_override_stretch_enabled() const override;
 
 	void set_update_mode(UpdateMode p_mode);
 	UpdateMode get_update_mode() const;
@@ -775,6 +780,7 @@ public:
 	ClearMode get_clear_mode() const;
 
 	virtual Transform2D get_screen_transform() const override;
+	virtual Transform2D get_popup_base_transform() const override;
 
 	SubViewport();
 	~SubViewport();

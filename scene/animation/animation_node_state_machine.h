@@ -118,6 +118,9 @@ class AnimationNodeStateMachinePlayback : public Resource {
 		StringName next;
 	};
 
+	double len_fade_from = 0.0;
+	double pos_fade_from = 0.0;
+
 	double len_current = 0.0;
 	double pos_current = 0.0;
 	bool end_loop = false;
@@ -164,6 +167,12 @@ public:
 	float get_current_play_pos() const;
 	float get_current_length() const;
 
+	float get_fade_from_play_pos() const;
+	float get_fade_from_length() const;
+
+	float get_fading_time() const;
+	float get_fading_pos() const;
+
 	AnimationNodeStateMachinePlayback();
 };
 
@@ -179,6 +188,7 @@ private:
 	};
 
 	HashMap<StringName, State> states;
+	bool allow_transition_to_self = false;
 
 	struct Transition {
 		StringName from;
@@ -244,6 +254,9 @@ public:
 	int get_transition_count() const;
 	void remove_transition_by_index(const int p_transition);
 	void remove_transition(const StringName &p_from, const StringName &p_to);
+
+	void set_allow_transition_to_self(bool p_enable);
+	bool is_allow_transition_to_self() const;
 
 	bool can_edit_node(const StringName &p_name) const;
 

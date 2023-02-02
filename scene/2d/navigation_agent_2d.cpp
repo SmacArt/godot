@@ -76,10 +76,10 @@ void NavigationAgent2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_navigation_map", "navigation_map"), &NavigationAgent2D::set_navigation_map);
 	ClassDB::bind_method(D_METHOD("get_navigation_map"), &NavigationAgent2D::get_navigation_map);
 
-	ClassDB::bind_method(D_METHOD("set_target_location", "location"), &NavigationAgent2D::set_target_location);
-	ClassDB::bind_method(D_METHOD("get_target_location"), &NavigationAgent2D::get_target_location);
+	ClassDB::bind_method(D_METHOD("set_target_position", "position"), &NavigationAgent2D::set_target_position);
+	ClassDB::bind_method(D_METHOD("get_target_position"), &NavigationAgent2D::get_target_position);
 
-	ClassDB::bind_method(D_METHOD("get_next_location"), &NavigationAgent2D::get_next_location);
+	ClassDB::bind_method(D_METHOD("get_next_path_position"), &NavigationAgent2D::get_next_path_position);
 	ClassDB::bind_method(D_METHOD("distance_to_target"), &NavigationAgent2D::distance_to_target);
 	ClassDB::bind_method(D_METHOD("set_velocity", "velocity"), &NavigationAgent2D::set_velocity);
 	ClassDB::bind_method(D_METHOD("get_current_navigation_result"), &NavigationAgent2D::get_current_navigation_result);
@@ -88,12 +88,12 @@ void NavigationAgent2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_target_reached"), &NavigationAgent2D::is_target_reached);
 	ClassDB::bind_method(D_METHOD("is_target_reachable"), &NavigationAgent2D::is_target_reachable);
 	ClassDB::bind_method(D_METHOD("is_navigation_finished"), &NavigationAgent2D::is_navigation_finished);
-	ClassDB::bind_method(D_METHOD("get_final_location"), &NavigationAgent2D::get_final_location);
+	ClassDB::bind_method(D_METHOD("get_final_position"), &NavigationAgent2D::get_final_position);
 
 	ClassDB::bind_method(D_METHOD("_avoidance_done", "new_velocity"), &NavigationAgent2D::_avoidance_done);
 
 	ADD_GROUP("Pathfinding", "");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "target_location", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_target_location", "get_target_location");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "target_position", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_target_position", "get_target_position");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_desired_distance", PROPERTY_HINT_RANGE, "0.1,1000,0.01,suffix:px"), "set_path_desired_distance", "get_path_desired_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "target_desired_distance", PROPERTY_HINT_RANGE, "0.1,1000,0.01,suffix:px"), "set_target_desired_distance", "get_target_desired_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "path_max_distance", PROPERTY_HINT_RANGE, "10,1000,1,suffix:px"), "set_path_max_distance", "get_path_max_distance");
@@ -108,6 +108,26 @@ void NavigationAgent2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "time_horizon", PROPERTY_HINT_RANGE, "0.1,10,0.01,suffix:s"), "set_time_horizon", "get_time_horizon");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_speed", PROPERTY_HINT_RANGE, "0.1,10000,0.01,suffix:px/s"), "set_max_speed", "get_max_speed");
 
+#ifdef DEBUG_ENABLED
+	ClassDB::bind_method(D_METHOD("set_debug_enabled", "enabled"), &NavigationAgent2D::set_debug_enabled);
+	ClassDB::bind_method(D_METHOD("get_debug_enabled"), &NavigationAgent2D::get_debug_enabled);
+	ClassDB::bind_method(D_METHOD("set_debug_use_custom", "enabled"), &NavigationAgent2D::set_debug_use_custom);
+	ClassDB::bind_method(D_METHOD("get_debug_use_custom"), &NavigationAgent2D::get_debug_use_custom);
+	ClassDB::bind_method(D_METHOD("set_debug_path_custom_color", "color"), &NavigationAgent2D::set_debug_path_custom_color);
+	ClassDB::bind_method(D_METHOD("get_debug_path_custom_color"), &NavigationAgent2D::get_debug_path_custom_color);
+	ClassDB::bind_method(D_METHOD("set_debug_path_custom_point_size", "point_size"), &NavigationAgent2D::set_debug_path_custom_point_size);
+	ClassDB::bind_method(D_METHOD("get_debug_path_custom_point_size"), &NavigationAgent2D::get_debug_path_custom_point_size);
+	ClassDB::bind_method(D_METHOD("set_debug_path_custom_line_width", "line_width"), &NavigationAgent2D::set_debug_path_custom_line_width);
+	ClassDB::bind_method(D_METHOD("get_debug_path_custom_line_width"), &NavigationAgent2D::get_debug_path_custom_line_width);
+
+	ADD_GROUP("Debug", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "debug_enabled"), "set_debug_enabled", "get_debug_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "debug_use_custom"), "set_debug_use_custom", "get_debug_use_custom");
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "debug_path_custom_color"), "set_debug_path_custom_color", "get_debug_path_custom_color");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "debug_path_custom_point_size", PROPERTY_HINT_RANGE, "1,50,1,suffix:px"), "set_debug_path_custom_point_size", "get_debug_path_custom_point_size");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "debug_path_custom_line_width", PROPERTY_HINT_RANGE, "1,50,1,suffix:px"), "set_debug_path_custom_line_width", "get_debug_path_custom_line_width");
+#endif // DEBUG_ENABLED
+
 	ADD_SIGNAL(MethodInfo("path_changed"));
 	ADD_SIGNAL(MethodInfo("target_reached"));
 	ADD_SIGNAL(MethodInfo("waypoint_reached", PropertyInfo(Variant::DICTIONARY, "details")));
@@ -120,9 +140,15 @@ void NavigationAgent2D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_POST_ENTER_TREE: {
 			// need to use POST_ENTER_TREE cause with normal ENTER_TREE not all required Nodes are ready.
-			// cannot use READY as ready does not get called if Node is readded to SceneTree
+			// cannot use READY as ready does not get called if Node is re-added to SceneTree
 			set_agent_parent(get_parent());
 			set_physics_process_internal(true);
+
+#ifdef DEBUG_ENABLED
+			if (NavigationServer2D::get_singleton()->get_debug_enabled()) {
+				debug_path_dirty = true;
+			}
+#endif // DEBUG_ENABLED
 		} break;
 
 		case NOTIFICATION_PARENTED: {
@@ -165,6 +191,12 @@ void NavigationAgent2D::_notification(int p_what) {
 		case NOTIFICATION_EXIT_TREE: {
 			agent_parent = nullptr;
 			set_physics_process_internal(false);
+
+#ifdef DEBUG_ENABLED
+			if (debug_path_instance.is_valid()) {
+				RenderingServer::get_singleton()->canvas_item_set_visible(debug_path_instance, false);
+			}
+#endif // DEBUG_ENABLED
 		} break;
 
 		case NOTIFICATION_INTERNAL_PHYSICS_PROCESS: {
@@ -176,6 +208,12 @@ void NavigationAgent2D::_notification(int p_what) {
 				}
 				_check_distance_to_target();
 			}
+
+#ifdef DEBUG_ENABLED
+			if (debug_path_dirty) {
+				_update_debug_path();
+			}
+#endif // DEBUG_ENABLED
 		} break;
 	}
 }
@@ -194,20 +232,33 @@ NavigationAgent2D::NavigationAgent2D() {
 
 	navigation_result = Ref<NavigationPathQueryResult2D>();
 	navigation_result.instantiate();
+
+#ifdef DEBUG_ENABLED
+	NavigationServer2D::get_singleton()->connect(SNAME("navigation_debug_changed"), callable_mp(this, &NavigationAgent2D::_navigation_debug_changed));
+#endif // DEBUG_ENABLED
 }
 
 NavigationAgent2D::~NavigationAgent2D() {
 	ERR_FAIL_NULL(NavigationServer2D::get_singleton());
 	NavigationServer2D::get_singleton()->free(agent);
 	agent = RID(); // Pointless
+
+#ifdef DEBUG_ENABLED
+	NavigationServer2D::get_singleton()->disconnect(SNAME("navigation_debug_changed"), callable_mp(this, &NavigationAgent2D::_navigation_debug_changed));
+
+	ERR_FAIL_NULL(RenderingServer::get_singleton());
+	if (debug_path_instance.is_valid()) {
+		RenderingServer::get_singleton()->free(debug_path_instance);
+	}
+#endif // DEBUG_ENABLED
 }
 
 void NavigationAgent2D::set_avoidance_enabled(bool p_enabled) {
 	avoidance_enabled = p_enabled;
 	if (avoidance_enabled) {
-		NavigationServer2D::get_singleton()->agent_set_callback(agent, get_instance_id(), "_avoidance_done");
+		NavigationServer2D::get_singleton()->agent_set_callback(agent, callable_mp(this, &NavigationAgent2D::_avoidance_done));
 	} else {
-		NavigationServer2D::get_singleton()->agent_set_callback(agent, ObjectID(), "_avoidance_done");
+		NavigationServer2D::get_singleton()->agent_set_callback(agent, Callable());
 	}
 }
 
@@ -217,7 +268,8 @@ bool NavigationAgent2D::get_avoidance_enabled() const {
 
 void NavigationAgent2D::set_agent_parent(Node *p_agent_parent) {
 	// remove agent from any avoidance map before changing parent or there will be leftovers on the RVO map
-	NavigationServer2D::get_singleton()->agent_set_callback(agent, ObjectID(), "_avoidance_done");
+	NavigationServer2D::get_singleton()->agent_set_callback(agent, Callable());
+
 	if (Object::cast_to<Node2D>(p_agent_parent) != nullptr) {
 		// place agent on navigation map first or else the RVO agent callback creation fails silently later
 		agent_parent = Object::cast_to<Node2D>(p_agent_parent);
@@ -226,6 +278,7 @@ void NavigationAgent2D::set_agent_parent(Node *p_agent_parent) {
 		} else {
 			NavigationServer2D::get_singleton()->agent_set_map(get_rid(), agent_parent->get_world_2d()->get_navigation_map());
 		}
+
 		// create new avoidance callback if enabled
 		set_avoidance_enabled(avoidance_enabled);
 	} else {
@@ -328,17 +381,17 @@ real_t NavigationAgent2D::get_path_max_distance() {
 	return path_max_distance;
 }
 
-void NavigationAgent2D::set_target_location(Vector2 p_location) {
-	target_location = p_location;
+void NavigationAgent2D::set_target_position(Vector2 p_position) {
+	target_position = p_position;
 	target_position_submitted = true;
 	_request_repath();
 }
 
-Vector2 NavigationAgent2D::get_target_location() const {
-	return target_location;
+Vector2 NavigationAgent2D::get_target_position() const {
+	return target_position;
 }
 
-Vector2 NavigationAgent2D::get_next_location() {
+Vector2 NavigationAgent2D::get_next_path_position() {
 	update_navigation();
 
 	const Vector<Vector2> &navigation_path = navigation_result->get_path();
@@ -352,7 +405,7 @@ Vector2 NavigationAgent2D::get_next_location() {
 
 real_t NavigationAgent2D::distance_to_target() const {
 	ERR_FAIL_COND_V_MSG(agent_parent == nullptr, 0.0, "The agent has no parent.");
-	return agent_parent->get_global_position().distance_to(target_location);
+	return agent_parent->get_global_position().distance_to(target_position);
 }
 
 bool NavigationAgent2D::is_target_reached() const {
@@ -360,7 +413,7 @@ bool NavigationAgent2D::is_target_reached() const {
 }
 
 bool NavigationAgent2D::is_target_reachable() {
-	return target_desired_distance >= get_final_location().distance_to(target_location);
+	return target_desired_distance >= get_final_position().distance_to(target_position);
 }
 
 bool NavigationAgent2D::is_navigation_finished() {
@@ -368,7 +421,7 @@ bool NavigationAgent2D::is_navigation_finished() {
 	return navigation_finished;
 }
 
-Vector2 NavigationAgent2D::get_final_location() {
+Vector2 NavigationAgent2D::get_final_position() {
 	update_navigation();
 
 	const Vector<Vector2> &navigation_path = navigation_result->get_path();
@@ -450,7 +503,7 @@ void NavigationAgent2D::update_navigation() {
 
 	if (reload_path) {
 		navigation_query->set_start_position(origin);
-		navigation_query->set_target_position(target_location);
+		navigation_query->set_target_position(target_position);
 		navigation_query->set_navigation_layers(navigation_layers);
 		navigation_query->set_metadata_flags(path_metadata_flags);
 
@@ -461,6 +514,9 @@ void NavigationAgent2D::update_navigation() {
 		}
 
 		NavigationServer2D::get_singleton()->query_path(navigation_query, navigation_result);
+#ifdef DEBUG_ENABLED
+		debug_path_dirty = true;
+#endif // DEBUG_ENABLED
 		navigation_finished = false;
 		navigation_path_index = 0;
 		emit_signal(SNAME("path_changed"));
@@ -472,7 +528,7 @@ void NavigationAgent2D::update_navigation() {
 
 	// Check if we can advance the navigation path
 	if (navigation_finished == false) {
-		// Advances to the next far away location.
+		// Advances to the next far away position.
 		const Vector<Vector2> &navigation_path = navigation_result->get_path();
 		const Vector<int32_t> &navigation_path_types = navigation_result->get_path_types();
 		const TypedArray<RID> &navigation_path_rids = navigation_result->get_path_rids();
@@ -482,7 +538,7 @@ void NavigationAgent2D::update_navigation() {
 			Dictionary details;
 
 			const Vector2 waypoint = navigation_path[navigation_path_index];
-			details[SNAME("location")] = waypoint;
+			details[SNAME("position")] = waypoint;
 
 			int waypoint_type = -1;
 			if (path_metadata_flags.has_flag(NavigationPathQueryParameters2D::PathMetadataFlags::PATH_METADATA_INCLUDE_TYPES)) {
@@ -547,3 +603,111 @@ void NavigationAgent2D::_check_distance_to_target() {
 		}
 	}
 }
+
+////////DEBUG////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_ENABLED
+void NavigationAgent2D::set_debug_enabled(bool p_enabled) {
+	debug_enabled = p_enabled;
+	debug_path_dirty = true;
+}
+
+bool NavigationAgent2D::get_debug_enabled() const {
+	return debug_enabled;
+}
+
+void NavigationAgent2D::set_debug_use_custom(bool p_enabled) {
+	debug_use_custom = p_enabled;
+	debug_path_dirty = true;
+}
+
+bool NavigationAgent2D::get_debug_use_custom() const {
+	return debug_use_custom;
+}
+
+void NavigationAgent2D::set_debug_path_custom_color(Color p_color) {
+	debug_path_custom_color = p_color;
+	debug_path_dirty = true;
+}
+
+Color NavigationAgent2D::get_debug_path_custom_color() const {
+	return debug_path_custom_color;
+}
+
+void NavigationAgent2D::set_debug_path_custom_point_size(float p_point_size) {
+	debug_path_custom_point_size = MAX(0.1, p_point_size);
+	debug_path_dirty = true;
+}
+
+float NavigationAgent2D::get_debug_path_custom_point_size() const {
+	return debug_path_custom_point_size;
+}
+
+void NavigationAgent2D::set_debug_path_custom_line_width(float p_line_width) {
+	debug_path_custom_line_width = p_line_width;
+	debug_path_dirty = true;
+}
+
+float NavigationAgent2D::get_debug_path_custom_line_width() const {
+	return debug_path_custom_line_width;
+}
+
+void NavigationAgent2D::_navigation_debug_changed() {
+	debug_path_dirty = true;
+}
+
+void NavigationAgent2D::_update_debug_path() {
+	if (!debug_path_dirty) {
+		return;
+	}
+	debug_path_dirty = false;
+
+	if (!debug_path_instance.is_valid()) {
+		debug_path_instance = RenderingServer::get_singleton()->canvas_item_create();
+	}
+
+	RenderingServer::get_singleton()->canvas_item_clear(debug_path_instance);
+
+	if (!(debug_enabled && NavigationServer2D::get_singleton()->get_debug_navigation_enable_agent_paths())) {
+		return;
+	}
+
+	if (!(agent_parent && agent_parent->is_inside_tree())) {
+		return;
+	}
+
+	RenderingServer::get_singleton()->canvas_item_set_parent(debug_path_instance, agent_parent->get_canvas());
+	RenderingServer::get_singleton()->canvas_item_set_visible(debug_path_instance, agent_parent->is_visible_in_tree());
+
+	const Vector<Vector2> &navigation_path = navigation_result->get_path();
+
+	if (navigation_path.size() <= 1) {
+		return;
+	}
+
+	Color debug_path_color = NavigationServer2D::get_singleton()->get_debug_navigation_agent_path_color();
+	if (debug_use_custom) {
+		debug_path_color = debug_path_custom_color;
+	}
+
+	Vector<Color> debug_path_colors;
+	debug_path_colors.resize(navigation_path.size());
+	debug_path_colors.fill(debug_path_color);
+
+	RenderingServer::get_singleton()->canvas_item_add_polyline(debug_path_instance, navigation_path, debug_path_colors, debug_path_custom_line_width, false);
+
+	float point_size = NavigationServer2D::get_singleton()->get_debug_navigation_agent_path_point_size();
+	float half_point_size = point_size * 0.5;
+
+	if (debug_use_custom) {
+		point_size = debug_path_custom_point_size;
+		half_point_size = debug_path_custom_point_size * 0.5;
+	}
+
+	for (int i = 0; i < navigation_path.size(); i++) {
+		const Vector2 &vert = navigation_path[i];
+		Rect2 path_point_rect = Rect2(vert.x - half_point_size, vert.y - half_point_size, point_size, point_size);
+		RenderingServer::get_singleton()->canvas_item_add_rect(debug_path_instance, path_point_rect, debug_path_color);
+	}
+}
+#endif // DEBUG_ENABLED
