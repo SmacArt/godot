@@ -36,6 +36,7 @@
 #include "core/object/message_queue.h"
 #include "core/string/translation.h"
 #include "core/templates/pair.h"
+#include "core/templates/sort_array.h"
 #include "scene/2d/audio_listener_2d.h"
 #include "scene/2d/camera_2d.h"
 #include "scene/2d/collision_object_2d.h"
@@ -669,6 +670,25 @@ void Viewport::_process_picking() {
 				point_params.pick_point = true;
 
 				int rc = ss2d->intersect_point(point_params, res, 64);
+				if (physics_object_picking_sort) {
+					struct ComparatorCollisionObjects {
+						bool operator()(const PhysicsDirectSpaceState2D::ShapeResult &p_a, const PhysicsDirectSpaceState2D::ShapeResult &p_b) const {
+							CollisionObject2D *a = Object::cast_to<CollisionObject2D>(p_a.collider);
+							CollisionObject2D *b = Object::cast_to<CollisionObject2D>(p_b.collider);
+							if (!a || !b) {
+								return false;
+							}
+							int za = a->get_effective_z_index();
+							int zb = b->get_effective_z_index();
+							if (za != zb) {
+								return zb < za;
+							}
+							return a->is_greater_than(b);
+						}
+					};
+					SortArray<PhysicsDirectSpaceState2D::ShapeResult, ComparatorCollisionObjects> sorter;
+					sorter.sort(res, rc);
+				}
 				for (int i = 0; i < rc; i++) {
 					if (res[i].collider_id.is_valid() && res[i].collider) {
 						CollisionObject2D *co = Object::cast_to<CollisionObject2D>(res[i].collider);
@@ -1052,7 +1072,7 @@ Camera2D *Viewport::get_camera_2d() const {
 }
 
 Transform2D Viewport::get_final_transform() const {
-	return _get_input_pre_xform().affine_inverse() * stretch_transform * global_canvas_transform;
+	return stretch_transform * global_canvas_transform;
 }
 
 void Viewport::assign_next_enabled_camera_2d(const StringName &p_camera_group) {
@@ -1062,6 +1082,10 @@ void Viewport::assign_next_enabled_camera_2d(const StringName &p_camera_group) {
 	Camera2D *new_camera = nullptr;
 	for (Node *E : camera_list) {
 		Camera2D *cam = Object::cast_to<Camera2D>(E);
+		if (!cam) {
+			continue; // Non-camera node (e.g. ParallaxBackground).
+		}
+
 		if (cam->is_enabled()) {
 			new_camera = cam;
 			break;
@@ -1136,14 +1160,6 @@ void Viewport::set_positional_shadow_atlas_quadrant_subdiv(int p_quadrant, Posit
 Viewport::PositionalShadowAtlasQuadrantSubdiv Viewport::get_positional_shadow_atlas_quadrant_subdiv(int p_quadrant) const {
 	ERR_FAIL_INDEX_V(p_quadrant, 4, SHADOW_ATLAS_QUADRANT_SUBDIV_DISABLED);
 	return positional_shadow_atlas_quadrant_subdiv[p_quadrant];
-}
-
-Transform2D Viewport::_get_input_pre_xform() const {
-	const Window *this_window = Object::cast_to<Window>(this);
-	if (this_window) {
-		return this_window->window_transform.affine_inverse();
-	}
-	return Transform2D();
 }
 
 Ref<InputEvent> Viewport::_make_input_local(const Ref<InputEvent> &ev) {
@@ -2868,6 +2884,14 @@ bool Viewport::get_physics_object_picking() {
 	return physics_object_picking;
 }
 
+void Viewport::set_physics_object_picking_sort(bool p_enable) {
+	physics_object_picking_sort = p_enable;
+}
+
+bool Viewport::get_physics_object_picking_sort() {
+	return physics_object_picking_sort;
+}
+
 Vector2 Viewport::get_camera_coords(const Vector2 &p_viewport_coords) const {
 	Transform2D xf = stretch_transform * global_canvas_transform;
 	return xf.xform(p_viewport_coords);
@@ -3802,6 +3826,8 @@ void Viewport::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_physics_object_picking", "enable"), &Viewport::set_physics_object_picking);
 	ClassDB::bind_method(D_METHOD("get_physics_object_picking"), &Viewport::get_physics_object_picking);
+	ClassDB::bind_method(D_METHOD("set_physics_object_picking_sort", "enable"), &Viewport::set_physics_object_picking_sort);
+	ClassDB::bind_method(D_METHOD("get_physics_object_picking_sort"), &Viewport::get_physics_object_picking_sort);
 
 	ClassDB::bind_method(D_METHOD("get_viewport_rid"), &Viewport::get_viewport_rid);
 	ClassDB::bind_method(D_METHOD("push_text_input", "text"), &Viewport::push_text_input);
@@ -3953,6 +3979,7 @@ void Viewport::_bind_methods() {
 #endif
 	ADD_GROUP("Physics", "physics_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "physics_object_picking"), "set_physics_object_picking", "get_physics_object_picking");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "physics_object_picking_sort"), "set_physics_object_picking_sort", "get_physics_object_picking_sort");
 	ADD_GROUP("GUI", "gui_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gui_disable_input"), "set_disable_input", "is_input_disabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gui_snap_controls_to_pixels"), "set_snap_controls_to_pixels", "is_snap_controls_to_pixels_enabled");
@@ -4207,7 +4234,7 @@ Transform2D SubViewport::get_screen_transform() const {
 	} else {
 		WARN_PRINT_ONCE("SubViewport is not a child of a SubViewportContainer. get_screen_transform doesn't return the actual screen position.");
 	}
-	return container_transform * Viewport::get_screen_transform();
+	return container_transform * get_final_transform();
 }
 
 Transform2D SubViewport::get_popup_base_transform() const {
@@ -4216,13 +4243,13 @@ Transform2D SubViewport::get_popup_base_transform() const {
 	}
 	SubViewportContainer *c = Object::cast_to<SubViewportContainer>(get_parent());
 	if (!c) {
-		return Viewport::get_screen_transform();
+		return get_final_transform();
 	}
 	Transform2D container_transform;
 	if (c->is_stretch_enabled()) {
 		container_transform.scale(Vector2(c->get_stretch_shrink(), c->get_stretch_shrink()));
 	}
-	return c->get_screen_transform() * container_transform * Viewport::get_screen_transform();
+	return c->get_screen_transform() * container_transform * get_final_transform();
 }
 
 void SubViewport::_notification(int p_what) {
