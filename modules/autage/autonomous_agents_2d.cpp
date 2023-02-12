@@ -720,6 +720,12 @@ void AutonomousAgents2D::setup_agent_with_face(Agent *agent){
   setup_agent_with_align(agent);
 }
 
+void AutonomousAgents2D::setup_agent_with_flock(Agent *agent){
+  set_behavior(agent, STEERING_BEHAVIOR_SEPARATION, true);
+  set_behavior(agent, STEERING_BEHAVIOR_ALIGN, true);
+  set_behavior(agent, STEERING_BEHAVIOR_VELOCITY_MATCHING, true);
+}
+
 void AutonomousAgents2D::setup_agent_with_look_where_youre_going(Agent *agent){
   setup_agent_with_align(agent);
 }
@@ -895,6 +901,9 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       }
       if (agent_flags[AGENT_FLAG_FLEE]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_FLEE);
+      }
+      if (agent_flags[AGENT_FLAG_FLOCK]) {
+        set_agent_behavior(i, STEERING_BEHAVIOR_FLOCK);
       }
       if (agent_flags[AGENT_FLAG_LOOK_WHERE_YOURE_GOING]) {
         set_agent_behavior(i, STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING);
@@ -1309,6 +1318,7 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     agent->did_evade=false;
     agent->did_face=false;
     agent->did_flee=false;
+    agent->did_flock=false;
     agent->did_path_following=false;
     agent->did_pursue=false;
     agent->did_seek=false;
@@ -1335,6 +1345,9 @@ void AutonomousAgents2D::apply_steering_behaviors(Agent *agent, int i, double de
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_FLEE)) {
       steering_output += flee(agent);
+    }
+    if (agent->steering_behavior.has(STEERING_BEHAVIOR_FLOCK)) {
+      steering_output += flock(agent, delta);
     }
     if (agent->steering_behavior.has(STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING)) {
       steering_output += look_where_youre_going(agent, delta);
@@ -1621,6 +1634,17 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent){
     }
 #endif
     return flee(agent, agents_arr[agent->target_agent].transform[2]);
+  }
+  return SteeringOutput();
+}
+
+AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flock(Agent *agent, double delta){
+  if (agent->target_agent > -1) {
+#ifdef DEBUG_ENABLED
+    if (is_debug) {
+      agent->did_flock=true;
+    }
+#endif
   }
   return SteeringOutput();
 }
@@ -2059,6 +2083,9 @@ void AutonomousAgents2D::set_behavior(Agent *agent, SteeringBehavior behavior, b
       if (behavior & STEERING_BEHAVIOR_FACE) {
         setup_agent_with_face(agent);
       }
+      if (behavior & STEERING_BEHAVIOR_FLOCK) {
+        setup_agent_with_flock(agent);
+      }
       if (behavior & STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING) {
         setup_agent_with_look_where_youre_going(agent);
       }
@@ -2226,6 +2253,9 @@ bool AutonomousAgents2D::get_did_agent_face(int index){
 }
 bool AutonomousAgents2D::get_did_agent_flee(int index){
   return agents_arr[index].did_flee;
+}
+bool AutonomousAgents2D::get_did_agent_flock(int index){
+  return agents_arr[index].did_flock;
 }
 bool AutonomousAgents2D::get_did_agent_path_following(int index){
   return agents_arr[index].did_path_following;
@@ -2441,6 +2471,7 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_evade"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_EVADE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_face"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FACE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flee"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLEE);
+  ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_flock"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_FLOCK);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_collision_avoidance"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_COLLISION_AVOIDANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_look_where_youre_going"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_LOOK_WHERE_YOURE_GOING);
   ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "agent_flag_path_following"), "set_agent_flag", "get_agent_flag", AGENT_FLAG_PATH_FOLLOWING);
@@ -2654,6 +2685,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(AGENT_FLAG_EVADE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_FACE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_FLEE);
+  BIND_ENUM_CONSTANT(AGENT_FLAG_FLOCK);
   BIND_ENUM_CONSTANT(AGENT_FLAG_LOOK_WHERE_YOURE_GOING);
   BIND_ENUM_CONSTANT(AGENT_FLAG_COLLISION_AVOIDANCE);
   BIND_ENUM_CONSTANT(AGENT_FLAG_COLLISION_AVOIDANCE_FOV_SCALE_TO_SIZE);
@@ -2680,6 +2712,7 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_EVADE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_FACE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_FLEE);
+  BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_FLOCK);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_COLLISION_AVOIDANCE);
   BIND_ENUM_CONSTANT(STEERING_BEHAVIOR_REMOTELY_CONTROLLED);
@@ -2723,6 +2756,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_did_agent_evade"), &AutonomousAgents2D::get_did_agent_evade);
   ClassDB::bind_method(D_METHOD("get_did_agent_face"), &AutonomousAgents2D::get_did_agent_face);
   ClassDB::bind_method(D_METHOD("get_did_agent_flee"), &AutonomousAgents2D::get_did_agent_flee);
+  ClassDB::bind_method(D_METHOD("get_did_agent_flock"), &AutonomousAgents2D::get_did_agent_flock);
   ClassDB::bind_method(D_METHOD("get_did_agent_align"), &AutonomousAgents2D::get_did_agent_align);
   ClassDB::bind_method(D_METHOD("get_did_agent_arrive"), &AutonomousAgents2D::get_did_agent_arrive);
   ClassDB::bind_method(D_METHOD("get_did_agent_path_following"), &AutonomousAgents2D::get_did_agent_path_following);

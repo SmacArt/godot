@@ -106,6 +106,7 @@ public:
     AGENT_FLAG_EVADE,
     AGENT_FLAG_FACE,
     AGENT_FLAG_FLEE,
+    AGENT_FLAG_FLOCK,
     AGENT_FLAG_LOOK_WHERE_YOURE_GOING,
     AGENT_FLAG_COLLISION_AVOIDANCE,
     AGENT_FLAG_COLLISION_AVOIDANCE_FOV_SCALE_TO_SIZE,
@@ -251,6 +252,7 @@ public:
     bool did_evade = false;
     bool did_face = false;
     bool did_flee = false;
+    bool did_flock = false;
     bool did_path_following = false;
     bool did_pursue = false;
     bool did_seek = false;
@@ -422,6 +424,7 @@ private:
   SteeringOutput face(Agent *agent, Vector2 target_position, double delta);
   SteeringOutput flee(Agent *agent);
   SteeringOutput flee(Agent *agent, Vector2 target);
+  SteeringOutput flock(Agent *agent, double delta);
   SteeringOutput look_where_youre_going(Agent *agent, double delta);
   SteeringOutput collision_avoidance(Agent *agent, double delta);
   SteeringOutput path_following(Agent *agent, double delta);
@@ -573,6 +576,7 @@ public:
   void setup_agent_with_arrive(Agent *agent);
   void setup_agent_with_evade(Agent *agent);
   void setup_agent_with_face(Agent *agent);
+  void setup_agent_with_flock(Agent *agent);
   void setup_agent_with_look_where_youre_going(Agent *agent);
   void setup_agent_with_collision_avoidance(Agent *agent);
   void setup_agent_with_path_following(Agent *agent);
@@ -622,6 +626,7 @@ public:
   Vector2 get_agent_face_target(int index);
   bool get_did_agent_flee(int index);
   Vector2 get_agent_flee_target(int index);
+  bool get_did_agent_flock(int index);
   bool get_did_agent_align(int index);
   real_t get_agent_align_target(int index);
   bool is_agent_aligning_in_slow_radius(int index);
