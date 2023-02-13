@@ -721,9 +721,11 @@ void AutonomousAgents2D::setup_agent_with_face(Agent *agent){
 }
 
 void AutonomousAgents2D::setup_agent_with_flock(Agent *agent){
-  set_behavior(agent, STEERING_BEHAVIOR_SEPARATION, true);
-  set_behavior(agent, STEERING_BEHAVIOR_ALIGN, true);
-  set_behavior(agent, STEERING_BEHAVIOR_VELOCITY_MATCHING, true);
+  agent->flock_neighborhood_distance = Math::lerp(parameters_min[PARAM_FLOCK_NEIGHBORHOOD_DISTANCE], parameters_max[PARAM_FLOCK_NEIGHBORHOOD_DISTANCE], rand_from_seed(agent->seed));
+  setup_agent_with_arrive(agent);
+  setup_agent_with_separation(agent);
+  setup_agent_with_align(agent);
+  setup_agent_with_velocity_matching(agent);
 }
 
 void AutonomousAgents2D::setup_agent_with_look_where_youre_going(Agent *agent){
@@ -1240,7 +1242,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
         p.transform[2].x = 0;
       }
       if (p.transform[2].x < 0) {
-        p.transform[2].x = 920;
+        p.transform[2].x = 1920;
       }
       if (p.transform[2].y > 800) {
         p.transform[2].y = 0;
@@ -1639,13 +1641,46 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flee(Agent *agent){
 }
 
 AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flock(Agent *agent, double delta){
-  if (agent->target_agent > -1) {
+  AABB aabb = agent->aabb.grow(agent->flock_neighborhood_distance);
+  Vector2 normalized_velocity = agent->velocity.normalized();
+  Vector3 pos = Vector3(aabb.get_position().x + agent->flock_neighborhood_distance * normalized_velocity.x, aabb.get_position().y + agent->flock_neighborhood_distance * normalized_velocity.y, 0);
+  aabb.set_position(pos);
+  agent_cull_aabb_query(aabb);
 #ifdef DEBUG_ENABLED
-    if (is_debug) {
-      agent->did_flock=true;
-    }
-#endif
+  if (is_debug) {
+    agent->did_flock=true;
+    agent->flock_aabb = aabb;
   }
+#endif
+
+  int result_size = agent_cull_aabb_result.size();
+  if (result_size > 0) {
+    int pos_x = 0, pos_y = 0;
+    Vector2 velocity;
+    double rotation = 0.0;
+    for (int i = 0; i < result_size; i++) {
+      Agent *neighbor_agent = agent_cull_aabb_result[i];
+      pos_x+= neighbor_agent->transform[2].x;
+      pos_y+= neighbor_agent->transform[2].y;
+      velocity+= neighbor_agent->velocity;
+      rotation+= neighbor_agent->transform.get_rotation();
+    }
+    pos_x/=result_size;
+    pos_y/=result_size;
+    velocity/=result_size;
+    rotation/=result_size;
+
+    // print_line("result size:", result_size, " pos_x:", pos_x, " pos_y:", pos_y, " velocity:", velocity, " rotation:", rotation);
+    SteeringOutput cohesion_output = arrive(agent, Vector2(pos_x,pos_y), delta);
+    SteeringOutput velocity_matching_output = velocity_matching(agent, velocity, delta);
+    SteeringOutput align_output = align(agent, rotation, delta);
+    SteeringOutput separation_output = separation(agent);
+
+    SteeringOutput steering_output = cohesion_output * 0.3 + velocity_matching_output * 0.4 + align_output + separation_output * 1.0;
+    //    print_line("flockoutput: x ", steering_output.linear.x, " y ", steering_output.linear.y);
+    return steering_output;
+  }
+
   return SteeringOutput();
 }
 
@@ -2167,6 +2202,9 @@ Vector2 AutonomousAgents2D::get_agent_steering_output_linear(int index){
 AABB AutonomousAgents2D::get_agent_aabb(int index){
   return agents_arr[index].aabb;
 }
+AABB AutonomousAgents2D::get_agent_flock_aabb(int index){
+  return agents_arr[index].flock_aabb;
+}
 AABB AutonomousAgents2D::get_agent_separation_aabb(int index){
   return agents_arr[index].separation_aabb;
 }
@@ -2521,6 +2559,10 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "collision_avoidance_decay_coefficient_min", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_min", "get_param_min", PARAM_COLLISION_AVOIDANCE_DECAY_COEFFICIENT);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "collision_avoidance_decay_coefficient_max", PROPERTY_HINT_RANGE, "0,1000000,0.01,or_greater"), "set_param_max", "get_param_max", PARAM_COLLISION_AVOIDANCE_DECAY_COEFFICIENT);
 
+  ADD_GROUP("Flock", "flock_");
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_neighborhood_distance_min", PROPERTY_HINT_RANGE, "1.0,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_FLOCK_NEIGHBORHOOD_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_neighborhood_distance_max", PROPERTY_HINT_RANGE, "1.0,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_FLOCK_NEIGHBORHOOD_DISTANCE);
+
   ADD_GROUP("Path Following", "path_following_");
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "path", PROPERTY_HINT_RESOURCE_TYPE, "AutonomousAgentsPath2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_path_following_path", "get_path_following_path");
   ADD_PROPERTY(PropertyInfo(Variant::INT, "path_following_direction", PROPERTY_HINT_ENUM, "Forwards,Backwards"), "set_path_following_direction", "get_path_following_direction");
@@ -2652,6 +2694,8 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_DISTANCE);
   BIND_ENUM_CONSTANT(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET);
 
+  BIND_ENUM_CONSTANT(PARAM_FLOCK_NEIGHBORHOOD_DISTANCE);
+
   BIND_ENUM_CONSTANT(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE);
   BIND_ENUM_CONSTANT(PARAM_PATH_FOLLOWING_START_DISTANCE);
 
@@ -2748,6 +2792,7 @@ void AutonomousAgents2D::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_agent_collision_avoidance_fov_right_position"), &AutonomousAgents2D::get_agent_collision_avoidance_fov_right_position);
   ClassDB::bind_method(D_METHOD("get_agent_collision_avoidance_predicted_position"), &AutonomousAgents2D::get_agent_collision_avoidance_predicted_position);
   ClassDB::bind_method(D_METHOD("get_agent_velocity_matching_target"), &AutonomousAgents2D::get_agent_velocity_matching_target);
+  ClassDB::bind_method(D_METHOD("get_agent_flock_aabb"), &AutonomousAgents2D::get_agent_flock_aabb);
   ClassDB::bind_method(D_METHOD("get_agent_wander_circle_position"), &AutonomousAgents2D::get_agent_wander_circle_position);
   ClassDB::bind_method(D_METHOD("get_agent_wander_radius"), &AutonomousAgents2D::get_agent_wander_radius);
   ClassDB::bind_method(D_METHOD("get_agent_wander_target"), &AutonomousAgents2D::get_agent_wander_target);
@@ -2840,6 +2885,9 @@ AutonomousAgents2D::AutonomousAgents2D() {
   set_param_min(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET, 0);
   set_param_max(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET, 0);
   set_agent_collision_base_speed(100.0);
+
+  set_param_min(PARAM_FLOCK_NEIGHBORHOOD_DISTANCE, 300);
+  set_param_max(PARAM_FLOCK_NEIGHBORHOOD_DISTANCE, 300);
 
   set_param_min(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE, 50);
   set_param_max(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE, 50);

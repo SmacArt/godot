@@ -162,6 +162,7 @@ public:
     DynamicBVH::ID bvh_leaf;
     AABB aabb;
     AABB aabb_collision_avoidance;
+    AABB aabb_flock;
     real_t current_width;
     real_t current_height;
 
@@ -226,7 +227,6 @@ public:
     Vector2 wander_target;
     bool aabb_culled = false;
     AABB separation_aabb;
-    AABB flock_aabb;
     AABB collision_avoidance_avoiding_aabb;
     AABB collision_avoidance_fov_aabb;
     Vector2 path_following_predicted_position;
@@ -302,17 +302,6 @@ private:
     inline SteeringOutput &operator-=(const SteeringOutput &steering_output) {
       linear -= steering_output.linear;
       angular -= steering_output.angular;
-
-      return *this;
-    }
-
-    inline SteeringOutput operator*(const double multiplier) const{
-      return SteeringOutput(Vector2(linear * multiplier), angular * multiplier);
-    }
-
-    inline SteeringOutput &operator*=(const double multiplier) {
-      linear *= multiplier;
-      angular *= multiplier;
 
       return *this;
     }
@@ -625,7 +614,6 @@ public:
   Vector2 get_agent_collision_avoidance_fov_right_end_position(int index);
   Vector2 get_agent_collision_avoidance_predicted_position(int index);
   Vector2 get_agent_collision_avoidance_normal_position(int index);
-  AABB get_agent_flock_aabb(int index);
   Vector2 get_agent_wander_circle_position(int index);
   real_t get_agent_wander_radius(int index);
   Vector2 get_agent_wander_target(int index);
