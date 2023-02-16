@@ -84,6 +84,10 @@ public:
     PARAM_EVADE_MAX_PREDICTION,
 
     PARAM_FLOCK_NEIGHBORHOOD_DISTANCE,
+    PARAM_FLOCK_COHESION_WEIGHT,
+    PARAM_FLOCK_SEPARATION_WEIGHT,
+    PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT,
+    PARAM_FLOCK_WANDER_WEIGHT,
 
     PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE,
     PARAM_PATH_FOLLOWING_START_DISTANCE,
@@ -199,6 +203,10 @@ public:
     bool collision_avoidance_fov_scale_to_size = false;
 
     real_t flock_neighborhood_distance = 0.0;
+    real_t flock_cohesion_weight = 1.0;
+    real_t flock_separation_weight = 1.0;
+    real_t flock_velocity_matching_weight = 1.0;
+    real_t flock_wander_weight = 1.0;
 
     Ref<AutonomousAgentsPath2D> path_following_path;
     real_t path_following_prediction_distance = 0.0;

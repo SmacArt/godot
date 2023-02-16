@@ -1129,7 +1129,7 @@ void AutonomousAgents2D::_agents_process(double p_delta) {
       else {
         if (ai_phase == p.ai_phase) {
           if (!p.steering == true) {
-            if (p.steering_behavior.has(STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING) || p.steering_behavior.has(STEERING_BEHAVIOR_FLOCK)) {
+            if (p.steering_behavior.has(STEERING_BEHAVIOR_LOOK_WHERE_YOURE_GOING)) {
               p.align_rotation_to_velocity = false;
             }
             p.steering = true;
@@ -1656,9 +1656,8 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flock(Agent *agent, doubl
 
   int result_size = agent_cull_aabb_result.size();
   if (result_size > 0) {
-    Vector2 pos_sum;
+    Vector2 cohesion_pos;
     Vector2 velocity, average_direction;
-    double rotation = 0.0;
     int count = 0;
     for (int i = 0; i < result_size; i++) {
       Agent *neighbor_agent = agent_cull_aabb_result[i];
@@ -1669,28 +1668,24 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flock(Agent *agent, doubl
         double dist = dir.length();
         average_direction += dir.normalized() / dist;
 
-        pos_sum += neighbor_agent->transform[2];
+        cohesion_pos += neighbor_agent->transform[2];
 
         velocity+= neighbor_agent->velocity;
-        rotation+= neighbor_agent->transform.get_rotation();
       }
     }
     if (count > 1) {
-      pos_sum /= count;
+      cohesion_pos /= count;
       velocity/=count;
-      rotation/=count;
     }
 
-    Vector2 desired_cohesion = pos_sum; // - agent->transform[2];
-
     // print_line("result size:", result_size, " pos_x:", pos_x, " pos_y:", pos_y, " velocity:", velocity, " rotation:", rotation);
-    SteeringOutput cohesion_output = arrive(agent, desired_cohesion, delta);
+    SteeringOutput cohesion_output = arrive(agent, cohesion_pos, delta);
     SteeringOutput velocity_matching_output = velocity_matching(agent, velocity, delta);
-    SteeringOutput look_where_youre_going_output = look_where_youre_going(agent, delta);
+    //SteeringOutput look_where_youre_going_output = look_where_youre_going(agent, delta);
     SteeringOutput separation_output = separation(agent);
     SteeringOutput wander_output = wander(agent, delta);
 
-    SteeringOutput steering_output = separation_output * 1.0 + cohesion_output * 1.0 + velocity_matching_output * 1.0 + look_where_youre_going_output * 1.0 + wander_output * 1.0;
+    SteeringOutput steering_output = separation_output * 1.0 + cohesion_output * 1.0 + velocity_matching_output * 1.0 + wander_output * 0.3;
     //steering_output.linear += average_direction * 1.0;
     //    print_line("flockoutput: x ", steering_output.linear.x, " y ", steering_output.linear.y);
     return steering_output;
