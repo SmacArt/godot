@@ -202,6 +202,7 @@ public:
     Vector2 collision_avoidance_field_of_view_right_angle;
     bool collision_avoidance_fov_scale_to_size = false;
 
+    // TODO consider the flock params does not need to be on each agent
     real_t flock_neighborhood_distance = 0.0;
     real_t flock_cohesion_weight = 1.0;
     real_t flock_separation_weight = 1.0;

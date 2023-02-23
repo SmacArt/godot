@@ -722,6 +722,10 @@ void AutonomousAgents2D::setup_agent_with_face(Agent *agent){
 
 void AutonomousAgents2D::setup_agent_with_flock(Agent *agent){
   agent->flock_neighborhood_distance = Math::lerp(parameters_min[PARAM_FLOCK_NEIGHBORHOOD_DISTANCE], parameters_max[PARAM_FLOCK_NEIGHBORHOOD_DISTANCE], rand_from_seed(agent->seed));
+  agent->flock_cohesion_weight = Math::lerp(parameters_min[PARAM_FLOCK_COHESION_WEIGHT], parameters_max[PARAM_FLOCK_COHESION_WEIGHT], rand_from_seed(agent->seed));
+  agent->flock_separation_weight = Math::lerp(parameters_min[PARAM_FLOCK_SEPARATION_WEIGHT], parameters_max[PARAM_FLOCK_SEPARATION_WEIGHT], rand_from_seed(agent->seed));
+  agent->flock_velocity_matching_weight = Math::lerp(parameters_min[PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT], parameters_max[PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT], rand_from_seed(agent->seed));
+  agent->flock_wander_weight = Math::lerp(parameters_min[PARAM_FLOCK_WANDER_WEIGHT], parameters_max[PARAM_FLOCK_WANDER_WEIGHT], rand_from_seed(agent->seed));
   setup_agent_with_arrive(agent);
   setup_agent_with_separation(agent);
   setup_agent_with_velocity_matching(agent);
@@ -1657,37 +1661,30 @@ AutonomousAgents2D::SteeringOutput AutonomousAgents2D::flock(Agent *agent, doubl
   int result_size = agent_cull_aabb_result.size();
   if (result_size > 0) {
     Vector2 cohesion_pos;
-    Vector2 velocity, average_direction;
+    Vector2 velocity;
     int count = 0;
     for (int i = 0; i < result_size; i++) {
       Agent *neighbor_agent = agent_cull_aabb_result[i];
       if (neighbor_agent != agent) {
         count++;
-
-        Vector2 dir = agent->transform[2] - neighbor_agent->transform[2];
-        double dist = dir.length();
-        average_direction += dir.normalized() / dist;
-
         cohesion_pos += neighbor_agent->transform[2];
-
         velocity+= neighbor_agent->velocity;
       }
     }
     if (count > 1) {
       cohesion_pos /= count;
       velocity/=count;
+    } else {
+      return wander(agent, delta);
     }
 
-    // print_line("result size:", result_size, " pos_x:", pos_x, " pos_y:", pos_y, " velocity:", velocity, " rotation:", rotation);
-    SteeringOutput cohesion_output = arrive(agent, cohesion_pos, delta);
-    SteeringOutput velocity_matching_output = velocity_matching(agent, velocity, delta);
-    //SteeringOutput look_where_youre_going_output = look_where_youre_going(agent, delta);
-    SteeringOutput separation_output = separation(agent);
-    SteeringOutput wander_output = wander(agent, delta);
+    SteeringOutput cohesion_output = arrive(agent, cohesion_pos, delta) * agent->flock_cohesion_weight;
+    SteeringOutput velocity_matching_output = velocity_matching(agent, velocity, delta) * agent->flock_velocity_matching_weight;
+    SteeringOutput separation_output = separation(agent) * agent->flock_separation_weight;
+    SteeringOutput wander_output = wander(agent, delta) * agent->flock_wander_weight;
 
-    SteeringOutput steering_output = separation_output * 1.0 + cohesion_output * 1.0 + velocity_matching_output * 1.0 + wander_output * 0.3;
-    //steering_output.linear += average_direction * 1.0;
-    //    print_line("flockoutput: x ", steering_output.linear.x, " y ", steering_output.linear.y);
+    SteeringOutput steering_output = separation_output + cohesion_output + velocity_matching_output + wander_output;
+
     return steering_output;
   }
 
@@ -2572,6 +2569,14 @@ void AutonomousAgents2D::_bind_methods() {
   ADD_GROUP("Flock", "flock_");
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_neighborhood_distance_min", PROPERTY_HINT_RANGE, "1.0,10000,0.01,or_greater,suffix:px"), "set_param_min", "get_param_min", PARAM_FLOCK_NEIGHBORHOOD_DISTANCE);
   ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_neighborhood_distance_max", PROPERTY_HINT_RANGE, "1.0,10000,0.01,or_greater,suffix:px"), "set_param_max", "get_param_max", PARAM_FLOCK_NEIGHBORHOOD_DISTANCE);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_cohesion_weight_min", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_min", "get_param_min", PARAM_FLOCK_COHESION_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_cohesion_weight_max", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_max", "get_param_max", PARAM_FLOCK_COHESION_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_separation_weight_min", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_min", "get_param_min", PARAM_FLOCK_SEPARATION_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_separation_weight_max", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_max", "get_param_max", PARAM_FLOCK_SEPARATION_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_velocity_matching_weight_min", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_min", "get_param_min", PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_velocity_matching_weight_max", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_max", "get_param_max", PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_wander_weight_min", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_min", "get_param_min", PARAM_FLOCK_WANDER_WEIGHT);
+  ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "flock_wander_weight_max", PROPERTY_HINT_RANGE, "-1000.0,1000,0.01,or_greater,suffix:wt"), "set_param_max", "get_param_max", PARAM_FLOCK_WANDER_WEIGHT);
 
   ADD_GROUP("Path Following", "path_following_");
   ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "path", PROPERTY_HINT_RESOURCE_TYPE, "AutonomousAgentsPath2D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_EDITOR_INSTANTIATE_OBJECT), "set_path_following_path", "get_path_following_path");
@@ -2705,6 +2710,10 @@ void AutonomousAgents2D::_bind_methods() {
   BIND_ENUM_CONSTANT(PARAM_COLLISION_AVOIDANCE_FIELD_OF_VIEW_OFFSET);
 
   BIND_ENUM_CONSTANT(PARAM_FLOCK_NEIGHBORHOOD_DISTANCE);
+  BIND_ENUM_CONSTANT(PARAM_FLOCK_COHESION_WEIGHT);
+  BIND_ENUM_CONSTANT(PARAM_FLOCK_SEPARATION_WEIGHT);
+  BIND_ENUM_CONSTANT(PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT);
+  BIND_ENUM_CONSTANT(PARAM_FLOCK_WANDER_WEIGHT);
 
   BIND_ENUM_CONSTANT(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE);
   BIND_ENUM_CONSTANT(PARAM_PATH_FOLLOWING_START_DISTANCE);
@@ -2898,6 +2907,14 @@ AutonomousAgents2D::AutonomousAgents2D() {
 
   set_param_min(PARAM_FLOCK_NEIGHBORHOOD_DISTANCE, 300);
   set_param_max(PARAM_FLOCK_NEIGHBORHOOD_DISTANCE, 300);
+  set_param_min(PARAM_FLOCK_COHESION_WEIGHT, 1.0);
+  set_param_max(PARAM_FLOCK_COHESION_WEIGHT, 1.0);
+  set_param_min(PARAM_FLOCK_SEPARATION_WEIGHT, 1.0);
+  set_param_max(PARAM_FLOCK_SEPARATION_WEIGHT, 1.0);
+  set_param_min(PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT, 1.0);
+  set_param_max(PARAM_FLOCK_VELOCITY_MATCHING_WEIGHT, 1.0);
+  set_param_min(PARAM_FLOCK_WANDER_WEIGHT, 1.0);
+  set_param_max(PARAM_FLOCK_WANDER_WEIGHT, 1.0);
 
   set_param_min(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE, 50);
   set_param_max(PARAM_PATH_FOLLOWING_PREDICTION_DISTANCE, 50);
