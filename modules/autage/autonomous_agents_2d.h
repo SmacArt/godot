@@ -119,6 +119,7 @@ public:
     AGENT_FLAG_REMOTELY_CONTROLLED,
     AGENT_FLAG_PATH_FOLLOWING,
     AGENT_FLAG_PURSUE,
+    AGENT_FLAG_RACE,
     AGENT_FLAG_SEEK,
     AGENT_FLAG_SEPARATION,
     AGENT_FLAG_VELOCITY_MATCHING,
@@ -269,6 +270,7 @@ public:
     bool did_flock = false;
     bool did_path_following = false;
     bool did_pursue = false;
+    bool did_race = false;
     bool did_seek = false;
     bool did_velocity_matching = false;
     bool did_wander = false;
@@ -455,6 +457,7 @@ private:
   SteeringOutput path_following(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, double delta);
   SteeringOutput pursue(Agent *agent, Vector2 target_position, Vector2 target_velocity, double delta);
+  SteeringOutput race(Agent *agent, double delta);
   SteeringOutput seek(Agent *agent);
   SteeringOutput seek(Agent *agent, Vector2 target);
   SteeringOutput separation(Agent *agent);
@@ -606,6 +609,7 @@ public:
   void setup_agent_with_collision_avoidance(Agent *agent);
   void setup_agent_with_path_following(Agent *agent);
   void setup_agent_with_pursue(Agent *agent);
+  void setup_agent_with_race(Agent *agent);
   void setup_agent_with_separation(Agent *agent);
   void setup_agent_with_velocity_matching(Agent *agent);
   void setup_agent_with_wander(Agent *agent);
@@ -644,6 +648,7 @@ public:
   bool get_did_agent_path_following(int index);
   bool get_did_agent_pursue(int index);
   Vector2 get_agent_pursue_target(int index);
+  bool get_did_agent_race(int index);
   bool get_did_agent_seek(int index);
   Vector2 get_agent_seek_target(int index);
   bool get_did_agent_evade(int index);
