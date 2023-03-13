@@ -1232,6 +1232,12 @@ Error ImageTexture3D::create(Image::Format p_format, int p_width, int p_height, 
 		texture = tex;
 	}
 
+	format = p_format;
+	width = p_width;
+	height = p_height;
+	depth = p_depth;
+	mipmaps = p_mipmaps;
+
 	return OK;
 }
 
@@ -2566,73 +2572,6 @@ void GradientTexture2D::_bind_methods() {
 
 //////////////////////////////////////
 
-void ProxyTexture::set_base(const Ref<Texture2D> &p_texture) {
-	ERR_FAIL_COND(p_texture == this);
-
-	base = p_texture;
-	if (base.is_valid()) {
-		ERR_FAIL_NULL(RenderingServer::get_singleton());
-		if (proxy_ph.is_valid()) {
-			RS::get_singleton()->texture_proxy_update(proxy, base->get_rid());
-			RS::get_singleton()->free(proxy_ph);
-			proxy_ph = RID();
-		} else if (proxy.is_valid()) {
-			RS::get_singleton()->texture_proxy_update(proxy, base->get_rid());
-		} else {
-			proxy = RS::get_singleton()->texture_proxy_create(base->get_rid());
-		}
-	}
-}
-
-Ref<Texture2D> ProxyTexture::get_base() const {
-	return base;
-}
-
-int ProxyTexture::get_width() const {
-	if (base.is_valid()) {
-		return base->get_width();
-	}
-	return 1;
-}
-
-int ProxyTexture::get_height() const {
-	if (base.is_valid()) {
-		return base->get_height();
-	}
-	return 1;
-}
-
-RID ProxyTexture::get_rid() const {
-	if (proxy.is_null()) {
-		proxy_ph = RS::get_singleton()->texture_2d_placeholder_create();
-		proxy = RS::get_singleton()->texture_proxy_create(proxy_ph);
-	}
-	return proxy;
-}
-
-bool ProxyTexture::has_alpha() const {
-	if (base.is_valid()) {
-		return base->has_alpha();
-	}
-	return false;
-}
-
-ProxyTexture::ProxyTexture() {
-	//proxy = RS::get_singleton()->texture_create();
-}
-
-ProxyTexture::~ProxyTexture() {
-	ERR_FAIL_NULL(RenderingServer::get_singleton());
-	if (proxy_ph.is_valid()) {
-		RS::get_singleton()->free(proxy_ph);
-	}
-	if (proxy.is_valid()) {
-		RS::get_singleton()->free(proxy);
-	}
-}
-
-//////////////////////////////////////////////
-
 void AnimatedTexture::_update_proxy() {
 	RWLockRead r(rw_lock);
 
@@ -2704,6 +2643,7 @@ void AnimatedTexture::set_current_frame(int p_frame) {
 	RWLockWrite r(rw_lock);
 
 	current_frame = p_frame;
+	time = 0;
 }
 
 int AnimatedTexture::get_current_frame() const {
@@ -2995,6 +2935,10 @@ TypedArray<Image> ImageTextureLayered::_get_images() const {
 	return images;
 }
 
+void ImageTextureLayered::_set_images(const TypedArray<Image> &p_images) {
+	ERR_FAIL_COND(_create_from_images(p_images) != OK);
+}
+
 Error ImageTextureLayered::create_from_images(Vector<Ref<Image>> p_images) {
 	int new_layers = p_images.size();
 	ERR_FAIL_COND_V(new_layers == 0, ERR_INVALID_PARAMETER);
@@ -3074,8 +3018,9 @@ void ImageTextureLayered::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("update_layer", "image", "layer"), &ImageTextureLayered::update_layer);
 
 	ClassDB::bind_method(D_METHOD("_get_images"), &ImageTextureLayered::_get_images);
+	ClassDB::bind_method(D_METHOD("_set_images", "images"), &ImageTextureLayered::_set_images);
 
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "_images", PROPERTY_HINT_ARRAY_TYPE, "Image", PROPERTY_USAGE_INTERNAL), "create_from_images", "_get_images");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "_images", PROPERTY_HINT_ARRAY_TYPE, "Image", PROPERTY_USAGE_INTERNAL), "_set_images", "_get_images");
 }
 
 ImageTextureLayered::ImageTextureLayered(LayeredType p_layered_type) {

@@ -257,8 +257,8 @@ void KeyMappingWindows::initialize() {
 	scansym_map[0x17] = Key::I;
 	scansym_map[0x18] = Key::O;
 	scansym_map[0x19] = Key::P;
-	scansym_map[0x1A] = Key::BRACELEFT;
-	scansym_map[0x1B] = Key::BRACERIGHT;
+	scansym_map[0x1A] = Key::BRACKETLEFT;
+	scansym_map[0x1B] = Key::BRACKETRIGHT;
 	scansym_map[0x1C] = Key::ENTER;
 	scansym_map[0x1D] = Key::CTRL;
 	scansym_map[0x1E] = Key::A;
@@ -315,7 +315,7 @@ void KeyMappingWindows::initialize() {
 	scansym_map[0x51] = Key::KP_3;
 	scansym_map[0x52] = Key::KP_0;
 	scansym_map[0x53] = Key::KP_PERIOD;
-	scansym_map[0x57] = Key::SECTION;
+	scansym_map[0x56] = Key::SECTION;
 	scansym_map[0x57] = Key::F11;
 	scansym_map[0x58] = Key::F12;
 	scansym_map[0x5B] = Key::META;

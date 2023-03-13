@@ -214,7 +214,14 @@ Node *EditorSceneFormatImporterBlend::import_scene(const String &p_path, uint32_
 		}
 		return nullptr;
 	}
+
+#ifndef DISABLE_DEPRECATED
+	bool trimming = p_options.has("animation/trimming") ? (bool)p_options["animation/trimming"] : false;
+	bool remove_immutable = p_options.has("animation/remove_immutable_tracks") ? (bool)p_options["animation/remove_immutable_tracks"] : true;
+	return gltf->generate_scene(state, (float)p_options["animation/fps"], trimming, remove_immutable);
+#else
 	return gltf->generate_scene(state, (float)p_options["animation/fps"], (bool)p_options["animation/trimming"], (bool)p_options["animation/remove_immutable_tracks"]);
+#endif
 }
 
 Variant EditorSceneFormatImporterBlend::get_option_visibility(const String &p_path, bool p_for_animation, const String &p_option,
@@ -290,13 +297,14 @@ static bool _test_blender_path(const String &p_path, String *r_err = nullptr) {
 		}
 		return false;
 	}
-
-	if (pipe.find("Blender ") != 0) {
+	int bl = pipe.find("Blender ");
+	if (bl == -1) {
 		if (r_err) {
 			*r_err = vformat(TTR("Unexpected --version output from Blender binary at: %s"), path);
 		}
 		return false;
 	}
+	pipe = pipe.substr(bl);
 	pipe = pipe.replace_first("Blender ", "");
 	int pp = pipe.find(".");
 	if (pp == -1) {

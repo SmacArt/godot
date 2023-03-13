@@ -62,6 +62,9 @@ public:
 		DEFAULT_RD_TEXTURE_3D_WHITE,
 		DEFAULT_RD_TEXTURE_3D_BLACK,
 		DEFAULT_RD_TEXTURE_2D_ARRAY_WHITE,
+		DEFAULT_RD_TEXTURE_2D_ARRAY_BLACK,
+		DEFAULT_RD_TEXTURE_2D_ARRAY_NORMAL,
+		DEFAULT_RD_TEXTURE_2D_ARRAY_DEPTH,
 		DEFAULT_RD_TEXTURE_2D_UINT,
 		DEFAULT_RD_TEXTURE_VRS,
 		DEFAULT_RD_TEXTURE_MAX
@@ -495,7 +498,7 @@ public:
 
 	virtual Size2 texture_size_with_proxy(RID p_proxy) override;
 
-	virtual RID texture_get_rd_texture_rid(RID p_texture, bool p_srgb = false) const override;
+	virtual RID texture_get_rd_texture(RID p_texture, bool p_srgb = false) const override;
 
 	//internal usage
 	_FORCE_INLINE_ TextureType texture_get_type(RID p_texture) {
@@ -514,18 +517,6 @@ public:
 		}
 
 		return tex->layers;
-	}
-
-	_FORCE_INLINE_ RID texture_get_rd_texture(RID p_texture, bool p_srgb = false) {
-		if (p_texture.is_null()) {
-			return RID();
-		}
-		RendererRD::TextureStorage::Texture *tex = texture_owner.get_or_null(p_texture);
-
-		if (!tex) {
-			return RID();
-		}
-		return (p_srgb && tex->rd_texture_srgb.is_valid()) ? tex->rd_texture_srgb : tex->rd_texture;
 	}
 
 	_FORCE_INLINE_ Size2i texture_2d_get_size(RID p_texture) {
@@ -738,6 +729,7 @@ public:
 	RID render_target_get_rd_framebuffer(RID p_render_target);
 	RID render_target_get_rd_texture(RID p_render_target);
 	RID render_target_get_rd_texture_slice(RID p_render_target, uint32_t p_layer);
+	RID render_target_get_rd_texture_msaa(RID p_render_target);
 	RID render_target_get_rd_backbuffer(RID p_render_target);
 	RID render_target_get_rd_backbuffer_framebuffer(RID p_render_target);
 

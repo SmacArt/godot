@@ -1010,12 +1010,14 @@ void GDScript::_bind_methods() {
 }
 
 void GDScript::set_path(const String &p_path, bool p_take_over) {
-	String old_path = path;
 	if (is_root_script()) {
 		Script::set_path(p_path, p_take_over);
 	}
-	this->path = p_path;
+
+	String old_path = path;
+	path = p_path;
 	GDScriptCache::move_script(old_path, p_path);
+
 	for (KeyValue<StringName, Ref<GDScript>> &kv : subclasses) {
 		kv.value->set_path(p_path, p_take_over);
 	}
@@ -2027,11 +2029,6 @@ String GDScriptLanguage::get_extension() const {
 	return "gd";
 }
 
-Error GDScriptLanguage::execute_file(const String &p_path) {
-	// ??
-	return OK;
-}
-
 void GDScriptLanguage::finish() {
 	if (_call_stack) {
 		memdelete_arr(_call_stack);
@@ -2563,7 +2560,7 @@ GDScriptLanguage::GDScriptLanguage() {
 	script_frame_time = 0;
 
 	_debug_call_stack_pos = 0;
-	int dmcs = GLOBAL_DEF(PropertyInfo(Variant::INT, "debug/settings/gdscript/max_call_stack", PROPERTY_HINT_RANGE, "1024,4096,1,or_greater"), 1024);
+	int dmcs = GLOBAL_DEF(PropertyInfo(Variant::INT, "debug/settings/gdscript/max_call_stack", PROPERTY_HINT_RANGE, "512," + itos(GDScriptFunction::MAX_CALL_DEPTH - 1) + ",1"), 1024);
 
 	if (EngineDebugger::is_active()) {
 		//debugging enabled!

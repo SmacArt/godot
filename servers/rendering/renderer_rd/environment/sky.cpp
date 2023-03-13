@@ -276,9 +276,7 @@ void SkyRD::ReflectionData::update_reflection_data(int p_size, int p_mipmaps, bo
 	int mipmaps = p_mipmaps;
 	uint32_t w = p_size, h = p_size;
 
-	EffectsRD *effects = RendererCompositorRD::singleton->get_effects();
-	ERR_FAIL_NULL_MSG(effects, "Effects haven't been initialized");
-	bool prefer_raster_effects = effects->get_prefer_raster_effects();
+	bool render_buffers_can_be_storage = RendererSceneRenderRD::get_singleton()->_render_buffers_can_be_storage();
 
 	if (p_use_array) {
 		int num_layers = p_low_quality ? 8 : p_roughness_layers;
@@ -348,7 +346,7 @@ void SkyRD::ReflectionData::update_reflection_data(int p_size, int p_mipmaps, bo
 	tf.array_layers = 6;
 	tf.mipmaps = p_low_quality ? 7 : mipmaps - 1;
 	tf.usage_bits = RD::TEXTURE_USAGE_SAMPLING_BIT | RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT;
-	if (RendererSceneRenderRD::get_singleton()->_render_buffers_can_be_storage()) {
+	if (render_buffers_can_be_storage) {
 		tf.usage_bits |= RD::TEXTURE_USAGE_STORAGE_BIT;
 	}
 
@@ -364,7 +362,7 @@ void SkyRD::ReflectionData::update_reflection_data(int p_size, int p_mipmaps, bo
 			mm.size.height = mmh;
 			mm.view = RD::get_singleton()->texture_create_shared_from_slice(RD::TextureView(), downsampled_radiance_cubemap, 0, j, 1, RD::TEXTURE_SLICE_CUBEMAP);
 			RD::get_singleton()->set_resource_name(mm.view, "Downsampled Radiance Cubemap Mip " + itos(j) + " ");
-			if (prefer_raster_effects) {
+			if (render_buffers_can_be_storage) {
 				// we need a framebuffer for each side of our cubemap
 
 				for (int k = 0; k < 6; k++) {
@@ -756,7 +754,7 @@ void SkyRD::init() {
 
 		sky_shader.shader.initialize(sky_modes, defines);
 
-		if (!RendererCompositorRD::singleton->is_xr_enabled()) {
+		if (!RendererCompositorRD::get_singleton()->is_xr_enabled()) {
 			sky_shader.shader.set_variant_enabled(SKY_VERSION_BACKGROUND_MULTIVIEW, false);
 			sky_shader.shader.set_variant_enabled(SKY_VERSION_HALF_RES_MULTIVIEW, false);
 			sky_shader.shader.set_variant_enabled(SKY_VERSION_QUARTER_RES_MULTIVIEW, false);

@@ -37,9 +37,22 @@
 
 #include "core/os/os.h"
 #include "core/templates/local_vector.h"
-#include "dynwrappers/xext-so_wrap.h"
+
+#ifdef SOWRAP_ENABLED
 #include "dynwrappers/xlib-so_wrap.h"
+
+#include "dynwrappers/xext-so_wrap.h"
 #include "dynwrappers/xrender-so_wrap.h"
+#else
+#include <X11/XKBlib.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+
+#include <X11/extensions/Xext.h>
+#include <X11/extensions/Xrender.h>
+#include <X11/extensions/shape.h>
+#endif
+
 #include "servers/display_server.h"
 
 struct GLManager_X11_Private;
@@ -101,7 +114,7 @@ private:
 	Error _create_context(GLDisplay &gl_display);
 
 public:
-	XVisualInfo get_vi(Display *p_display);
+	XVisualInfo get_vi(Display *p_display, Error &r_error);
 	Error window_create(DisplayServer::WindowID p_window_id, ::Window p_window, Display *p_display, int p_width, int p_height);
 	void window_destroy(DisplayServer::WindowID p_window_id);
 	void window_resize(DisplayServer::WindowID p_window_id, int p_width, int p_height);

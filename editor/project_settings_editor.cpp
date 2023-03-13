@@ -45,7 +45,7 @@ void ProjectSettingsEditor::connect_filesystem_dock_signals(FileSystemDock *p_fs
 	localization_editor->connect_filesystem_dock_signals(p_fs_dock);
 }
 
-void ProjectSettingsEditor::popup_project_settings() {
+void ProjectSettingsEditor::popup_project_settings(bool p_clear_filter) {
 	// Restore valid window bounds or pop up at default size.
 	Rect2 saved_size = EditorSettings::get_singleton()->get_project_metadata("dialog_bounds", "project_settings", Rect2());
 	if (saved_size != Rect2()) {
@@ -62,6 +62,10 @@ void ProjectSettingsEditor::popup_project_settings() {
 	autoload_settings->update_autoload();
 	plugin_settings->update_plugins();
 	import_defaults_editor->clear();
+
+	if (p_clear_filter) {
+		search_box->clear();
+	}
 }
 
 void ProjectSettingsEditor::queue_save() {
@@ -412,7 +416,7 @@ void ProjectSettingsEditor::_action_renamed(const String &p_old_name, const Stri
 	Dictionary action = GLOBAL_GET(old_property_name);
 
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
-	undo_redo->create_action(TTR("Rename Input Action Event"));
+	undo_redo->create_action(TTR("Rename Input Action"));
 	// Do: clear old, set new
 	undo_redo->add_do_method(ProjectSettings::get_singleton(), "clear", old_property_name);
 	undo_redo->add_do_method(ProjectSettings::get_singleton(), "set", new_property_name, action);

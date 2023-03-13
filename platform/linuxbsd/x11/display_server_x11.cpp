@@ -128,6 +128,7 @@ bool DisplayServerX11::has_feature(Feature p_feature) const {
 #endif
 		case FEATURE_CLIPBOARD_PRIMARY:
 		case FEATURE_TEXT_TO_SPEECH:
+		case FEATURE_SCREEN_CAPTURE:
 			return true;
 		default: {
 		}
@@ -1169,6 +1170,29 @@ int DisplayServerX11::screen_get_dpi(int p_screen) const {
 	return 96;
 }
 
+Color DisplayServerX11::screen_get_pixel(const Point2i &p_position) const {
+	Point2i pos = p_position;
+
+	int number_of_screens = XScreenCount(x11_display);
+	for (int i = 0; i < number_of_screens; i++) {
+		Window root = XRootWindow(x11_display, i);
+		XWindowAttributes root_attrs;
+		XGetWindowAttributes(x11_display, root, &root_attrs);
+		if ((pos.x >= root_attrs.x) && (pos.x <= root_attrs.x + root_attrs.width) && (pos.y >= root_attrs.y) && (pos.y <= root_attrs.y + root_attrs.height)) {
+			XImage *image = XGetImage(x11_display, root, pos.x, pos.y, 1, 1, AllPlanes, XYPixmap);
+			if (image) {
+				XColor c;
+				c.pixel = XGetPixel(image, 0, 0);
+				XFree(image);
+				XQueryColor(x11_display, XDefaultColormap(x11_display, i), &c);
+				return Color(float(c.red) / 65535.0, float(c.green) / 65535.0, float(c.blue) / 65535.0, 1.0);
+			}
+		}
+	}
+
+	return Color();
+}
+
 float DisplayServerX11::screen_get_refresh_rate(int p_screen) const {
 	_THREAD_SAFE_METHOD_
 
@@ -1329,12 +1353,14 @@ void DisplayServerX11::delete_sub_window(WindowID p_id) {
 		wd.xic = nullptr;
 	}
 	XDestroyWindow(x11_display, wd.x11_xim_window);
+#ifdef XKB_ENABLED
 	if (xkb_loaded) {
 		if (wd.xkb_state) {
 			xkb_compose_state_unref(wd.xkb_state);
 			wd.xkb_state = nullptr;
 		}
 	}
+#endif
 
 	XUnmapWindow(x11_display, wd.x11_window);
 	XDestroyWindow(x11_display, wd.x11_window);
@@ -2055,6 +2081,22 @@ void DisplayServerX11::_validate_mode_on_map(WindowID p_window) {
 	} else if (wd.minimized && !_window_minimize_check(p_window)) {
 		_set_wm_minimized(p_window, true);
 	}
+
+	if (wd.on_top) {
+		Atom wm_state = XInternAtom(x11_display, "_NET_WM_STATE", False);
+		Atom wm_above = XInternAtom(x11_display, "_NET_WM_STATE_ABOVE", False);
+
+		XClientMessageEvent xev;
+		memset(&xev, 0, sizeof(xev));
+		xev.type = ClientMessage;
+		xev.window = wd.x11_window;
+		xev.message_type = wm_state;
+		xev.format = 32;
+		xev.data.l[0] = _NET_WM_STATE_ADD;
+		xev.data.l[1] = wm_above;
+		xev.data.l[3] = 1;
+		XSendEvent(x11_display, DefaultRootWindow(x11_display), False, SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *)&xev);
+	}
 }
 
 bool DisplayServerX11::window_is_maximize_allowed(WindowID p_window) const {
@@ -2597,6 +2639,8 @@ DisplayServerX11::CursorShape DisplayServerX11::cursor_get_shape() const {
 void DisplayServerX11::cursor_set_custom_image(const Ref<Resource> &p_cursor, CursorShape p_shape, const Vector2 &p_hotspot) {
 	_THREAD_SAFE_METHOD_
 
+	ERR_FAIL_INDEX(p_shape, CURSOR_MAX);
+
 	if (p_cursor.is_valid()) {
 		HashMap<CursorShape, Vector<Variant>>::Iterator cursor_c = cursors_cache.find(p_shape);
 
@@ -2897,7 +2941,7 @@ BitField<MouseButtonMask> DisplayServerX11::_get_mouse_button_state(MouseButton 
 }
 
 void DisplayServerX11::_handle_key_event(WindowID p_window, XKeyEvent *p_event, LocalVector<XEvent> &p_events, uint32_t &p_event_index, bool p_echo) {
-	WindowData wd = windows[p_window];
+	WindowData &wd = windows[p_window];
 	// X11 functions don't know what const is
 	XKeyEvent *xkeyevent = p_event;
 
@@ -2942,11 +2986,13 @@ void DisplayServerX11::_handle_key_event(WindowID p_window, XKeyEvent *p_event, 
 	XLookupString(&xkeyevent_no_mod, nullptr, 0, &keysym_keycode, nullptr);
 
 	String keysym;
+#ifdef XKB_ENABLED
 	if (xkb_loaded) {
 		KeySym keysym_unicode_nm = 0; // keysym used to find unicode
 		XLookupString(&xkeyevent_no_mod, nullptr, 0, &keysym_unicode_nm, nullptr);
 		keysym = String::chr(xkb_keysym_to_utf32(xkb_keysym_to_upper(keysym_unicode_nm)));
 	}
+#endif
 
 	// Meanwhile, XLookupString returns keysyms useful for unicode.
 
@@ -3035,6 +3081,7 @@ void DisplayServerX11::_handle_key_event(WindowID p_window, XKeyEvent *p_event, 
 			}
 		} while (status == XBufferOverflow);
 #endif
+#ifdef XKB_ENABLED
 	} else if (xkeyevent->type == KeyPress && wd.xkb_state && xkb_loaded) {
 		xkb_compose_feed_result res = xkb_compose_state_feed(wd.xkb_state, keysym_unicode);
 		if (res == XKB_COMPOSE_FEED_ACCEPTED) {
@@ -3093,6 +3140,7 @@ void DisplayServerX11::_handle_key_event(WindowID p_window, XKeyEvent *p_event, 
 				return;
 			}
 		}
+#endif
 	}
 
 	/* Phase 2, obtain a Godot keycode from the keysym */
@@ -4826,7 +4874,7 @@ DisplayServer *DisplayServerX11::create_func(const String &p_rendering_driver, W
 					vformat("Your video card drivers seem not to support the required Vulkan version.\n\n"
 							"If possible, consider updating your video card drivers or using the OpenGL 3 driver.\n\n"
 							"You can enable the OpenGL 3 driver by starting the engine from the\n"
-							"command line with the command:\n'%s --rendering-driver opengl3'\n\n"
+							"command line with the command:\n\n    \"%s\" --rendering-driver opengl3\n\n"
 							"If you recently updated your video card drivers, try rebooting.",
 							executable_name),
 					"Unable to initialize Vulkan video driver");
@@ -4849,7 +4897,9 @@ DisplayServerX11::WindowID DisplayServerX11::_create_window(WindowMode p_mode, V
 
 #ifdef GLES3_ENABLED
 	if (gl_manager) {
-		visualInfo = gl_manager->get_vi(x11_display);
+		Error err;
+		visualInfo = gl_manager->get_vi(x11_display, err);
+		ERR_FAIL_COND_V_MSG(err != OK, INVALID_WINDOW_ID, "Can't acquire visual info from display.");
 		vi_selected = true;
 	}
 #endif
@@ -4936,6 +4986,11 @@ DisplayServerX11::WindowID DisplayServerX11::_create_window(WindowMode p_mode, V
 		win_rect.position = wpos;
 	}
 
+	// Position and size hints are set from these values before they are updated to the actual
+	// window size, so we need to initialize them here.
+	wd.position = win_rect.position;
+	wd.size = win_rect.size;
+
 	{
 		wd.x11_window = XCreateWindow(x11_display, RootWindow(x11_display, visualInfo.screen), win_rect.position.x, win_rect.position.y, win_rect.size.width > 0 ? win_rect.size.width : 1, win_rect.size.height > 0 ? win_rect.size.height : 1, 0, visualInfo.depth, InputOutput, visualInfo.visual, valuemask, &windowAttributes);
 
@@ -4943,11 +4998,11 @@ DisplayServerX11::WindowID DisplayServerX11::_create_window(WindowMode p_mode, V
 		window_attributes_ime.event_mask = KeyPressMask | KeyReleaseMask | StructureNotifyMask | ExposureMask;
 
 		wd.x11_xim_window = XCreateWindow(x11_display, wd.x11_window, 0, 0, 1, 1, 0, CopyFromParent, InputOnly, CopyFromParent, CWEventMask, &window_attributes_ime);
-
+#ifdef XKB_ENABLED
 		if (dead_tbl && xkb_loaded) {
 			wd.xkb_state = xkb_compose_state_new(dead_tbl, XKB_COMPOSE_STATE_NO_FLAGS);
 		}
-
+#endif
 		// Enable receiving notification when the window is initialized (MapNotify)
 		// so the focus can be set at the right time.
 		if (!wd.no_focus && !wd.is_popup) {
@@ -5212,6 +5267,7 @@ static ::XIMStyle _get_best_xim_style(const ::XIMStyle &p_style_a, const ::XIMSt
 DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode p_mode, VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, int p_screen, Error &r_error) {
 	KeyMappingX11::initialize();
 
+#ifdef SOWRAP_ENABLED
 #ifdef DEBUG_ENABLED
 	int dylibloader_verbose = 1;
 #else
@@ -5226,9 +5282,12 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 		r_error = ERR_UNAVAILABLE;
 		ERR_FAIL_MSG("Can't load XCursor dynamically.");
 	}
-
+#ifdef XKB_ENABLED
 	xkb_loaded = (initialize_xkbcommon(dylibloader_verbose) == 0);
-
+	if (!xkb_context_new || !xkb_compose_table_new_from_locale || !xkb_compose_table_unref || !xkb_context_unref || !xkb_compose_state_feed || !xkb_compose_state_unref || !xkb_compose_state_new || !xkb_compose_state_get_status || !xkb_compose_state_get_utf8 || !xkb_keysym_to_utf32 || !xkb_keysym_to_upper) {
+		xkb_loaded = false;
+	}
+#endif
 	if (initialize_xext(dylibloader_verbose) != 0) {
 		r_error = ERR_UNAVAILABLE;
 		ERR_FAIL_MSG("Can't load Xext dynamically.");
@@ -5253,7 +5312,13 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 		r_error = ERR_UNAVAILABLE;
 		ERR_FAIL_MSG("Can't load Xinput2 dynamically.");
 	}
+#else
+#ifdef XKB_ENABLED
+	xkb_loaded = true;
+#endif
+#endif
 
+#ifdef XKB_ENABLED
 	if (xkb_loaded) {
 		xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 		if (xkb_ctx) {
@@ -5270,6 +5335,7 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 			dead_tbl = xkb_compose_table_new_from_locale(xkb_ctx, locale, XKB_COMPOSE_COMPILE_NO_FLAGS);
 		}
 	}
+#endif
 
 	Input::get_singleton()->set_event_dispatch_function(_dispatch_input_events);
 
@@ -5712,16 +5778,19 @@ DisplayServerX11::~DisplayServerX11() {
 			wd.xic = nullptr;
 		}
 		XDestroyWindow(x11_display, wd.x11_xim_window);
+#ifdef XKB_ENABLED
 		if (xkb_loaded) {
 			if (wd.xkb_state) {
 				xkb_compose_state_unref(wd.xkb_state);
 				wd.xkb_state = nullptr;
 			}
 		}
+#endif
 		XUnmapWindow(x11_display, wd.x11_window);
 		XDestroyWindow(x11_display, wd.x11_window);
 	}
 
+#ifdef XKB_ENABLED
 	if (xkb_loaded) {
 		if (dead_tbl) {
 			xkb_compose_table_unref(dead_tbl);
@@ -5730,6 +5799,7 @@ DisplayServerX11::~DisplayServerX11() {
 			xkb_context_unref(xkb_ctx);
 		}
 	}
+#endif
 
 	//destroy drivers
 #if defined(VULKAN_ENABLED)
