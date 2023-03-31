@@ -356,12 +356,13 @@ void EditorNode::_update_scene_tabs() {
 		scene_tabs->set_current_tab(editor_data.get_edited_scene());
 	}
 
+	const Size2 add_button_size = Size2(0, scene_tabs->get_size().y);
 	if (scene_tabs->get_offset_buttons_visible()) {
 		// Move the add button to a fixed position.
 		if (scene_tab_add->get_parent() == scene_tabs) {
 			scene_tabs->remove_child(scene_tab_add);
 			scene_tab_add_ph->add_child(scene_tab_add);
-			scene_tab_add->set_position(Point2());
+			scene_tab_add->set_rect(Rect2(Point2(), add_button_size));
 		}
 	} else {
 		// Move the add button to be after the last tab.
@@ -371,16 +372,16 @@ void EditorNode::_update_scene_tabs() {
 		}
 
 		if (scene_tabs->get_tab_count() == 0) {
-			scene_tab_add->set_position(Point2());
+			scene_tab_add->set_rect(Rect2(Point2(), add_button_size));
 			return;
 		}
 
 		Rect2 last_tab = scene_tabs->get_tab_rect(scene_tabs->get_tab_count() - 1);
 		int hsep = scene_tabs->get_theme_constant(SNAME("h_separation"));
 		if (scene_tabs->is_layout_rtl()) {
-			scene_tab_add->set_position(Point2(last_tab.position.x - scene_tab_add->get_size().x - hsep, last_tab.position.y));
+			scene_tab_add->set_rect(Rect2(Point2(last_tab.position.x - scene_tab_add->get_size().x - hsep, last_tab.position.y), add_button_size));
 		} else {
-			scene_tab_add->set_position(Point2(last_tab.position.x + last_tab.size.width + hsep, last_tab.position.y));
+			scene_tab_add->set_rect(Rect2(Point2(last_tab.position.x + last_tab.size.width + hsep, last_tab.position.y), add_button_size));
 		}
 	}
 
@@ -3533,6 +3534,10 @@ void EditorNode::remove_editor_plugin(EditorPlugin *p_editor, bool p_config_chan
 	singleton->editor_plugins_force_input_forwarding->remove_plugin(p_editor);
 	singleton->remove_child(p_editor);
 	singleton->editor_data.remove_editor_plugin(p_editor);
+
+	for (KeyValue<ObjectID, HashSet<EditorPlugin *>> &kv : singleton->active_plugins) {
+		kv.value.erase(p_editor);
+	}
 }
 
 void EditorNode::_update_addon_config() {
@@ -7156,6 +7161,7 @@ EditorNode::EditorNode() {
 	scene_tabs->set_tab_close_display_policy((TabBar::CloseButtonDisplayPolicy)EDITOR_GET("interface/scene_tabs/display_close_button").operator int());
 	scene_tabs->set_max_tab_width(int(EDITOR_GET("interface/scene_tabs/maximum_width")) * EDSCALE);
 	scene_tabs->set_drag_to_rearrange_enabled(true);
+	scene_tabs->set_auto_translate(false);
 	scene_tabs->connect("tab_changed", callable_mp(this, &EditorNode::_scene_tab_changed));
 	scene_tabs->connect("tab_button_pressed", callable_mp(this, &EditorNode::_scene_tab_script_edited));
 	scene_tabs->connect("tab_close_pressed", callable_mp(this, &EditorNode::_scene_tab_closed).bind(SCENE_TAB_CLOSE));
@@ -7436,6 +7442,7 @@ EditorNode::EditorNode() {
 
 	editor_layouts = memnew(PopupMenu);
 	editor_layouts->set_name("Layouts");
+	editor_layouts->set_auto_translate(false);
 	settings_menu->add_child(editor_layouts);
 	editor_layouts->connect("id_pressed", callable_mp(this, &EditorNode::_layout_menu_option));
 	settings_menu->add_submenu_item(TTR("Editor Layout"), "Layouts");
