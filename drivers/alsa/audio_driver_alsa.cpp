@@ -44,7 +44,8 @@ extern int initialize_pulse(int verbose);
 #endif
 
 Error AudioDriverALSA::init_output_device() {
-	mix_rate = GLOBAL_GET("audio/driver/mix_rate");
+	mix_rate = _get_configured_mix_rate();
+
 	speaker_mode = SPEAKER_MODE_STEREO;
 	channels = 2;
 
@@ -338,7 +339,9 @@ void AudioDriverALSA::finish_output_device() {
 
 void AudioDriverALSA::finish() {
 	exit_thread.set();
-	thread.wait_to_finish();
+	if (thread.is_started()) {
+		thread.wait_to_finish();
+	}
 
 	finish_output_device();
 }

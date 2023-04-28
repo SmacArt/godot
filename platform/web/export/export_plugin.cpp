@@ -33,6 +33,7 @@
 #include "core/config/project_settings.h"
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
+#include "editor/export/editor_export.h"
 #include "platform/web/logo_svg.gen.h"
 #include "platform/web/run_icon_svg.gen.h"
 
@@ -686,5 +687,7 @@ EditorExportPlatformWeb::~EditorExportPlatformWeb() {
 		server->stop();
 	}
 	server_quit = true;
-	server_thread.wait_to_finish();
+	if (server_thread.is_started()) {
+		server_thread.wait_to_finish();
+	}
 }
