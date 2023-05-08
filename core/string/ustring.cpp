@@ -2857,6 +2857,12 @@ String String::insert(int p_at_pos, const String &p_string) const {
 	return pre + p_string + post;
 }
 
+String String::erase(int p_pos, int p_chars) const {
+	ERR_FAIL_COND_V_MSG(p_pos < 0, "", vformat("Invalid starting position for `String.erase()`: %d. Starting position must be positive or zero.", p_pos));
+	ERR_FAIL_COND_V_MSG(p_chars < 0, "", vformat("Invalid character count for `String.erase()`: %d. Character count must be positive or zero.", p_chars));
+	return left(p_pos) + substr(p_pos + p_chars);
+}
+
 String String::substr(int p_from, int p_chars) const {
 	if (p_chars == -1) {
 		p_chars = length() - p_from;
@@ -3524,6 +3530,14 @@ String String::replacen(const String &p_key, const String &p_with) const {
 String String::repeat(int p_count) const {
 	ERR_FAIL_COND_V_MSG(p_count < 0, "", "Parameter count should be a positive number.");
 
+	if (p_count == 0) {
+		return "";
+	}
+
+	if (p_count == 1) {
+		return *this;
+	}
+
 	int len = length();
 	String new_string = *this;
 	new_string.resize(p_count * len + 1);
@@ -4161,13 +4175,11 @@ String String::pad_decimals(int p_digits) const {
 	}
 
 	if (s.length() - (c + 1) > p_digits) {
-		s = s.substr(0, c + p_digits + 1);
+		return s.substr(0, c + p_digits + 1);
 	} else {
-		while (s.length() - (c + 1) < p_digits) {
-			s += "0";
-		}
+		int zeros_to_add = p_digits - s.length() + (c + 1);
+		return s + String("0").repeat(zeros_to_add);
 	}
-	return s;
 }
 
 String String::pad_zeros(int p_digits) const {
@@ -4192,12 +4204,8 @@ String String::pad_zeros(int p_digits) const {
 		return s;
 	}
 
-	while (end - begin < p_digits) {
-		s = s.insert(begin, "0");
-		end++;
-	}
-
-	return s;
+	int zeros_to_add = p_digits - (end - begin);
+	return s.insert(begin, String("0").repeat(zeros_to_add));
 }
 
 String String::trim_prefix(const String &p_prefix) const {
@@ -4376,11 +4384,8 @@ String String::path_to(const String &p_path) const {
 
 	common_parent--;
 
-	String dir;
-
-	for (int i = src_dirs.size() - 1; i > common_parent; i--) {
-		dir += "../";
-	}
+	int dirs_to_backtrack = (src_dirs.size() - 1) - common_parent;
+	String dir = String("../").repeat(dirs_to_backtrack);
 
 	for (int i = common_parent + 1; i < dst_dirs.size(); i++) {
 		dir += dst_dirs[i] + "/";
@@ -4669,11 +4674,8 @@ String String::rpad(int min_length, const String &character) const {
 	String s = *this;
 	int padding = min_length - s.length();
 	if (padding > 0) {
-		for (int i = 0; i < padding; i++) {
-			s = s + character;
-		}
+		s += character.repeat(padding);
 	}
-
 	return s;
 }
 
@@ -4682,11 +4684,8 @@ String String::lpad(int min_length, const String &character) const {
 	String s = *this;
 	int padding = min_length - s.length();
 	if (padding > 0) {
-		for (int i = 0; i < padding; i++) {
-			s = character + s;
-		}
+		s = character.repeat(padding) + s;
 	}
-
 	return s;
 }
 

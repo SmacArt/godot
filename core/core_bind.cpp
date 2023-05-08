@@ -423,7 +423,14 @@ Error OS::set_thread_name(const String &p_name) {
 };
 
 bool OS::has_feature(const String &p_feature) const {
-	return ::OS::get_singleton()->has_feature(p_feature);
+	const bool *value_ptr = feature_cache.getptr(p_feature);
+	if (value_ptr) {
+		return *value_ptr;
+	} else {
+		const bool has = ::OS::get_singleton()->has_feature(p_feature);
+		feature_cache[p_feature] = has;
+		return has;
+	}
 }
 
 uint64_t OS::get_static_memory_usage() const {
@@ -975,10 +982,11 @@ Vector<Vector3> Geometry3D::segment_intersects_cylinder(const Vector3 &p_from, c
 	return r;
 }
 
-Vector<Vector3> Geometry3D::segment_intersects_convex(const Vector3 &p_from, const Vector3 &p_to, const Vector<Plane> &p_planes) {
+Vector<Vector3> Geometry3D::segment_intersects_convex(const Vector3 &p_from, const Vector3 &p_to, const TypedArray<Plane> &p_planes) {
 	Vector<Vector3> r;
 	Vector3 res, norm;
-	if (!::Geometry3D::segment_intersects_convex(p_from, p_to, p_planes.ptr(), p_planes.size(), &res, &norm)) {
+	Vector<Plane> planes = Variant(p_planes);
+	if (!::Geometry3D::segment_intersects_convex(p_from, p_to, planes.ptr(), planes.size(), &res, &norm)) {
 		return r;
 	}
 

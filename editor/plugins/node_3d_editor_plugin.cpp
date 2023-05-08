@@ -8578,9 +8578,11 @@ void fragment() {
 		sun_color->get_popup()->connect("about_to_popup", callable_mp(EditorNode::get_singleton(), &EditorNode::setup_color_picker).bind(sun_color->get_picker()));
 
 		sun_energy = memnew(EditorSpinSlider);
+		sun_energy->set_max(64.0);
+		sun_energy->set_min(0);
+		sun_energy->set_step(0.05);
 		sun_vb->add_margin_child(TTR("Sun Energy"), sun_energy);
 		sun_energy->connect("value_changed", callable_mp(this, &Node3DEditor::_preview_settings_changed).unbind(1));
-		sun_energy->set_max(64.0);
 
 		sun_max_distance = memnew(EditorSpinSlider);
 		sun_vb->add_margin_child(TTR("Shadow Max Distance"), sun_max_distance);
@@ -8629,8 +8631,10 @@ void fragment() {
 		environ_ground_color->get_popup()->connect("about_to_popup", callable_mp(EditorNode::get_singleton(), &EditorNode::setup_color_picker).bind(environ_ground_color->get_picker()));
 		environ_vb->add_margin_child(TTR("Ground Color"), environ_ground_color);
 		environ_energy = memnew(EditorSpinSlider);
-		environ_energy->connect("value_changed", callable_mp(this, &Node3DEditor::_preview_settings_changed).unbind(1));
 		environ_energy->set_max(8.0);
+		environ_energy->set_min(0);
+		environ_energy->set_step(0.05);
+		environ_energy->connect("value_changed", callable_mp(this, &Node3DEditor::_preview_settings_changed).unbind(1));
 		environ_vb->add_margin_child(TTR("Sky Energy"), environ_energy);
 		HBoxContainer *fx_vb = memnew(HBoxContainer);
 		fx_vb->set_h_size_flags(SIZE_EXPAND_FILL);

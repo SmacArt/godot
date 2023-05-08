@@ -338,6 +338,10 @@ void CanvasItem::_notification(int p_what) {
 		case NOTIFICATION_VISIBILITY_CHANGED: {
 			emit_signal(SceneStringNames::get_singleton()->visibility_changed);
 		} break;
+		case NOTIFICATION_WORLD_2D_CHANGED: {
+			_exit_canvas();
+			_enter_canvas();
+		}
 	}
 }
 
@@ -569,8 +573,7 @@ void CanvasItem::draw_line(const Point2 &p_from, const Point2 &p_to, const Color
 void CanvasItem::draw_polyline(const Vector<Point2> &p_points, const Color &p_color, real_t p_width, bool p_antialiased) {
 	ERR_FAIL_COND_MSG(!drawing, "Drawing is only allowed inside NOTIFICATION_DRAW, _draw() function or 'draw' signal.");
 
-	Vector<Color> colors;
-	colors.push_back(p_color);
+	Vector<Color> colors = { p_color };
 	RenderingServer::get_singleton()->canvas_item_add_polyline(canvas_item, p_points, colors, p_width, p_antialiased);
 }
 
@@ -598,8 +601,7 @@ void CanvasItem::draw_arc(const Vector2 &p_center, real_t p_radius, real_t p_sta
 void CanvasItem::draw_multiline(const Vector<Point2> &p_points, const Color &p_color, real_t p_width) {
 	ERR_FAIL_COND_MSG(!drawing, "Drawing is only allowed inside NOTIFICATION_DRAW, _draw() function or 'draw' signal.");
 
-	Vector<Color> colors;
-	colors.push_back(p_color);
+	Vector<Color> colors = { p_color };
 	RenderingServer::get_singleton()->canvas_item_add_multiline(canvas_item, p_points, colors, p_width);
 }
 
@@ -727,8 +729,7 @@ void CanvasItem::draw_polygon(const Vector<Point2> &p_points, const Vector<Color
 void CanvasItem::draw_colored_polygon(const Vector<Point2> &p_points, const Color &p_color, const Vector<Point2> &p_uvs, Ref<Texture2D> p_texture) {
 	ERR_FAIL_COND_MSG(!drawing, "Drawing is only allowed inside NOTIFICATION_DRAW, _draw() function or 'draw' signal.");
 
-	Vector<Color> colors;
-	colors.push_back(p_color);
+	Vector<Color> colors = { p_color };
 	RID rid = p_texture.is_valid() ? p_texture->get_rid() : RID();
 	RenderingServer::get_singleton()->canvas_item_add_polygon(canvas_item, p_points, colors, p_uvs, rid);
 }
@@ -1123,6 +1124,7 @@ void CanvasItem::_bind_methods() {
 	BIND_CONSTANT(NOTIFICATION_VISIBILITY_CHANGED);
 	BIND_CONSTANT(NOTIFICATION_ENTER_CANVAS);
 	BIND_CONSTANT(NOTIFICATION_EXIT_CANVAS);
+	BIND_CONSTANT(NOTIFICATION_WORLD_2D_CHANGED);
 
 	BIND_ENUM_CONSTANT(TEXTURE_FILTER_PARENT_NODE);
 	BIND_ENUM_CONSTANT(TEXTURE_FILTER_NEAREST);

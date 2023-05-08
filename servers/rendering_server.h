@@ -57,6 +57,8 @@ class RenderingServer : public Object {
 	const Vector2 SMALL_VEC2 = Vector2(CMP_EPSILON, CMP_EPSILON);
 	const Vector3 SMALL_VEC3 = Vector3(CMP_EPSILON, CMP_EPSILON, CMP_EPSILON);
 
+	virtual TypedArray<StringName> _global_shader_parameter_get_list() const;
+
 protected:
 	RID _make_test_cube();
 	void _free_internal_rids();
@@ -837,6 +839,7 @@ public:
 
 	virtual void viewport_set_clear_mode(RID p_viewport, ViewportClearMode p_clear_mode) = 0;
 
+	virtual RID viewport_get_render_target(RID p_viewport) const = 0;
 	virtual RID viewport_get_texture(RID p_viewport) const = 0;
 
 	enum ViewportEnvironmentMode {

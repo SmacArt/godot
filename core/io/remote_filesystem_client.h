@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  dir_access_windows.h                                                  */
+/*  remote_filesystem_client.h                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,67 +28,38 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef DIR_ACCESS_WINDOWS_H
-#define DIR_ACCESS_WINDOWS_H
+#ifndef REMOTE_FILESYSTEM_CLIENT_H
+#define REMOTE_FILESYSTEM_CLIENT_H
 
-#ifdef WINDOWS_ENABLED
+#include "core/io/ip_address.h"
+#include "core/string/ustring.h"
+#include "core/templates/hash_set.h"
+#include "core/templates/local_vector.h"
 
-#include "core/io/dir_access.h"
-
-struct DirAccessWindowsPrivate;
-
-class DirAccessWindows : public DirAccess {
-	enum {
-		MAX_DRIVES = 26
-	};
-
-	DirAccessWindowsPrivate *p = nullptr;
-	/* Windows stuff */
-
-	char drives[MAX_DRIVES] = { 0 }; // a-z:
-	int drive_count = 0;
-
-	String current_dir;
-
-	bool _cisdir = false;
-	bool _cishidden = false;
+class RemoteFilesystemClient {
+	String cache_path;
+	HashSet<String> validated_directories;
 
 protected:
-	virtual String fix_path(String p_path) const override;
+	String _get_cache_path() { return cache_path; }
+	struct FileCache {
+		String path; // Local path (as in "folder/to/file.png")
+		uint64_t server_modified_time; // MD5 checksum.
+		uint64_t modified_time;
+	};
+	virtual bool _is_configured() { return !cache_path.is_empty(); }
+	// Can be re-implemented per platform. If so, feel free to ignore get_cache_path()
+	virtual Vector<FileCache> _load_cache_file();
+	virtual Error _store_file(const String &p_path, const LocalVector<uint8_t> &p_file, uint64_t &modified_time);
+	virtual Error _remove_file(const String &p_path);
+	virtual Error _store_cache_file(const Vector<FileCache> &p_cache);
+	virtual Error _synchronize_with_server(const String &p_host, int p_port, const String &p_password, String &r_cache_path);
+
+	virtual void _update_cache_path(String &r_cache_path);
 
 public:
-	virtual Error list_dir_begin() override; ///< This starts dir listing
-	virtual String get_next() override;
-	virtual bool current_is_dir() const override;
-	virtual bool current_is_hidden() const override;
-	virtual void list_dir_end() override; ///<
-
-	virtual int get_drive_count() override;
-	virtual String get_drive(int p_drive) override;
-
-	virtual Error change_dir(String p_dir) override; ///< can be relative or absolute, return false on success
-	virtual String get_current_dir(bool p_include_drive = true) const override; ///< return current dir location
-
-	virtual bool file_exists(String p_file) override;
-	virtual bool dir_exists(String p_dir) override;
-
-	virtual Error make_dir(String p_dir) override;
-
-	virtual Error rename(String p_path, String p_new_path) override;
-	virtual Error remove(String p_path) override;
-
-	virtual bool is_link(String p_file) override { return false; };
-	virtual String read_link(String p_file) override { return p_file; };
-	virtual Error create_link(String p_source, String p_target) override { return FAILED; };
-
-	uint64_t get_space_left() override;
-
-	virtual String get_filesystem_type() const override;
-
-	DirAccessWindows();
-	~DirAccessWindows();
+	Error synchronize_with_server(const String &p_host, int p_port, const String &p_password, String &r_cache_path);
+	virtual ~RemoteFilesystemClient() {}
 };
 
-#endif // WINDOWS_ENABLED
-
-#endif // DIR_ACCESS_WINDOWS_H
+#endif // REMOTE_FILESYSTEM_CLIENT_H
