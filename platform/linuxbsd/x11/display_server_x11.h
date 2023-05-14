@@ -119,8 +119,7 @@ typedef struct _xrr_monitor_info {
 #undef CursorShape
 
 class DisplayServerX11 : public DisplayServer {
-	//No need to register, it's platform-specific and nothing is added
-	//GDCLASS(DisplayServerX11, DisplayServer)
+	// No need to register with GDCLASS, it's platform-specific and nothing is added.
 
 	_THREAD_SAFE_CLASS_
 
@@ -307,7 +306,7 @@ class DisplayServerX11 : public DisplayServer {
 
 	const char *cursor_theme = nullptr;
 	int cursor_size = 0;
-	XcursorImage *img[CURSOR_MAX];
+	XcursorImage *cursor_img[CURSOR_MAX];
 	Cursor cursors[CURSOR_MAX];
 	Cursor null_cursor;
 	CursorShape current_cursor = CURSOR_ARROW;

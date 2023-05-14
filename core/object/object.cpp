@@ -201,6 +201,10 @@ bool Object::_predelete() {
 	return _predelete_ok;
 }
 
+void Object::cancel_free() {
+	_predelete_ok = false;
+}
+
 void Object::_postinitialize() {
 	_class_name_ptr = _get_class_namev(); // Set the direct pointer, which is much faster to obtain, but can only happen after postinitialize.
 	_initialize_classv();
@@ -884,8 +888,13 @@ void Object::set_meta(const StringName &p_name, const Variant &p_value) {
 	if (p_value.get_type() == Variant::NIL) {
 		if (metadata.has(p_name)) {
 			metadata.erase(p_name);
-			metadata_properties.erase("metadata/" + p_name.operator String());
-			notify_property_list_changed();
+
+			const String &sname = p_name;
+			metadata_properties.erase("metadata/" + sname);
+			if (!sname.begins_with("_")) {
+				// Metadata starting with _ don't show up in the inspector, so no need to update.
+				notify_property_list_changed();
+			}
 		}
 		return;
 	}
@@ -896,8 +905,12 @@ void Object::set_meta(const StringName &p_name, const Variant &p_value) {
 	} else {
 		ERR_FAIL_COND(!p_name.operator String().is_valid_identifier());
 		Variant *V = &metadata.insert(p_name, p_value)->value;
-		metadata_properties["metadata/" + p_name.operator String()] = V;
-		notify_property_list_changed();
+
+		const String &sname = p_name;
+		metadata_properties["metadata/" + sname] = V;
+		if (!sname.begins_with("_")) {
+			notify_property_list_changed();
+		}
 	}
 }
 
@@ -1561,6 +1574,7 @@ void Object::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("tr_n", "message", "plural_message", "n", "context"), &Object::tr_n, DEFVAL(""));
 
 	ClassDB::bind_method(D_METHOD("is_queued_for_deletion"), &Object::is_queued_for_deletion);
+	ClassDB::bind_method(D_METHOD("cancel_free"), &Object::cancel_free);
 
 	ClassDB::add_virtual_method("Object", MethodInfo("free"), false);
 

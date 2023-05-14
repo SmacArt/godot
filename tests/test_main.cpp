@@ -93,6 +93,7 @@
 #include "tests/scene/test_code_edit.h"
 #include "tests/scene/test_curve.h"
 #include "tests/scene/test_curve_2d.h"
+#include "tests/scene/test_curve_3d.h"
 #include "tests/scene/test_gradient.h"
 #include "tests/scene/test_navigation_agent_2d.h"
 #include "tests/scene/test_navigation_agent_3d.h"
@@ -133,6 +134,8 @@ int test_main(int argc, char *argv[]) {
 	}
 	OS::get_singleton()->set_cmdline("", args, List<String>());
 	DisplayServerMock::register_mock_driver();
+
+	WorkerThreadPool::get_singleton()->init();
 
 	// Run custom test tools.
 	if (test_commands) {
@@ -255,8 +258,8 @@ struct GodotTestCaseListener : public doctest::IReporter {
 		}
 
 		if (suite_name.find("[Navigation]") != -1 && navigation_server_2d == nullptr && navigation_server_3d == nullptr) {
-			navigation_server_2d = memnew(NavigationServer2D);
 			navigation_server_3d = NavigationServer3DManager::new_default_server();
+			navigation_server_2d = memnew(NavigationServer2D);
 			return;
 		}
 	}

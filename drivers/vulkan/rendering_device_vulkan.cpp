@@ -2881,6 +2881,15 @@ Size2i RenderingDeviceVulkan::texture_size(RID p_texture) {
 	return Size2i(tex->width, tex->height);
 }
 
+uint64_t RenderingDeviceVulkan::texture_native_handle(RID p_texture) {
+	_THREAD_SAFE_METHOD_
+
+	Texture *tex = texture_owner.get_or_null(p_texture);
+	ERR_FAIL_COND_V(!tex, 0);
+
+	return (uint64_t)tex->image;
+}
+
 Error RenderingDeviceVulkan::texture_copy(RID p_from_texture, RID p_to_texture, const Vector3 &p_from, const Vector3 &p_to, const Vector3 &p_size, uint32_t p_src_mipmap, uint32_t p_dst_mipmap, uint32_t p_src_layer, uint32_t p_dst_layer, BitField<BarrierMask> p_post_barrier) {
 	_THREAD_SAFE_METHOD_
 
@@ -8915,6 +8924,11 @@ void RenderingDeviceVulkan::initialize(VulkanContext *p_context, bool p_local_de
 		}
 	}
 
+	for (int i = 0; i < frame_count; i++) {
+		//Reset all queries in a query pool before doing any operations with them.
+		vkCmdResetQueryPool(frames[0].setup_command_buffer, frames[i].timestamp_pool, 0, max_timestamp_query_elements);
+	}
+
 	staging_buffer_block_size = GLOBAL_GET("rendering/rendering_device/staging_buffer/block_size_kb");
 	staging_buffer_block_size = MAX(4u, staging_buffer_block_size);
 	staging_buffer_block_size *= 1024; // Kb -> bytes.
@@ -9379,6 +9393,9 @@ bool RenderingDeviceVulkan::has_feature(const Features p_feature) const {
 		case SUPPORTS_ATTACHMENT_VRS: {
 			VulkanContext::VRSCapabilities vrs_capabilities = context->get_vrs_capabilities();
 			return vrs_capabilities.attachment_vrs_supported && context->get_physical_device_features().shaderStorageImageExtendedFormats;
+		} break;
+		case SUPPORTS_FRAGMENT_SHADER_WITH_ONLY_SIDE_EFFECTS: {
+			return true;
 		} break;
 		default: {
 			return false;

@@ -112,6 +112,10 @@
 #include "modules/mono/editor/bindings_generator.h"
 #endif
 
+#ifdef MODULE_GDSCRIPT_ENABLED
+#include "modules/gdscript/gdscript.h"
+#endif
+
 /* Static members */
 
 // Singletons
@@ -178,6 +182,7 @@ static int converter_max_line_length = 100000;
 
 HashMap<Main::CLIScope, Vector<String>> forwardable_cli_arguments;
 #endif
+static bool single_threaded_scene = false;
 bool use_startup_benchmark = false;
 String startup_benchmark_file;
 
@@ -205,6 +210,7 @@ static bool use_debug_profiler = false;
 static bool debug_collisions = false;
 static bool debug_paths = false;
 static bool debug_navigation = false;
+static bool debug_avoidance = false;
 #endif
 static int frame_delay = 0;
 static bool disable_render_loop = false;
@@ -246,6 +252,31 @@ static String get_full_version_string() {
 	}
 	return String(VERSION_FULL_BUILD) + hash;
 }
+
+#if defined(TOOLS_ENABLED) && defined(MODULE_GDSCRIPT_ENABLED)
+static Vector<String> get_files_with_extension(const String &p_root, const String &p_extension) {
+	Vector<String> paths;
+
+	Ref<DirAccess> dir = DirAccess::open(p_root);
+	if (dir.is_valid()) {
+		dir->list_dir_begin();
+		String fn = dir->get_next();
+		while (!fn.is_empty()) {
+			if (!dir->current_is_hidden() && fn != "." && fn != "..") {
+				if (dir->current_is_dir()) {
+					paths.append_array(get_files_with_extension(p_root.path_join(fn), p_extension));
+				} else if (fn.get_extension() == p_extension) {
+					paths.append(p_root.path_join(fn));
+				}
+			}
+			fn = dir->get_next();
+		}
+		dir->list_dir_end();
+	}
+
+	return paths;
+}
+#endif
 
 // FIXME: Could maybe be moved to have less code in main.cpp.
 void initialize_physics() {
@@ -423,10 +454,12 @@ void Main::print_help(const char *p_binary) {
 	OS::get_singleton()->print("  --gpu-abort                       Abort on graphics API usage errors (usually validation layer errors). May help see the problem if your system freezes.\n");
 #endif
 	OS::get_singleton()->print("  --remote-debug <uri>              Remote debug (<protocol>://<host/IP>[:<port>], e.g. tcp://127.0.0.1:6007).\n");
+	OS::get_singleton()->print("  --single-threaded-scene           Scene tree runs in single-threaded mode. Sub-thread groups are disabled and run on the main thread.\n");
 #if defined(DEBUG_ENABLED)
 	OS::get_singleton()->print("  --debug-collisions                Show collision shapes when running the scene.\n");
 	OS::get_singleton()->print("  --debug-paths                     Show path lines when running the scene.\n");
 	OS::get_singleton()->print("  --debug-navigation                Show navigation polygons when running the scene.\n");
+	OS::get_singleton()->print("  --debug-avoidance                 Show navigation polygons when running the scene.\n");
 	OS::get_singleton()->print("  --debug-stringnames               Print all StringName allocations to stdout when the engine quits.\n");
 #endif
 	OS::get_singleton()->print("  --frame-delay <ms>                Simulate high CPU load (delay each frame by <ms> milliseconds).\n");
@@ -455,6 +488,9 @@ void Main::print_help(const char *p_binary) {
 #endif // DISABLE_DEPRECATED
 	OS::get_singleton()->print("  --doctool [<path>]                Dump the engine API reference to the given <path> (defaults to current dir) in XML format, merging if existing files are found.\n");
 	OS::get_singleton()->print("  --no-docbase                      Disallow dumping the base types (used with --doctool).\n");
+#ifdef MODULE_GDSCRIPT_ENABLED
+	OS::get_singleton()->print("  --gdscript-docs <path>            Rather than dumping the engine API, generate API reference from the inline documentation in the GDScript files found in <path> (used with --doctool).\n");
+#endif
 	OS::get_singleton()->print("  --build-solutions                 Build the scripting solutions (e.g. for C# projects). Implies --editor and requires a valid project to edit.\n");
 	OS::get_singleton()->print("  --dump-gdextension-interface      Generate GDExtension header file 'gdextension_interface.h' in the current folder. This file is the base file required to implement a GDExtension.\n");
 	OS::get_singleton()->print("  --dump-extension-api              Generate JSON dump of the Godot API for GDExtension bindings named 'extension_api.json' in the current folder.\n");
@@ -581,8 +617,6 @@ void Main::test_cleanup() {
 		TextServerManager::get_singleton()->get_interface(i)->cleanup();
 	}
 
-	EngineDebugger::deinitialize();
-
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
 
@@ -594,6 +628,7 @@ void Main::test_cleanup() {
 
 	GDExtensionManager::get_singleton()->deinitialize_extensions(GDExtension::INITIALIZATION_LEVEL_SCENE);
 	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_SCENE);
+
 	unregister_platform_apis();
 	unregister_driver_types();
 	unregister_scene_types();
@@ -604,8 +639,12 @@ void Main::test_cleanup() {
 	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_SERVERS);
 	unregister_server_types();
 
+	EngineDebugger::deinitialize();
 	OS::get_singleton()->finalize();
 
+	if (packed_data) {
+		memdelete(packed_data);
+	}
 	if (translation_server) {
 		memdelete(translation_server);
 	}
@@ -621,16 +660,13 @@ void Main::test_cleanup() {
 	if (globals) {
 		memdelete(globals);
 	}
-	if (packed_data) {
-		memdelete(packed_data);
-	}
 	if (engine) {
 		memdelete(engine);
 	}
 
 	unregister_core_driver_types();
-	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_CORE);
 	unregister_core_extensions();
+	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_CORE);
 	unregister_core_types();
 
 	OS::get_singleton()->finalize_core();
@@ -1108,6 +1144,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				OS::get_singleton()->print("Missing remote debug server uri, aborting.\n");
 				goto error;
 			}
+		} else if (I->get() == "--single-threaded-scene") {
+			single_threaded_scene = true;
 		} else if (I->get() == "--build-solutions") { // Build the scripting solution such C#
 
 			auto_build_solutions = true;
@@ -1276,6 +1314,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			debug_paths = true;
 		} else if (I->get() == "--debug-navigation") {
 			debug_navigation = true;
+		} else if (I->get() == "--debug-avoidance") {
+			debug_avoidance = true;
 		} else if (I->get() == "--debug-stringnames") {
 			StringName::set_debug_stringnames(true);
 #endif
@@ -1412,6 +1452,19 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 		goto error;
 #endif
+	}
+
+	// Initialize WorkerThreadPool.
+	{
+		int worker_threads = GLOBAL_GET("threading/worker_pool/max_threads");
+		bool low_priority_use_system_threads = GLOBAL_GET("threading/worker_pool/use_system_threads_for_low_priority_tasks");
+		float low_property_ratio = GLOBAL_GET("threading/worker_pool/low_priority_thread_ratio");
+
+		if (editor || project_manager) {
+			WorkerThreadPool::get_singleton()->init();
+		} else {
+			WorkerThreadPool::get_singleton()->init(worker_threads, low_priority_use_system_threads, low_property_ratio);
+		}
 	}
 
 	// Initialize user data dir.
@@ -2461,6 +2514,9 @@ bool Main::start() {
 	String _export_preset;
 	bool export_debug = false;
 	bool export_pack_only = false;
+#ifdef MODULE_GDSCRIPT_ENABLED
+	String gdscript_docs_path;
+#endif
 #ifndef DISABLE_DEPRECATED
 	bool converting_project = false;
 	bool validating_converting_project = false;
@@ -2521,6 +2577,10 @@ bool Main::start() {
 					doc_tool_path = ".";
 					parsed_pair = false;
 				}
+#ifdef MODULE_GDSCRIPT_ENABLED
+			} else if (args[i] == "--gdscript-docs") {
+				gdscript_docs_path = args[i + 1];
+#endif
 			} else if (args[i] == "--export-release") {
 				editor = true; //needs editor
 				_export_preset = args[i + 1];
@@ -2552,6 +2612,38 @@ bool Main::start() {
 	uint64_t minimum_time_msec = GLOBAL_DEF(PropertyInfo(Variant::INT, "application/boot_splash/minimum_display_time", PROPERTY_HINT_RANGE, "0,100,1,or_greater,suffix:ms"), 0);
 
 #ifdef TOOLS_ENABLED
+#ifdef MODULE_GDSCRIPT_ENABLED
+	if (!doc_tool_path.is_empty() && !gdscript_docs_path.is_empty()) {
+		DocTools docs;
+		Error err;
+
+		Vector<String> paths = get_files_with_extension(gdscript_docs_path, "gd");
+		ERR_FAIL_COND_V_MSG(paths.size() == 0, false, "Couldn't find any GDScript files under the given directory: " + gdscript_docs_path);
+
+		for (const String &path : paths) {
+			Ref<GDScript> gdscript = ResourceLoader::load(path);
+			for (const DocData::ClassDoc &class_doc : gdscript->get_documentation()) {
+				docs.add_doc(class_doc);
+			}
+		}
+
+		if (doc_tool_path == ".") {
+			doc_tool_path = "./docs";
+		}
+
+		Ref<DirAccess> da = DirAccess::create_for_path(doc_tool_path);
+		err = da->make_dir_recursive(doc_tool_path);
+		ERR_FAIL_COND_V_MSG(err != OK, false, "Error: Can't create GDScript docs directory: " + doc_tool_path + ": " + itos(err));
+
+		HashMap<String, String> doc_data_classes;
+		err = docs.save_classes(doc_tool_path, doc_data_classes, false);
+		ERR_FAIL_COND_V_MSG(err != OK, false, "Error saving GDScript docs:" + itos(err));
+
+		OS::get_singleton()->set_exit_code(EXIT_SUCCESS);
+		return false;
+	}
+#endif // MODULE_GDSCRIPT_ENABLED
+
 	if (!doc_tool_path.is_empty()) {
 		// Needed to instance editor-only classes for their default values
 		Engine::get_singleton()->set_editor_hint(true);
@@ -2775,10 +2867,25 @@ bool Main::start() {
 		}
 		if (debug_navigation) {
 			sml->set_debug_navigation_hint(true);
+		}
+		if (debug_avoidance) {
+			sml->set_debug_avoidance_hint(true);
+		}
+		if (debug_navigation || debug_avoidance) {
 			NavigationServer3D::get_singleton()->set_active(true);
 			NavigationServer3D::get_singleton()->set_debug_enabled(true);
+			if (debug_navigation) {
+				NavigationServer3D::get_singleton()->set_debug_navigation_enabled(true);
+			}
+			if (debug_avoidance) {
+				NavigationServer3D::get_singleton()->set_debug_avoidance_enabled(true);
+			}
 		}
 #endif
+
+		if (single_threaded_scene) {
+			sml->set_disable_node_threading(true);
+		}
 
 		bool embed_subwindows = GLOBAL_GET("display/window/subwindows/embed_subwindows");
 
@@ -3296,10 +3403,7 @@ bool Main::iteration() {
 	}
 
 	if (movie_writer) {
-		RID main_vp_rid = RenderingServer::get_singleton()->viewport_find_from_screen_attachment(DisplayServer::MAIN_WINDOW_ID);
-		RID main_vp_texture = RenderingServer::get_singleton()->viewport_get_texture(main_vp_rid);
-		Ref<Image> vp_tex = RenderingServer::get_singleton()->texture_2d_get(main_vp_texture);
-		movie_writer->add_frame(vp_tex);
+		movie_writer->add_frame();
 	}
 
 	if ((quit_after > 0) && (Engine::get_singleton()->_process_frames >= quit_after)) {
@@ -3355,6 +3459,8 @@ void Main::cleanup(bool p_force) {
 		movie_writer->end();
 	}
 
+	ResourceLoader::clear_thread_load_tasks();
+
 	ResourceLoader::remove_custom_loaders();
 	ResourceSaver::remove_custom_savers();
 
@@ -3370,8 +3476,6 @@ void Main::cleanup(bool p_force) {
 
 	ResourceLoader::clear_translation_remaps();
 	ResourceLoader::clear_path_remaps();
-
-	ResourceLoader::clear_thread_load_tasks();
 
 	ScriptServer::finish_languages();
 

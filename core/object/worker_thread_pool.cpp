@@ -140,9 +140,9 @@ void WorkerThreadPool::_process_task(Task *p_task) {
 			task_queue.add_last(&low_prio_task->task_elem);
 			post = true;
 		} else {
-			low_priority_threads_used.decrement();
+			low_priority_threads_used--;
 		}
-		task_mutex.lock();
+		task_mutex.unlock();
 		if (post) {
 			task_available_semaphore.post();
 		}
@@ -152,7 +152,7 @@ void WorkerThreadPool::_process_task(Task *p_task) {
 void WorkerThreadPool::_thread_function(void *p_user) {
 	while (true) {
 		singleton->task_available_semaphore.wait();
-		if (singleton->exit_threads.is_set()) {
+		if (singleton->exit_threads) {
 			break;
 		}
 		singleton->_process_task_queue();
@@ -165,17 +165,29 @@ void WorkerThreadPool::_native_low_priority_thread_function(void *p_user) {
 }
 
 void WorkerThreadPool::_post_task(Task *p_task, bool p_high_priority) {
+	// Fall back to processing on the calling thread if there are no worker threads.
+	// Separated into its own variable to make it easier to extend this logic
+	// in custom builds.
+	bool process_on_calling_thread = threads.size() == 0;
+	if (process_on_calling_thread) {
+		_process_task(p_task);
+		return;
+	}
+
 	task_mutex.lock();
 	p_task->low_priority = !p_high_priority;
 	if (!p_high_priority && use_native_low_priority_threads) {
-		task_mutex.unlock();
 		p_task->low_priority_thread = native_thread_allocator.alloc();
-		p_task->low_priority_thread->start(_native_low_priority_thread_function, p_task); // Pask task directly to thread.
+		task_mutex.unlock();
 
-	} else if (p_high_priority || low_priority_threads_used.get() < max_low_priority_threads) {
+		if (p_task->group) {
+			p_task->group->low_priority_native_tasks.push_back(p_task);
+		}
+		p_task->low_priority_thread->start(_native_low_priority_thread_function, p_task); // Pask task directly to thread.
+	} else if (p_high_priority || low_priority_threads_used < max_low_priority_threads) {
 		task_queue.add_last(&p_task->task_elem);
 		if (!p_high_priority) {
-			low_priority_threads_used.increment();
+			low_priority_threads_used++;
 		}
 		task_mutex.unlock();
 		task_available_semaphore.post();
@@ -251,30 +263,38 @@ void WorkerThreadPool::wait_for_task_completion(TaskID p_task_id) {
 
 	if (use_native_low_priority_threads && task->low_priority) {
 		task->low_priority_thread->wait_to_finish();
+
+		task_mutex.lock();
 		native_thread_allocator.free(task->low_priority_thread);
 	} else {
 		int *index = thread_ids.getptr(Thread::get_caller_id());
 
 		if (index) {
 			// We are an actual process thread, we must not be blocked so continue processing stuff if available.
+			bool must_exit = false;
 			while (true) {
 				if (task->done_semaphore.try_wait()) {
 					// If done, exit
 					break;
 				}
-				if (task_available_semaphore.try_wait()) {
-					// Solve tasks while they are around.
-					_process_task_queue();
-					continue;
+				if (!must_exit && task_available_semaphore.try_wait()) {
+					if (exit_threads) {
+						must_exit = true;
+					} else {
+						// Solve tasks while they are around.
+						_process_task_queue();
+						continue;
+					}
 				}
 				OS::get_singleton()->delay_usec(1); // Microsleep, this could be converted to waiting for multiple objects in supported platforms for a bit more performance.
 			}
 		} else {
 			task->done_semaphore.wait();
 		}
+
+		task_mutex.lock();
 	}
 
-	task_mutex.lock();
 	tasks.erase(p_task_id);
 	task_allocator.free(task);
 	task_mutex.unlock();
@@ -322,15 +342,8 @@ WorkerThreadPool::GroupID WorkerThreadPool::_add_group_task(const Callable &p_ca
 	groups[id] = group;
 	task_mutex.unlock();
 
-	if (!p_high_priority && use_native_low_priority_threads) {
-		group->low_priority_native_tasks.resize(p_tasks);
-	}
-
 	for (int i = 0; i < p_tasks; i++) {
 		_post_task(tasks_posted[i], p_high_priority);
-		if (!p_high_priority && use_native_low_priority_threads) {
-			group->low_priority_native_tasks[i] = tasks_posted[i];
-		}
 	}
 
 	return id;
@@ -379,8 +392,8 @@ void WorkerThreadPool::wait_for_group_task_completion(GroupID p_group) {
 	if (group->low_priority_native_tasks.size() > 0) {
 		for (Task *task : group->low_priority_native_tasks) {
 			task->low_priority_thread->wait_to_finish();
-			native_thread_allocator.free(task->low_priority_thread);
 			task_mutex.lock();
+			native_thread_allocator.free(task->low_priority_thread);
 			task_allocator.free(task);
 			task_mutex.unlock();
 		}
@@ -443,7 +456,7 @@ void WorkerThreadPool::finish() {
 	}
 	task_mutex.unlock();
 
-	exit_threads.set_to(true);
+	exit_threads = true;
 
 	for (uint32_t i = 0; i < threads.size(); i++) {
 		task_available_semaphore.post();
