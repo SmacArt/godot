@@ -41,7 +41,6 @@ typedef void (*EditorPluginInitializeCallback)();
 typedef bool (*EditorBuildCallback)();
 
 class AcceptDialog;
-class AcceptDialogAutoReparent;
 class CenterContainer;
 class CheckBox;
 class ColorPicker;
@@ -359,10 +358,10 @@ private:
 	PluginConfigDialog *plugin_config_dialog = nullptr;
 
 	RichTextLabel *load_errors = nullptr;
-	AcceptDialogAutoReparent *load_error_dialog = nullptr;
+	AcceptDialog *load_error_dialog = nullptr;
 
 	RichTextLabel *execute_outputs = nullptr;
-	AcceptDialogAutoReparent *execute_output_dialog = nullptr;
+	AcceptDialog *execute_output_dialog = nullptr;
 
 	Ref<Theme> theme;
 
@@ -377,10 +376,10 @@ private:
 	ConfirmationDialog *import_confirmation = nullptr;
 	ConfirmationDialog *pick_main_scene = nullptr;
 	Button *select_current_scene_button = nullptr;
-	AcceptDialogAutoReparent *accept = nullptr;
-	AcceptDialogAutoReparent *save_accept = nullptr;
+	AcceptDialog *accept = nullptr;
+	AcceptDialog *save_accept = nullptr;
 	EditorAbout *about = nullptr;
-	AcceptDialogAutoReparent *warning = nullptr;
+	AcceptDialog *warning = nullptr;
 
 	int overridden_default_layout = -1;
 	Ref<ConfigFile> default_layout;
@@ -519,8 +518,10 @@ private:
 	static void _editor_file_dialog_unregister(EditorFileDialog *p_dialog);
 
 	static void _file_access_close_error_notify(const String &p_str);
+	static void _file_access_close_error_notify_impl(const String &p_str);
 
 	static void _print_handler(void *p_this, const String &p_string, bool p_error, bool p_rich);
+	static void _print_handler_impl(const String &p_string, bool p_error, bool p_rich);
 	static void _resource_saved(Ref<Resource> p_resource, const String &p_path);
 	static void _resource_loaded(Ref<Resource> p_resource, const String &p_path);
 
