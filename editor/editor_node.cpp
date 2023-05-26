@@ -1041,7 +1041,7 @@ void EditorNode::_sources_changed(bool p_exist) {
 	if (waiting_for_first_scan) {
 		waiting_for_first_scan = false;
 
-		Engine::get_singleton()->startup_benchmark_end_measure(); // editor_scan_and_reimport
+		OS::get_singleton()->benchmark_end_measure("editor_scan_and_import");
 
 		// Reload the global shader variables, but this time
 		// loading textures, as they are now properly imported.
@@ -1055,16 +1055,12 @@ void EditorNode::_sources_changed(bool p_exist) {
 		_load_editor_layout();
 
 		if (!defer_load_scene.is_empty()) {
-			Engine::get_singleton()->startup_benchmark_begin_measure("editor_load_scene");
+			OS::get_singleton()->benchmark_begin_measure("editor_load_scene");
 			load_scene(defer_load_scene);
 			defer_load_scene = "";
-			Engine::get_singleton()->startup_benchmark_end_measure();
+			OS::get_singleton()->benchmark_end_measure("editor_load_scene");
 
-			if (use_startup_benchmark) {
-				Engine::get_singleton()->startup_dump(startup_benchmark_file);
-				startup_benchmark_file = String();
-				use_startup_benchmark = false;
-			}
+			OS::get_singleton()->benchmark_dump();
 		}
 	}
 }
@@ -3243,6 +3239,30 @@ void EditorNode::remove_editor_plugin(EditorPlugin *p_editor, bool p_config_chan
 	}
 }
 
+void EditorNode::add_extension_editor_plugin(const StringName &p_class_name) {
+	ERR_FAIL_COND_MSG(!ClassDB::class_exists(p_class_name), vformat("No such editor plugin registered: %s", p_class_name));
+	ERR_FAIL_COND_MSG(!ClassDB::is_parent_class(p_class_name, SNAME("EditorPlugin")), vformat("Class is not an editor plugin: %s", p_class_name));
+	ERR_FAIL_COND_MSG(singleton->editor_data.has_extension_editor_plugin(p_class_name), vformat("Editor plugin already added for class: %s", p_class_name));
+
+	EditorPlugin *plugin = Object::cast_to<EditorPlugin>(ClassDB::instantiate(p_class_name));
+	singleton->editor_data.add_extension_editor_plugin(p_class_name, plugin);
+	add_editor_plugin(plugin);
+}
+
+void EditorNode::remove_extension_editor_plugin(const StringName &p_class_name) {
+	// If we're exiting, the editor plugins will get cleaned up anyway, so don't do anything.
+	if (singleton->exiting) {
+		return;
+	}
+
+	ERR_FAIL_COND_MSG(!singleton->editor_data.has_extension_editor_plugin(p_class_name), vformat("No editor plugin added for class: %s", p_class_name));
+
+	EditorPlugin *plugin = singleton->editor_data.get_extension_editor_plugin(p_class_name);
+	remove_editor_plugin(plugin);
+	memfree(plugin);
+	singleton->editor_data.remove_extension_editor_plugin(p_class_name);
+}
+
 void EditorNode::_update_addon_config() {
 	if (_initializing_plugins) {
 		return;
@@ -4392,12 +4412,8 @@ void EditorNode::_editor_file_dialog_unregister(EditorFileDialog *p_dialog) {
 Vector<EditorNodeInitCallback> EditorNode::_init_callbacks;
 
 void EditorNode::_begin_first_scan() {
-	Engine::get_singleton()->startup_benchmark_begin_measure("editor_scan_and_import");
+	OS::get_singleton()->benchmark_begin_measure("editor_scan_and_import");
 	EditorFileSystem::get_singleton()->scan();
-}
-void EditorNode::set_use_startup_benchmark(bool p_use_startup_benchmark, const String &p_startup_benchmark_file) {
-	use_startup_benchmark = p_use_startup_benchmark;
-	startup_benchmark_file = p_startup_benchmark_file;
 }
 
 Error EditorNode::export_preset(const String &p_preset, const String &p_path, bool p_debug, bool p_pack_only) {
@@ -4826,8 +4842,13 @@ void EditorNode::_load_editor_layout() {
 	Ref<ConfigFile> config;
 	config.instantiate();
 	Error err = config->load(EditorPaths::get_singleton()->get_project_settings_dir().path_join("editor_layout.cfg"));
-	if (err != OK) {
-		// No config.
+	if (err != OK) { // No config.
+		// If config is not found, expand the res:// folder by default.
+		TreeItem *root = FileSystemDock::get_singleton()->get_tree_control()->get_item_with_metadata("res://", 0);
+		if (root) {
+			root->set_collapsed(false);
+		}
+
 		if (overridden_default_layout >= 0) {
 			_layout_menu_option(overridden_default_layout);
 		}
@@ -5094,8 +5115,14 @@ void EditorNode::_load_docks_from_config(Ref<ConfigFile> p_layout, const String 
 	}
 
 	// Restore collapsed state of FileSystemDock.
+	PackedStringArray uncollapsed_tis;
 	if (p_layout->has_section_key(p_section, "dock_filesystem_uncollapsed_paths")) {
-		PackedStringArray uncollapsed_tis = p_layout->get_value(p_section, "dock_filesystem_uncollapsed_paths");
+		uncollapsed_tis = p_layout->get_value(p_section, "dock_filesystem_uncollapsed_paths");
+	} else {
+		uncollapsed_tis = { "res://" };
+	}
+
+	if (!uncollapsed_tis.is_empty()) {
 		for (int i = 0; i < uncollapsed_tis.size(); i++) {
 			TreeItem *uncollapsed_ti = FileSystemDock::get_singleton()->get_tree_control()->get_item_with_metadata(uncollapsed_tis[i], 0);
 			if (uncollapsed_ti) {
@@ -7775,6 +7802,12 @@ EditorNode::EditorNode() {
 	for (int i = 0; i < EditorPlugins::get_plugin_count(); i++) {
 		add_editor_plugin(EditorPlugins::create(i));
 	}
+
+	for (const StringName &extension_class_name : GDExtensionEditorPlugins::get_extension_classes()) {
+		add_extension_editor_plugin(extension_class_name);
+	}
+	GDExtensionEditorPlugins::editor_node_add_plugin = &EditorNode::add_extension_editor_plugin;
+	GDExtensionEditorPlugins::editor_node_remove_plugin = &EditorNode::remove_extension_editor_plugin;
 
 	for (int i = 0; i < plugin_init_callback_count; i++) {
 		plugin_init_callbacks[i]();

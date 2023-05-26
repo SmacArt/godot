@@ -694,8 +694,6 @@ private:
 	void _bottom_panel_raise_toggled(bool);
 
 	void _begin_first_scan();
-	bool use_startup_benchmark = false;
-	String startup_benchmark_file;
 
 protected:
 	friend class FileSystemDock;
@@ -740,6 +738,9 @@ public:
 
 	static void add_editor_plugin(EditorPlugin *p_editor, bool p_config_changed = false);
 	static void remove_editor_plugin(EditorPlugin *p_editor, bool p_config_changed = false);
+
+	static void add_extension_editor_plugin(const StringName &p_class_name);
+	static void remove_extension_editor_plugin(const StringName &p_class_name);
 
 	static void add_plugin_init_callback(EditorPluginInitializeCallback p_callback);
 	static void add_init_callback(EditorNodeInitCallback p_callback) { _init_callbacks.push_back(p_callback); }
@@ -871,7 +872,6 @@ public:
 
 	void _copy_warning(const String &p_str);
 
-	void set_use_startup_benchmark(bool p_use_startup_benchmark, const String &p_startup_benchmark_file);
 	Error export_preset(const String &p_preset, const String &p_path, bool p_debug, bool p_pack_only);
 
 	Control *get_gui_base() { return gui_base; }
