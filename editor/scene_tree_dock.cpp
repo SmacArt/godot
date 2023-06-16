@@ -2470,11 +2470,6 @@ void SceneTreeDock::replace_node(Node *p_node, Node *p_by_node, bool p_keep_prop
 	}
 	n->replace_by(newnode, true);
 
-	if (n == edited_scene) {
-		edited_scene = newnode;
-		EditorNode::get_singleton()->set_edited_scene(newnode);
-	}
-
 	//small hack to make collisionshapes and other kind of nodes to work
 	for (int i = 0; i < newnode->get_child_count(); i++) {
 		Node *c = newnode->get_child(i);
@@ -3578,6 +3573,13 @@ void SceneTreeDock::_list_all_subresources(PopupMenu *p_menu) {
 			p_menu->set_item_metadata(-1, pair.first->get_instance_id());
 		}
 	}
+
+	if (resources_by_type.is_empty()) {
+		p_menu->add_item(TTR("None"));
+		p_menu->set_item_disabled(-1, true);
+	}
+
+	p_menu->reset_size();
 }
 
 void SceneTreeDock::_gather_resources(Node *p_node, List<Pair<Ref<Resource>, Node *>> &r_resources) {

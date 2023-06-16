@@ -228,9 +228,6 @@
 		<member name="editors/2d/bone_width" type="int" setter="" getter="">
 			The bone width in the 2D skeleton editor (in pixels). See also [member editors/2d/bone_outline_size].
 		</member>
-		<member name="editors/2d/constrain_editor_view" type="bool" setter="" getter="">
-			If [code]true[/code], prevents the 2D editor viewport from leaving the scene. Limits are calculated dynamically based on nodes present in the current scene. If [code]false[/code], the 2D editor viewport will be able to move freely, but you risk getting lost when zooming out too far. You can refocus on the scene by selecting a node then pressing [kbd]F[/kbd].
-		</member>
 		<member name="editors/2d/grid_color" type="Color" setter="" getter="">
 			The grid color to use in the 2D editor.
 		</member>
@@ -700,6 +697,10 @@
 		<member name="run/output/font_size" type="int" setter="" getter="">
 			The size of the font in the [b]Output[/b] panel at the bottom of the editor. This setting does not impact the font size of the script editor (see [member interface/editor/code_font_size]).
 		</member>
+		<member name="run/window_placement/android_window" type="int" setter="" getter="">
+			The Android window to display the project on when starting the project from the editor.
+			[b]Note:[/b] Only available in the Android editor.
+		</member>
 		<member name="run/window_placement/rect" type="int" setter="" getter="">
 			The window mode to use to display the project when starting the project from the editor.
 		</member>
@@ -739,14 +740,14 @@
 		<member name="text_editor/appearance/gutters/line_numbers_zero_padded" type="bool" setter="" getter="">
 			If [code]true[/code], displays line numbers with zero padding (e.g. [code]007[/code] instead of [code]7[/code]).
 		</member>
-		<member name="text_editor/appearance/gutters/show_bookmark_gutter" type="bool" setter="" getter="">
-			If [code]true[/code], displays icons for bookmarks in a gutter at the left. Bookmarks remain functional when this setting is disabled.
-		</member>
 		<member name="text_editor/appearance/gutters/show_info_gutter" type="bool" setter="" getter="">
-			If [code]true[/code], displays a gutter at the left containing icons for methods with signal connections.
+			If [code]true[/code], displays a gutter at the left containing icons for methods with signal connections and for overridden methods.
 		</member>
 		<member name="text_editor/appearance/gutters/show_line_numbers" type="bool" setter="" getter="">
 			If [code]true[/code], displays line numbers in a gutter at the left.
+		</member>
+		<member name="text_editor/appearance/lines/autowrap_mode" type="int" setter="" getter="">
+			If [member text_editor/appearance/lines/word_wrap] is set to [code]1[/code], sets text wrapping mode. To see how each mode behaves, see [enum TextServer.AutowrapMode].
 		</member>
 		<member name="text_editor/appearance/lines/code_folding" type="bool" setter="" getter="">
 			If [code]true[/code], displays the folding arrows next to indented code sections and allows code folding. If [code]false[/code], hides the folding arrows next to indented code sections and disallows code folding.

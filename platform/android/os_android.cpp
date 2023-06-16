@@ -30,24 +30,23 @@
 
 #include "os_android.h"
 
+#include "dir_access_jandroid.h"
+#include "display_server_android.h"
+#include "file_access_android.h"
+#include "file_access_filesystem_jandroid.h"
+#include "java_godot_io_wrapper.h"
+#include "java_godot_wrapper.h"
+#include "net_socket_android.h"
+
 #include "core/config/project_settings.h"
 #include "drivers/unix/dir_access_unix.h"
 #include "drivers/unix/file_access_unix.h"
 #include "main/main.h"
-#include "platform/android/display_server_android.h"
 #include "scene/main/scene_tree.h"
 #include "servers/rendering_server.h"
 
-#include "dir_access_jandroid.h"
-#include "file_access_android.h"
-#include "file_access_filesystem_jandroid.h"
-#include "net_socket_android.h"
-
 #include <dlfcn.h>
 #include <sys/system_properties.h>
-
-#include "java_godot_io_wrapper.h"
-#include "java_godot_wrapper.h"
 
 const char *OS_Android::ANDROID_EXEC_PATH = "apk";
 
@@ -182,7 +181,7 @@ String OS_Android::get_name() const {
 }
 
 String OS_Android::get_system_property(const char *key) const {
-	static String value;
+	String value;
 	char value_str[PROP_VALUE_MAX];
 	if (__system_property_get(key, value_str)) {
 		value = String(value_str);
@@ -230,20 +229,20 @@ String OS_Android::get_version() const {
 		"ro.potato.version", "ro.xtended.version", "org.evolution.version", "ro.corvus.version", "ro.pa.version",
 		"ro.crdroid.version", "ro.syberia.version", "ro.arrow.version", "ro.lineage.version" };
 	for (int i = 0; i < roms.size(); i++) {
-		static String rom_version = get_system_property(roms[i]);
+		String rom_version = get_system_property(roms[i]);
 		if (!rom_version.is_empty()) {
 			return rom_version;
 		}
 	}
 
-	static String mod_version = get_system_property("ro.modversion"); // Handles other Android custom ROMs.
+	String mod_version = get_system_property("ro.modversion"); // Handles other Android custom ROMs.
 	if (!mod_version.is_empty()) {
 		return mod_version;
 	}
 
 	// Handles stock Android.
-	static String sdk_version = get_system_property("ro.build.version.sdk_int");
-	static String build = get_system_property("ro.build.version.incremental");
+	String sdk_version = get_system_property("ro.build.version.sdk_int");
+	String build = get_system_property("ro.build.version.incremental");
 	if (!sdk_version.is_empty()) {
 		if (!build.is_empty()) {
 			return vformat("%s.%s", sdk_version, build);

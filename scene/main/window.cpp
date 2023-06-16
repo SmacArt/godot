@@ -524,8 +524,6 @@ void Window::set_ime_position(const Point2i &p_pos) {
 
 bool Window::is_embedded() const {
 	ERR_READ_THREAD_GUARD_V(false);
-	ERR_FAIL_COND_V(!is_inside_tree(), false);
-
 	return get_embedder() != nullptr;
 }
 
@@ -618,6 +616,8 @@ void Window::_update_from_window() {
 void Window::_clear_window() {
 	ERR_FAIL_COND(window_id == DisplayServer::INVALID_WINDOW_ID);
 
+	bool had_focus = has_focus();
+
 	DisplayServer::get_singleton()->window_set_rect_changed_callback(Callable(), window_id);
 	DisplayServer::get_singleton()->window_set_window_event_callback(Callable(), window_id);
 	DisplayServer::get_singleton()->window_set_input_event_callback(Callable(), window_id);
@@ -640,7 +640,7 @@ void Window::_clear_window() {
 	window_id = DisplayServer::INVALID_WINDOW_ID;
 
 	// If closing window was focused and has a parent, return focus.
-	if (focused && transient_parent) {
+	if (had_focus && transient_parent) {
 		transient_parent->grab_focus();
 	}
 
@@ -721,10 +721,13 @@ void Window::_event_callback(DisplayServer::WindowEvent p_event) {
 	}
 }
 
-void Window::update_mouse_cursor_shape() {
+void Window::update_mouse_cursor_state() {
 	ERR_MAIN_THREAD_GUARD;
-	// The default shape is set in Viewport::_gui_input_event. To instantly
-	// see the shape in the viewport we need to trigger a mouse motion event.
+	// Update states based on mouse cursor position.
+	// This includes updated mouse_enter or mouse_exit signals or the current mouse cursor shape.
+	// These details are set in Viewport::_gui_input_event. To instantly
+	// see the changes in the viewport, we need to trigger a mouse motion event.
+	// This function should be called whenever scene tree changes affect the mouse cursor.
 	Ref<InputEventMouseMotion> mm;
 	Vector2 pos = get_mouse_position();
 	Transform2D xform = get_global_canvas_transform().affine_inverse();
@@ -775,6 +778,9 @@ void Window::set_visible(bool p_visible) {
 	} else {
 		if (visible) {
 			embedder = embedder_vp;
+			if (initial_position != WINDOW_INITIAL_POSITION_ABSOLUTE) {
+				position = (embedder->get_visible_rect().size - size) / 2;
+			}
 			embedder->_sub_window_register(this);
 			RS::get_singleton()->viewport_set_update_mode(get_viewport_rid(), RS::VIEWPORT_UPDATE_WHEN_PARENT_VISIBLE);
 		} else {
@@ -1162,6 +1168,9 @@ void Window::_notification(int p_what) {
 			if (embedded) {
 				// Create as embedded.
 				if (embedder) {
+					if (initial_position != WINDOW_INITIAL_POSITION_ABSOLUTE) {
+						position = (embedder->get_visible_rect().size - size) / 2;
+					}
 					embedder->_sub_window_register(this);
 					RS::get_singleton()->viewport_set_update_mode(get_viewport_rid(), RS::VIEWPORT_UPDATE_WHEN_PARENT_VISIBLE);
 					_update_window_size();
@@ -1178,6 +1187,7 @@ void Window::_notification(int p_what) {
 					{
 						position = DisplayServer::get_singleton()->window_get_position(window_id);
 						size = DisplayServer::get_singleton()->window_get_size(window_id);
+						focused = DisplayServer::get_singleton()->window_is_focused(window_id);
 					}
 					_update_window_size(); // Inform DisplayServer of minimum and maximum size.
 					_update_viewport_size(); // Then feed back to the viewport.
@@ -1755,6 +1765,9 @@ void Window::grab_focus() {
 
 bool Window::has_focus() const {
 	ERR_READ_THREAD_GUARD_V(false);
+	if (window_id != DisplayServer::INVALID_WINDOW_ID) {
+		return DisplayServer::get_singleton()->window_is_focused(window_id);
+	}
 	return focused;
 }
 
@@ -1767,7 +1780,7 @@ Rect2i Window::get_usable_parent_rect() const {
 	} else {
 		const Window *w = is_visible() ? this : get_parent_visible_window();
 		//find a parent that can contain us
-		ERR_FAIL_COND_V(!w, Rect2());
+		ERR_FAIL_NULL_V(w, Rect2());
 
 		parent_rect = DisplayServer::get_singleton()->screen_get_usable_rect(DisplayServer::get_singleton()->window_get_current_screen(w->get_window_id()));
 	}
@@ -2328,9 +2341,9 @@ Rect2i Window::get_parent_rect() const {
 	if (is_embedded()) {
 		//viewport
 		Node *n = get_parent();
-		ERR_FAIL_COND_V(!n, Rect2i());
+		ERR_FAIL_NULL_V(n, Rect2i());
 		Viewport *p = n->get_viewport();
-		ERR_FAIL_COND_V(!p, Rect2i());
+		ERR_FAIL_NULL_V(p, Rect2i());
 
 		return p->get_visible_rect();
 	} else {
@@ -2472,6 +2485,14 @@ Transform2D Window::get_popup_base_transform() const {
 		return get_embedder()->get_popup_base_transform() * popup_base_transform;
 	}
 	return popup_base_transform;
+}
+
+bool Window::is_directly_attached_to_screen() const {
+	if (get_embedder()) {
+		return get_embedder()->is_directly_attached_to_screen();
+	}
+	// Distinguish between the case that this is a native Window and not inside the tree.
+	return is_inside_tree();
 }
 
 void Window::_bind_methods() {

@@ -30,11 +30,11 @@
 
 #include "godot_navigation_server.h"
 
-#include "core/os/mutex.h"
-
 #ifndef _3D_DISABLED
 #include "navigation_mesh_generator.h"
 #endif
+
+#include "core/os/mutex.h"
 
 using namespace NavigationUtilities;
 
@@ -164,6 +164,20 @@ real_t GodotNavigationServer::map_get_cell_size(RID p_map) const {
 	ERR_FAIL_COND_V(map == nullptr, 0);
 
 	return map->get_cell_size();
+}
+
+COMMAND_2(map_set_cell_height, RID, p_map, real_t, p_cell_height) {
+	NavMap *map = map_owner.get_or_null(p_map);
+	ERR_FAIL_COND(map == nullptr);
+
+	map->set_cell_height(p_cell_height);
+}
+
+real_t GodotNavigationServer::map_get_cell_height(RID p_map) const {
+	const NavMap *map = map_owner.get_or_null(p_map);
+	ERR_FAIL_COND_V(map == nullptr, 0);
+
+	return map->get_cell_height();
 }
 
 COMMAND_2(map_set_use_edge_connections, RID, p_map, bool, p_enabled) {
@@ -451,7 +465,10 @@ void GodotNavigationServer::region_bake_navigation_mesh(Ref<NavigationMesh> p_na
 
 #ifndef _3D_DISABLED
 	NavigationMeshGenerator::get_singleton()->clear(p_navigation_mesh);
-	NavigationMeshGenerator::get_singleton()->bake(p_navigation_mesh, p_root_node);
+	Ref<NavigationMeshSourceGeometryData3D> source_geometry_data;
+	source_geometry_data.instantiate();
+	NavigationMeshGenerator::get_singleton()->parse_source_geometry_data(p_navigation_mesh, source_geometry_data, p_root_node);
+	NavigationMeshGenerator::get_singleton()->bake_from_source_geometry_data(p_navigation_mesh, source_geometry_data);
 #endif
 }
 
@@ -802,7 +819,42 @@ RID GodotNavigationServer::obstacle_create() {
 	RID rid = obstacle_owner.make_rid();
 	NavObstacle *obstacle = obstacle_owner.get_or_null(rid);
 	obstacle->set_self(rid);
+
+	RID agent_rid = agent_owner.make_rid();
+	NavAgent *agent = agent_owner.get_or_null(agent_rid);
+	agent->set_self(agent_rid);
+
+	obstacle->set_agent(agent);
+
 	return rid;
+}
+
+COMMAND_2(obstacle_set_avoidance_enabled, RID, p_obstacle, bool, p_enabled) {
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
+	ERR_FAIL_COND(obstacle == nullptr);
+
+	obstacle->set_avoidance_enabled(p_enabled);
+}
+
+bool GodotNavigationServer::obstacle_get_avoidance_enabled(RID p_obstacle) const {
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
+	ERR_FAIL_COND_V(obstacle == nullptr, false);
+
+	return obstacle->is_avoidance_enabled();
+}
+
+COMMAND_2(obstacle_set_use_3d_avoidance, RID, p_obstacle, bool, p_enabled) {
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
+	ERR_FAIL_COND(obstacle == nullptr);
+
+	obstacle->set_use_3d_avoidance(p_enabled);
+}
+
+bool GodotNavigationServer::obstacle_get_use_3d_avoidance(RID p_obstacle) const {
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
+	ERR_FAIL_COND_V(obstacle == nullptr, false);
+
+	return obstacle->get_use_3d_avoidance();
 }
 
 COMMAND_2(obstacle_set_map, RID, p_obstacle, RID, p_map) {
@@ -837,10 +889,25 @@ RID GodotNavigationServer::obstacle_get_map(RID p_obstacle) const {
 	return RID();
 }
 
+COMMAND_2(obstacle_set_radius, RID, p_obstacle, real_t, p_radius) {
+	ERR_FAIL_COND_MSG(p_radius < 0.0, "Radius must be positive.");
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
+	ERR_FAIL_COND(obstacle == nullptr);
+
+	obstacle->set_radius(p_radius);
+}
+
 COMMAND_2(obstacle_set_height, RID, p_obstacle, real_t, p_height) {
 	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
 	ERR_FAIL_COND(obstacle == nullptr);
 	obstacle->set_height(p_height);
+}
+
+COMMAND_2(obstacle_set_velocity, RID, p_obstacle, Vector3, p_velocity) {
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
+	ERR_FAIL_COND(obstacle == nullptr);
+
+	obstacle->set_velocity(p_velocity);
 }
 
 COMMAND_2(obstacle_set_position, RID, p_obstacle, Vector3, p_position) {
@@ -859,6 +926,18 @@ COMMAND_2(obstacle_set_avoidance_layers, RID, p_obstacle, uint32_t, p_layers) {
 	NavObstacle *obstacle = obstacle_owner.get_or_null(p_obstacle);
 	ERR_FAIL_COND(obstacle == nullptr);
 	obstacle->set_avoidance_layers(p_layers);
+}
+
+void GodotNavigationServer::parse_source_geometry_data(const Ref<NavigationMesh> &p_navigation_mesh, Ref<NavigationMeshSourceGeometryData3D> p_source_geometry_data, Node *p_root_node, const Callable &p_callback) {
+#ifndef _3D_DISABLED
+	NavigationMeshGenerator::get_singleton()->parse_source_geometry_data(p_navigation_mesh, p_source_geometry_data, p_root_node, p_callback);
+#endif
+}
+
+void GodotNavigationServer::bake_from_source_geometry_data(Ref<NavigationMesh> p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, const Callable &p_callback) {
+#ifndef _3D_DISABLED
+	NavigationMeshGenerator::get_singleton()->bake_from_source_geometry_data(p_navigation_mesh, p_source_geometry_data, p_callback);
+#endif
 }
 
 COMMAND_1(free, RID, p_object) {
@@ -917,29 +996,42 @@ COMMAND_1(free, RID, p_object) {
 		link_owner.free(p_object);
 
 	} else if (agent_owner.owns(p_object)) {
-		NavAgent *agent = agent_owner.get_or_null(p_object);
+		internal_free_agent(p_object);
 
-		// Removes this agent from the map if assigned
+	} else if (obstacle_owner.owns(p_object)) {
+		internal_free_obstacle(p_object);
+
+	} else {
+		ERR_PRINT("Attempted to free a NavigationServer RID that did not exist (or was already freed).");
+	}
+}
+
+void GodotNavigationServer::internal_free_agent(RID p_object) {
+	NavAgent *agent = agent_owner.get_or_null(p_object);
+	if (agent) {
 		if (agent->get_map() != nullptr) {
 			agent->get_map()->remove_agent(agent);
 			agent->set_map(nullptr);
 		}
-
 		agent_owner.free(p_object);
+	}
+}
 
-	} else if (obstacle_owner.owns(p_object)) {
-		NavObstacle *obstacle = obstacle_owner.get_or_null(p_object);
-
-		// Removes this agent from the map if assigned
+void GodotNavigationServer::internal_free_obstacle(RID p_object) {
+	NavObstacle *obstacle = obstacle_owner.get_or_null(p_object);
+	if (obstacle) {
 		if (obstacle->get_map() != nullptr) {
 			obstacle->get_map()->remove_obstacle(obstacle);
 			obstacle->set_map(nullptr);
 		}
-
+		if (obstacle->get_agent()) {
+			if (obstacle->get_agent()->get_self() != RID()) {
+				RID _agent_rid = obstacle->get_agent()->get_self();
+				obstacle->set_agent(nullptr);
+				internal_free_agent(_agent_rid);
+			}
+		}
 		obstacle_owner.free(p_object);
-
-	} else {
-		ERR_PRINT("Attempted to free a NavigationServer RID that did not exist (or was already freed).");
 	}
 }
 

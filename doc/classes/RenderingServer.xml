@@ -2096,7 +2096,7 @@
 			<param index="2" name="arrays" type="Array" />
 			<param index="3" name="blend_shapes" type="Array" default="[]" />
 			<param index="4" name="lods" type="Dictionary" default="{}" />
-			<param index="5" name="compress_format" type="int" enum="RenderingServer.ArrayFormat" default="0" />
+			<param index="5" name="compress_format" type="int" enum="RenderingServer.ArrayFormat" is_bitfield="true" default="0" />
 			<description>
 			</description>
 		</method>
@@ -2199,14 +2199,14 @@
 		</method>
 		<method name="mesh_surface_get_format_attribute_stride" qualifiers="const">
 			<return type="int" />
-			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" />
+			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" is_bitfield="true" />
 			<param index="1" name="vertex_count" type="int" />
 			<description>
 			</description>
 		</method>
 		<method name="mesh_surface_get_format_offset" qualifiers="const">
 			<return type="int" />
-			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" />
+			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" is_bitfield="true" />
 			<param index="1" name="vertex_count" type="int" />
 			<param index="2" name="array_index" type="int" />
 			<description>
@@ -2214,14 +2214,14 @@
 		</method>
 		<method name="mesh_surface_get_format_skin_stride" qualifiers="const">
 			<return type="int" />
-			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" />
+			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" is_bitfield="true" />
 			<param index="1" name="vertex_count" type="int" />
 			<description>
 			</description>
 		</method>
 		<method name="mesh_surface_get_format_vertex_stride" qualifiers="const">
 			<return type="int" />
-			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" />
+			<param index="0" name="format" type="int" enum="RenderingServer.ArrayFormat" is_bitfield="true" />
 			<param index="1" name="vertex_count" type="int" />
 			<description>
 			</description>
@@ -3286,8 +3286,8 @@
 			<param index="0" name="texture" type="RID" />
 			<param index="1" name="srgb" type="bool" default="false" />
 			<description>
-				Returns the internal graphics handle for this texture object. For use when communicating with 3rd party APIs mostly with GDExternal.
-				[b]Note:[/b] This functions returns a [code]uint64_t[/code] which internally maps to a [code]GLuint[/code] (OpenGL) or [code]VkImage[/code] (Vulkan).
+				Returns the internal graphics handle for this texture object. For use when communicating with third-party APIs mostly with GDExtension.
+				[b]Note:[/b] This function returns a [code]uint64_t[/code] which internally maps to a [code]GLuint[/code] (OpenGL) or [code]VkImage[/code] (Vulkan).
 			</description>
 		</method>
 		<method name="texture_get_path" qualifiers="const">
@@ -3304,14 +3304,14 @@
 				Returns a texture [RID] that can be used with [RenderingDevice].
 			</description>
 		</method>
-		<method name="texture_proxy_create">
+		<method name="texture_proxy_create" is_deprecated="true">
 			<return type="RID" />
 			<param index="0" name="base" type="RID" />
 			<description>
-				[i]Deprecated.[/i] As ProxyTexture was removed in Godot 4, this method does nothing when called and always returns a null [RID].
+				[i]Deprecated.[/i] ProxyTexture was removed in Godot 4, so this method does nothing when called and always returns a null [RID].
 			</description>
 		</method>
-		<method name="texture_proxy_update">
+		<method name="texture_proxy_update" is_deprecated="true">
 			<return type="void" />
 			<param index="0" name="texture" type="RID" />
 			<param index="1" name="proxy_to" type="RID" />
@@ -3622,7 +3622,7 @@
 			<param index="1" name="size" type="int" />
 			<param index="2" name="use_16_bits" type="bool" default="false" />
 			<description>
-				Sets the [param size] of the shadow atlas's images (used for omni and spot lights) on the viewport specified by the [param viewport] RID. The value is rounded up to the nearest power of 2. If [code]use_16_bits[/code] is [code]true[/code], use 16 bits for the omni/spot shadow depth map. Enabling this results in shadows having less precision and may result in shadow acne, but can lead to performance improvements on some devices.
+				Sets the [param size] of the shadow atlas's images (used for omni and spot lights) on the viewport specified by the [param viewport] RID. The value is rounded up to the nearest power of 2. If [param use_16_bits] is [code]true[/code], use 16 bits for the omni/spot shadow depth map. Enabling this results in shadows having less precision and may result in shadow acne, but can lead to performance improvements on some devices.
 				[b]Note:[/b] If this is set to [code]0[/code], no positional shadows will be visible at all. This can improve performance significantly on low-end systems by reducing both the CPU and GPU load (as fewer draw calls are needed to draw the scene without shadows).
 			</description>
 		</method>
@@ -3960,8 +3960,8 @@
 		<constant name="MAX_GLOW_LEVELS" value="7">
 			The maximum number of glow levels that can be used with the glow post-processing effect.
 		</constant>
-		<constant name="MAX_CURSORS" value="8">
-			[i]Deprecated.[/i] This constant is unused.
+		<constant name="MAX_CURSORS" value="8" is_deprecated="true">
+			[i]Deprecated.[/i] This constant is unused internally.
 		</constant>
 		<constant name="MAX_2D_DIRECTIONAL_LIGHTS" value="8">
 			The maximum number of directional lights that can be rendered at a given time in 2D.
@@ -4030,10 +4030,10 @@
 			Array is a vertex color array.
 		</constant>
 		<constant name="ARRAY_TEX_UV" value="4" enum="ArrayType">
-			Array is an UV coordinates array.
+			Array is a UV coordinates array.
 		</constant>
 		<constant name="ARRAY_TEX_UV2" value="5" enum="ArrayType">
-			Array is an UV coordinates array for the second set of UV coordinates.
+			Array is a UV coordinates array for the second set of UV coordinates.
 		</constant>
 		<constant name="ARRAY_CUSTOM0" value="6" enum="ArrayType">
 			Array is a custom data array for the first set of custom data.
@@ -4102,10 +4102,10 @@
 			Flag used to mark a vertex color array.
 		</constant>
 		<constant name="ARRAY_FORMAT_TEX_UV" value="16" enum="ArrayFormat" is_bitfield="true">
-			Flag used to mark an UV coordinates array.
+			Flag used to mark a UV coordinates array.
 		</constant>
 		<constant name="ARRAY_FORMAT_TEX_UV2" value="32" enum="ArrayFormat" is_bitfield="true">
-			Flag used to mark an UV coordinates array for the second UV coordinates.
+			Flag used to mark a UV coordinates array for the second UV coordinates.
 		</constant>
 		<constant name="ARRAY_FORMAT_CUSTOM0" value="64" enum="ArrayFormat" is_bitfield="true">
 			Flag used to mark an array of custom per-vertex data for the first set of custom data.
@@ -4575,7 +4575,7 @@
 			Number of objects drawn in a single frame.
 		</constant>
 		<constant name="VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME" value="1" enum="ViewportRenderInfo">
-			Number of vertices drawn in a single frame.
+			Number of points, lines, or triangles drawn in a single frame.
 		</constant>
 		<constant name="VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME" value="2" enum="ViewportRenderInfo">
 			Number of draw calls during this frame.
@@ -5201,7 +5201,7 @@
 			Number of objects rendered in the current 3D scene. This varies depending on camera position and rotation.
 		</constant>
 		<constant name="RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME" value="1" enum="RenderingInfo">
-			Number of vertices/indices rendered in the current 3D scene. This varies depending on camera position and rotation.
+			Number of points, lines, or triangles rendered in the current 3D scene. This varies depending on camera position and rotation.
 		</constant>
 		<constant name="RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME" value="2" enum="RenderingInfo">
 			Number of draw calls performed to render in the current 3D scene. This varies depending on camera position and rotation.
@@ -5210,10 +5210,10 @@
 			Texture memory used (in bytes).
 		</constant>
 		<constant name="RENDERING_INFO_BUFFER_MEM_USED" value="4" enum="RenderingInfo">
-			Buffer memory used (in bytes).
+			Buffer memory used (in bytes). This includes vertex data, uniform buffers, and many miscellaneous buffer types used internally.
 		</constant>
 		<constant name="RENDERING_INFO_VIDEO_MEM_USED" value="5" enum="RenderingInfo">
-			Video memory used (in bytes). This is always greater than the sum of [constant RENDERING_INFO_TEXTURE_MEM_USED] and [constant RENDERING_INFO_BUFFER_MEM_USED], since there is miscellaneous data not accounted for by those two metrics.
+			Video memory used (in bytes). When using the Forward+ or mobile rendering backends, this is always greater than the sum of [constant RENDERING_INFO_TEXTURE_MEM_USED] and [constant RENDERING_INFO_BUFFER_MEM_USED], since there is miscellaneous data not accounted for by those two metrics. When using the GL Compatibility backend, this is equal to the sum of [constant RENDERING_INFO_TEXTURE_MEM_USED] and [constant RENDERING_INFO_BUFFER_MEM_USED].
 		</constant>
 		<constant name="FEATURE_SHADERS" value="0" enum="Features">
 			Hardware supports shaders. This enum is currently unused in Godot 3.x.
