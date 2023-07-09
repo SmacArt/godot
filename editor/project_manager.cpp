@@ -2337,6 +2337,8 @@ void ProjectManager::_perform_full_project_conversion() {
 	args.push_back("--path");
 	args.push_back(path);
 	args.push_back("--convert-3to4");
+	args.push_back("--rendering-driver");
+	args.push_back(Main::get_rendering_driver_name());
 
 	Error err = OS::get_singleton()->create_instance(args);
 	ERR_FAIL_COND(err);
@@ -2504,6 +2506,7 @@ void ProjectManager::_apply_project_tags() {
 		callable_mp((Window *)tag_manage_dialog, &Window::show).call_deferred(); // Make sure the dialog does not disappear.
 		return;
 	} else {
+		tags.sort();
 		cfg.set_value("application", "config/tags", tags);
 		err = cfg.save(project_godot);
 		if (err != OK) {
