@@ -66,6 +66,10 @@ Variant::Type GDScriptParser::get_builtin_type(const StringName &p_type) {
 	return Variant::VARIANT_MAX;
 }
 
+#ifdef TOOLS_ENABLED
+HashMap<String, String> GDScriptParser::theme_color_names;
+#endif
+
 void GDScriptParser::cleanup() {
 	builtin_types.clear();
 }
@@ -120,6 +124,15 @@ GDScriptParser::GDScriptParser() {
 
 #ifdef DEBUG_ENABLED
 	is_ignoring_warnings = !(bool)GLOBAL_GET("debug/gdscript/warnings/enable");
+#endif
+
+#ifdef TOOLS_ENABLED
+	if (theme_color_names.is_empty()) {
+		theme_color_names.insert("x", "axis_x_color");
+		theme_color_names.insert("y", "axis_y_color");
+		theme_color_names.insert("z", "axis_z_color");
+		theme_color_names.insert("w", "axis_w_color");
+	}
 #endif
 }
 
@@ -2291,9 +2304,7 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_identifier(ExpressionNode 
 	IdentifierNode *identifier = alloc_node<IdentifierNode>();
 	complete_extents(identifier);
 	identifier->name = previous.get_identifier();
-#ifdef DEBUG_ENABLED
 	identifier->suite = current_suite;
-#endif
 
 	if (current_suite != nullptr && current_suite->has_local(identifier->name)) {
 		const SuiteNode::Local &declaration = current_suite->get_local(identifier->name);
@@ -3151,6 +3162,8 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_preload(ExpressionNode *p_
 GDScriptParser::ExpressionNode *GDScriptParser::parse_lambda(ExpressionNode *p_previous_operand, bool p_can_assign) {
 	LambdaNode *lambda = alloc_node<LambdaNode>();
 	lambda->parent_function = current_function;
+	lambda->parent_lambda = current_lambda;
+
 	FunctionNode *function = alloc_node<FunctionNode>();
 	function->source_lambda = lambda;
 
@@ -3177,6 +3190,9 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_lambda(ExpressionNode *p_p
 
 	FunctionNode *previous_function = current_function;
 	current_function = function;
+
+	LambdaNode *previous_lambda = current_lambda;
+	current_lambda = lambda;
 
 	SuiteNode *body = alloc_node<SuiteNode>();
 	body->parent_function = current_function;
@@ -3215,6 +3231,7 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_lambda(ExpressionNode *p_p
 	}
 
 	current_function = previous_function;
+	current_lambda = previous_lambda;
 	in_lambda = previous_in_lambda;
 	lambda->function = function;
 
@@ -3836,18 +3853,31 @@ bool GDScriptParser::tool_annotation(const AnnotationNode *p_annotation, Node *p
 bool GDScriptParser::icon_annotation(const AnnotationNode *p_annotation, Node *p_node) {
 	ERR_FAIL_COND_V_MSG(p_node->type != Node::CLASS, false, R"("@icon" annotation can only be applied to classes.)");
 	ERR_FAIL_COND_V(p_annotation->resolved_arguments.is_empty(), false);
+
 	ClassNode *p_class = static_cast<ClassNode *>(p_node);
+	String path = p_annotation->resolved_arguments[0];
+
 #ifdef DEBUG_ENABLED
 	if (!p_class->icon_path.is_empty()) {
 		push_error(R"("@icon" annotation can only be used once.)", p_annotation);
 		return false;
 	}
-	if (String(p_annotation->resolved_arguments[0]).is_empty()) {
+	if (path.is_empty()) {
 		push_error(R"("@icon" annotation argument must contain the path to the icon.)", p_annotation->arguments[0]);
 		return false;
 	}
 #endif // DEBUG_ENABLED
-	p_class->icon_path = p_annotation->resolved_arguments[0];
+
+	p_class->icon_path = path;
+
+	if (path.is_empty() || path.is_absolute_path()) {
+		p_class->simplified_icon_path = path.simplify_path();
+	} else if (path.is_relative_path()) {
+		p_class->simplified_icon_path = script_path.get_base_dir().path_join(path).simplify_path();
+	} else {
+		p_class->simplified_icon_path = path;
+	}
+
 	return true;
 }
 
@@ -4082,6 +4112,8 @@ bool GDScriptParser::export_annotations(const AnnotationNode *p_annotation, Node
 				}
 
 				variable->export_info.hint_string = enum_hint_string;
+				variable->export_info.usage |= PROPERTY_USAGE_CLASS_IS_ENUM;
+				variable->export_info.class_name = String(export_type.native_type).replace("::", ".");
 			} break;
 			default:
 				push_error(R"(Export type can only be built-in, a resource, a node, or an enum.)", variable);
@@ -4283,7 +4315,7 @@ String GDScriptParser::SuiteNode::Local::get_name() const {
 		case SuiteNode::Local::FOR_VARIABLE:
 			return "for loop iterator";
 		case SuiteNode::Local::PATTERN_BIND:
-			return "pattern_bind";
+			return "pattern bind";
 		case SuiteNode::Local::UNDEFINED:
 			return "<undefined>";
 		default:
@@ -4338,6 +4370,104 @@ String GDScriptParser::DataType::to_string() const {
 	}
 
 	ERR_FAIL_V_MSG("<unresolved type>", "Kind set outside the enum range.");
+}
+
+PropertyInfo GDScriptParser::DataType::to_property_info(const String &p_name) const {
+	PropertyInfo result;
+	result.name = p_name;
+	result.usage = PROPERTY_USAGE_NONE;
+
+	if (!is_hard_type()) {
+		result.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+		return result;
+	}
+
+	switch (kind) {
+		case BUILTIN:
+			result.type = builtin_type;
+			if (builtin_type == Variant::ARRAY && has_container_element_type()) {
+				const DataType *elem_type = container_element_type;
+				switch (elem_type->kind) {
+					case BUILTIN:
+						result.hint = PROPERTY_HINT_ARRAY_TYPE;
+						result.hint_string = Variant::get_type_name(elem_type->builtin_type);
+						break;
+					case NATIVE:
+						result.hint = PROPERTY_HINT_ARRAY_TYPE;
+						result.hint_string = elem_type->native_type;
+						break;
+					case SCRIPT:
+						result.hint = PROPERTY_HINT_ARRAY_TYPE;
+						if (elem_type->script_type.is_valid() && elem_type->script_type->get_global_name() != StringName()) {
+							result.hint_string = elem_type->script_type->get_global_name();
+						} else {
+							result.hint_string = elem_type->native_type;
+						}
+						break;
+					case CLASS:
+						result.hint = PROPERTY_HINT_ARRAY_TYPE;
+						if (elem_type->class_type != nullptr && elem_type->class_type->get_global_name() != StringName()) {
+							result.hint_string = elem_type->class_type->get_global_name();
+						} else {
+							result.hint_string = elem_type->native_type;
+						}
+						break;
+					case ENUM:
+						result.hint = PROPERTY_HINT_ARRAY_TYPE;
+						result.hint_string = String(elem_type->native_type).replace("::", ".");
+						break;
+					case VARIANT:
+					case RESOLVING:
+					case UNRESOLVED:
+						break;
+				}
+			}
+			break;
+		case NATIVE:
+			result.type = Variant::OBJECT;
+			if (is_meta_type) {
+				result.class_name = GDScriptNativeClass::get_class_static();
+			} else {
+				result.class_name = native_type;
+			}
+			break;
+		case SCRIPT:
+			result.type = Variant::OBJECT;
+			if (is_meta_type) {
+				result.class_name = script_type.is_valid() ? script_type->get_class() : Script::get_class_static();
+			} else if (script_type.is_valid() && script_type->get_global_name() != StringName()) {
+				result.class_name = script_type->get_global_name();
+			} else {
+				result.class_name = native_type;
+			}
+			break;
+		case CLASS:
+			result.type = Variant::OBJECT;
+			if (is_meta_type) {
+				result.class_name = GDScript::get_class_static();
+			} else if (class_type != nullptr && class_type->get_global_name() != StringName()) {
+				result.class_name = class_type->get_global_name();
+			} else {
+				result.class_name = native_type;
+			}
+			break;
+		case ENUM:
+			if (is_meta_type) {
+				result.type = Variant::DICTIONARY;
+			} else {
+				result.type = Variant::INT;
+				result.usage |= PROPERTY_USAGE_CLASS_IS_ENUM;
+				result.class_name = String(native_type).replace("::", ".");
+			}
+			break;
+		case VARIANT:
+		case RESOLVING:
+		case UNRESOLVED:
+			result.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
+			break;
+	}
+
+	return result;
 }
 
 static Variant::Type _variant_type_to_typed_array_element_type(Variant::Type p_type) {

@@ -103,6 +103,9 @@ void LightmapGIEditorPlugin::_bake_select_file(const String &p_file) {
 			case LightmapGI::BAKE_ERROR_FOREIGN_DATA: {
 				EditorNode::get_singleton()->show_warning(TTR("Lightmap data is not local to the scene."));
 			} break;
+			case LightmapGI::BAKE_ERROR_TEXTURE_SIZE_TOO_SMALL: {
+				EditorNode::get_singleton()->show_warning(TTR("Maximum texture size is too small for the lightmap images."));
+			} break;
 			default: {
 			} break;
 		}
@@ -165,7 +168,7 @@ void LightmapGIEditorPlugin::_bind_methods() {
 LightmapGIEditorPlugin::LightmapGIEditorPlugin() {
 	bake = memnew(Button);
 	bake->set_flat(true);
-	bake->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("Bake"), SNAME("EditorIcons")));
+	bake->set_icon(EditorNode::get_singleton()->get_gui_base()->get_editor_theme_icon(SNAME("Bake")));
 	bake->set_text(TTR("Bake Lightmaps"));
 	bake->hide();
 	bake->connect("pressed", Callable(this, "_bake"));

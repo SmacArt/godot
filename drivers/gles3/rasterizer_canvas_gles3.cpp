@@ -1451,7 +1451,7 @@ void RasterizerCanvasGLES3::_render_batch(Light *p_lights, uint32_t p_index) {
 void RasterizerCanvasGLES3::_add_to_batch(uint32_t &r_index, bool &r_batch_broken) {
 	state.canvas_instance_batches[state.current_batch_index].instance_count++;
 	r_index++;
-	if (r_index >= data.max_instances_per_buffer) {
+	if (r_index + state.last_item_index >= data.max_instances_per_buffer) {
 		// Copy over all data needed for rendering right away
 		// then go back to recording item commands.
 		glBindBuffer(GL_ARRAY_BUFFER, state.canvas_instance_data_buffers[state.current_data_buffer_index].instance_buffers[state.current_instance_buffer_index]);
@@ -2115,7 +2115,7 @@ void RasterizerCanvasGLES3::canvas_begin(RID p_to_render_target, bool p_to_backb
 
 	if (render_target && render_target->clear_requested) {
 		const Color &col = render_target->clear_color;
-		glClearColor(col.r, col.g, col.b, col.a);
+		glClearColor(col.r, col.g, col.b, render_target->is_transparent ? col.a : 1.0f);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 		render_target->clear_requested = false;

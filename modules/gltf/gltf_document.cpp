@@ -563,17 +563,17 @@ Error GLTFDocument::_parse_scenes(Ref<GLTFState> p_state) {
 
 	if (scenes.size()) {
 		ERR_FAIL_COND_V(loaded_scene >= scenes.size(), ERR_FILE_CORRUPT);
-		const Dictionary &s = scenes[loaded_scene];
-		ERR_FAIL_COND_V(!s.has("nodes"), ERR_UNAVAILABLE);
-		const Array &nodes = s["nodes"];
+		const Dictionary &scene_dict = scenes[loaded_scene];
+		ERR_FAIL_COND_V(!scene_dict.has("nodes"), ERR_UNAVAILABLE);
+		const Array &nodes = scene_dict["nodes"];
 		for (int j = 0; j < nodes.size(); j++) {
 			p_state->root_nodes.push_back(nodes[j]);
 		}
-
-		if (s.has("name") && !String(s["name"]).is_empty() && !((String)s["name"]).begins_with("Scene")) {
-			p_state->scene_name = _gen_unique_name(p_state, s["name"]);
+		// Determine what to use for the scene name.
+		if (scene_dict.has("name") && !String(scene_dict["name"]).is_empty() && !((String)scene_dict["name"]).begins_with("Scene")) {
+			p_state->scene_name = scene_dict["name"];
 		} else {
-			p_state->scene_name = _gen_unique_name(p_state, p_state->filename);
+			p_state->scene_name = p_state->filename;
 		}
 	}
 
@@ -5271,23 +5271,21 @@ Error GLTFDocument::_parse_animations(Ref<GLTFState> p_state) {
 void GLTFDocument::_assign_node_names(Ref<GLTFState> p_state) {
 	for (int i = 0; i < p_state->nodes.size(); i++) {
 		Ref<GLTFNode> gltf_node = p_state->nodes[i];
-
 		// Any joints get unique names generated when the skeleton is made, unique to the skeleton
 		if (gltf_node->skeleton >= 0) {
 			continue;
 		}
-
-		if (gltf_node->get_name().is_empty()) {
+		String gltf_node_name = gltf_node->get_name();
+		if (gltf_node_name.is_empty()) {
 			if (gltf_node->mesh >= 0) {
-				gltf_node->set_name(_gen_unique_name(p_state, "Mesh"));
+				gltf_node_name = "Mesh";
 			} else if (gltf_node->camera >= 0) {
-				gltf_node->set_name(_gen_unique_name(p_state, "Camera3D"));
+				gltf_node_name = "Camera3D";
 			} else {
-				gltf_node->set_name(_gen_unique_name(p_state, "Node"));
+				gltf_node_name = "Node";
 			}
 		}
-
-		gltf_node->set_name(_gen_unique_name(p_state, gltf_node->get_name()));
+		gltf_node->set_name(_gen_unique_name(p_state, gltf_node_name));
 	}
 }
 
@@ -5804,10 +5802,14 @@ void GLTFDocument::_generate_scene_node(Ref<GLTFState> p_state, const GLTFNodeIn
 	// If none of our GLTFDocumentExtension classes generated us a node, we generate one.
 	if (!current_node) {
 		if (gltf_node->skin >= 0 && gltf_node->mesh >= 0 && !gltf_node->children.is_empty()) {
+			// GLTF specifies that skinned meshes should ignore their node transforms,
+			// only being controlled by the skeleton, so Godot will reparent a skinned
+			// mesh to its skeleton. However, we still need to ensure any child nodes
+			// keep their place in the tree, so if there are any child nodes, the skinned
+			// mesh must not be the base node, so generate an empty spatial base.
 			current_node = _generate_spatial(p_state, p_node_index);
 			Node3D *mesh_inst = _generate_mesh_instance(p_state, p_node_index);
 			mesh_inst->set_name(gltf_node->get_name());
-
 			current_node->add_child(mesh_inst, true);
 		} else if (gltf_node->mesh >= 0) {
 			current_node = _generate_mesh_instance(p_state, p_node_index);

@@ -292,7 +292,7 @@ void TilesEditorUtils::draw_selection_rect(CanvasItem *p_ci, const Rect2 &p_rect
 	real_t scale = p_ci->get_global_transform().get_scale().x * 0.5;
 	p_ci->draw_set_transform(p_rect.position, 0, Vector2(1, 1) / scale);
 	RS::get_singleton()->canvas_item_add_nine_patch(
-			p_ci->get_canvas_item(), Rect2(Vector2(), p_rect.size * scale), Rect2(), EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("TileSelection"), SNAME("EditorIcons"))->get_rid(),
+			p_ci->get_canvas_item(), Rect2(Vector2(), p_rect.size * scale), Rect2(), EditorNode::get_singleton()->get_gui_base()->get_editor_theme_icon(SNAME("TileSelection"))->get_rid(),
 			Vector2(2, 2), Vector2(2, 2), RS::NINE_PATCH_STRETCH, RS::NINE_PATCH_STRETCH, false, p_color);
 	p_ci->draw_set_transform_matrix(Transform2D());
 }
@@ -369,6 +369,13 @@ void TileMapEditorPlugin::edit(Object *p_object) {
 			tile_set_plugin_singleton->make_visible(true);
 			edited_tileset = tile_map->get_tileset()->get_instance_id();
 		}
+	} else if (edited_tileset.is_valid()) {
+		// Hide the TileSet editor, unless another TileSet is being edited.
+		if (tile_set_plugin_singleton->get_edited_tileset() == edited_tileset) {
+			tile_set_plugin_singleton->edit(nullptr);
+			tile_set_plugin_singleton->make_visible(false);
+		}
+		edited_tileset = ObjectID();
 	}
 }
 
@@ -426,6 +433,11 @@ TileMapEditorPlugin::~TileMapEditorPlugin() {
 
 void TileSetEditorPlugin::edit(Object *p_object) {
 	editor->edit(Ref<TileSet>(p_object));
+	if (p_object) {
+		edited_tileset = p_object->get_instance_id();
+	} else {
+		edited_tileset = ObjectID();
+	}
 }
 
 bool TileSetEditorPlugin::handles(Object *p_object) const {
@@ -444,6 +456,10 @@ void TileSetEditorPlugin::make_visible(bool p_visible) {
 			EditorNode::get_singleton()->hide_bottom_panel();
 		}
 	}
+}
+
+ObjectID TileSetEditorPlugin::get_edited_tileset() const {
+	return edited_tileset;
 }
 
 TileSetEditorPlugin::TileSetEditorPlugin() {

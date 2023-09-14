@@ -367,9 +367,19 @@ String BindingsGenerator::bbcode_to_xml(const String &p_bbcode, const TypeInterf
 				}
 
 				if (target_itype) {
-					xml_output.append("<see cref=\"" BINDINGS_NAMESPACE ".");
-					xml_output.append(target_itype->proxy_name);
-					xml_output.append("\"/>");
+					if ((!p_itype || p_itype->api_type == ClassDB::API_CORE) && target_itype->api_type == ClassDB::API_EDITOR) {
+						// Editor references in core documentation cannot be resolved,
+						// handle as standard codeblock.
+						_log("Cannot reference editor type '%s' in documentation for core type '%s'\n",
+								target_itype->proxy_name.utf8().get_data(), p_itype ? p_itype->proxy_name.utf8().get_data() : "@GlobalScope");
+						xml_output.append("<c>");
+						xml_output.append(target_itype->proxy_name);
+						xml_output.append("</c>");
+					} else {
+						xml_output.append("<see cref=\"" BINDINGS_NAMESPACE ".");
+						xml_output.append(target_itype->proxy_name);
+						xml_output.append("\"/>");
+					}
 				} else {
 					ERR_PRINT("Cannot resolve type reference in documentation: '" + tag + "'.");
 
@@ -523,7 +533,31 @@ void BindingsGenerator::_append_xml_method(StringBuilder &p_xml_output, const Ty
 				p_xml_output.append(p_target_itype->proxy_name);
 				p_xml_output.append(".");
 				p_xml_output.append(target_imethod->proxy_name);
-				p_xml_output.append("\"/>");
+				p_xml_output.append("(");
+				bool first_key = true;
+				for (const ArgumentInterface &iarg : target_imethod->arguments) {
+					const TypeInterface *arg_type = _get_type_or_null(iarg.type);
+
+					if (first_key) {
+						first_key = false;
+					} else {
+						p_xml_output.append(", ");
+					}
+					if (!arg_type) {
+						ERR_PRINT("Cannot resolve argument type in documentation: '" + p_link_target + "'.");
+						p_xml_output.append(iarg.type.cname);
+						continue;
+					}
+					if (iarg.def_param_mode == ArgumentInterface::NULLABLE_VAL) {
+						p_xml_output.append("Nullable{");
+					}
+					String arg_cs_type = arg_type->cs_type + _get_generic_type_parameters(*arg_type, iarg.type.generic_type_parameters);
+					p_xml_output.append(arg_cs_type.replacen("<", "{").replacen(">", "}").replacen("params ", ""));
+					if (iarg.def_param_mode == ArgumentInterface::NULLABLE_VAL) {
+						p_xml_output.append("}");
+					}
+				}
+				p_xml_output.append(")\"/>");
 			} else {
 				if (!p_target_itype->is_intentionally_ignored(p_link_target)) {
 					ERR_PRINT("Cannot resolve method reference in documentation: '" + p_link_target + "'.");

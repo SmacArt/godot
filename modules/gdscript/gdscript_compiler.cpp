@@ -2165,8 +2165,14 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 		}
 	}
 
+	MethodInfo method_info;
+
 	codegen.function_name = func_name;
+	method_info.name = func_name;
 	codegen.is_static = is_static;
+	if (is_static) {
+		method_info.flags |= METHOD_FLAG_STATIC;
+	}
 	codegen.generator->write_start(p_script, func_name, is_static, rpc_config, return_type);
 
 	int optional_parameters = 0;
@@ -2178,10 +2184,14 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 			uint32_t par_addr = codegen.generator->add_parameter(parameter->identifier->name, parameter->initializer != nullptr, par_type);
 			codegen.parameters[parameter->identifier->name] = GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::FUNCTION_PARAMETER, par_addr, par_type);
 
+			method_info.arguments.push_back(parameter->get_datatype().to_property_info(parameter->identifier->name));
+
 			if (parameter->initializer != nullptr) {
 				optional_parameters++;
 			}
 		}
+
+		method_info.default_arguments.append_array(p_func->default_arg_values);
 	}
 
 	// Parse initializer if applies.
@@ -2335,19 +2345,19 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 	}
 
 	if (p_func) {
-		// if no return statement -> return type is void not unresolved Variant
+		// If no `return` statement, then return type is `void`, not `Variant`.
 		if (p_func->body->has_return) {
 			gd_function->return_type = _gdtype_from_datatype(p_func->get_datatype(), p_script);
+			method_info.return_val = p_func->get_datatype().to_property_info(String());
 		} else {
 			gd_function->return_type = GDScriptDataType();
 			gd_function->return_type.has_type = true;
 			gd_function->return_type.kind = GDScriptDataType::BUILTIN;
 			gd_function->return_type.builtin_type = Variant::NIL;
 		}
-#ifdef TOOLS_ENABLED
-		gd_function->default_arg_values = p_func->default_arg_values;
-#endif
 	}
+
+	gd_function->method_info = method_info;
 
 	if (!is_implicit_initializer && !is_implicit_ready && !p_for_lambda) {
 		p_script->member_functions[func_name] = gd_function;
@@ -2503,7 +2513,10 @@ Error GDScriptCompiler::_parse_setter_getter(GDScript *p_script, const GDScriptP
 	return err;
 }
 
-Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScriptParser::ClassNode *p_class, bool p_keep_state) {
+// Prepares given script, and inner class scripts, for compilation. It populates class members and initializes method
+// RPC info for its base classes first, then for itself, then for inner classes.
+// Warning: this function cannot initiate compilation of other classes, or it will result in cyclic dependency issues.
+Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptParser::ClassNode *p_class, bool p_keep_state) {
 	if (parsed_classes.has(p_script)) {
 		return OK;
 	}
@@ -2554,7 +2567,6 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 
 	p_script->member_functions.clear();
 	p_script->member_indices.clear();
-	p_script->member_info.clear();
 	p_script->static_variables_indices.clear();
 	p_script->static_variables.clear();
 	p_script->_signals.clear();
@@ -2562,14 +2574,15 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 	p_script->implicit_initializer = nullptr;
 	p_script->implicit_ready = nullptr;
 	p_script->static_initializer = nullptr;
+	p_script->rpc_config.clear();
 
 	p_script->clearing = false;
 
 	p_script->tool = parser->is_tool();
 
-	if (!p_script->name.is_empty()) {
-		if (ClassDB::class_exists(p_script->name) && ClassDB::is_class_exposed(p_script->name)) {
-			_set_error("The class '" + p_script->name + "' shadows a native class", p_class);
+	if (p_script->local_name != StringName()) {
+		if (ClassDB::class_exists(p_script->local_name) && ClassDB::is_class_exposed(p_script->local_name)) {
+			_set_error(vformat(R"(The class "%s" shadows a native class)", p_script->local_name), p_class);
 			return ERR_ALREADY_EXISTS;
 		}
 	}
@@ -2592,7 +2605,7 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 			}
 
 			if (main_script->has_class(base.ptr())) {
-				Error err = _populate_class_members(base.ptr(), p_class->base_type.class_type, p_keep_state);
+				Error err = _prepare_compilation(base.ptr(), p_class->base_type.class_type, p_keep_state);
 				if (err) {
 					return err;
 				}
@@ -2611,7 +2624,7 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 					return ERR_COMPILATION_FAILED;
 				}
 
-				err = _populate_class_members(base.ptr(), p_class->base_type.class_type, p_keep_state);
+				err = _prepare_compilation(base.ptr(), p_class->base_type.class_type, p_keep_state);
 				if (err) {
 					_set_error(vformat(R"(Could not populate class members of base class "%s" in "%s".)", base->fully_qualified_name, base->path), nullptr);
 					return err;
@@ -2628,6 +2641,12 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 		} break;
 	}
 
+	// Duplicate RPC information from base GDScript
+	// Base script isn't valid because it should not have been compiled yet, but the reference contains relevant info.
+	if (base_type.kind == GDScriptDataType::GDSCRIPT && p_script->base.is_valid()) {
+		p_script->rpc_config = p_script->base->rpc_config.duplicate();
+	}
+
 	for (int i = 0; i < p_class->members.size(); i++) {
 		const GDScriptParser::ClassNode::Member &member = p_class->members[i];
 		switch (member.type) {
@@ -2636,7 +2655,6 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 				StringName name = variable->identifier->name;
 
 				GDScript::MemberInfo minfo;
-				minfo.index = p_script->member_indices.size();
 				switch (variable->property) {
 					case GDScriptParser::VariableNode::PROP_NONE:
 						break; // Nothing to do.
@@ -2659,8 +2677,7 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 				}
 				minfo.data_type = _gdtype_from_datatype(variable->get_datatype(), p_script);
 
-				PropertyInfo prop_info = minfo.data_type;
-				prop_info.name = name;
+				PropertyInfo prop_info = variable->get_datatype().to_property_info(name);
 				PropertyInfo export_info = variable->export_info;
 
 				if (variable->exported) {
@@ -2670,16 +2687,16 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 					}
 					prop_info.hint = export_info.hint;
 					prop_info.hint_string = export_info.hint_string;
-					prop_info.usage = export_info.usage | PROPERTY_USAGE_SCRIPT_VARIABLE;
-				} else {
-					prop_info.usage = PROPERTY_USAGE_SCRIPT_VARIABLE;
+					prop_info.usage = export_info.usage;
 				}
+				prop_info.usage |= PROPERTY_USAGE_SCRIPT_VARIABLE;
+				minfo.property_info = prop_info;
 
 				if (variable->is_static) {
 					minfo.index = p_script->static_variables_indices.size();
 					p_script->static_variables_indices[name] = minfo;
 				} else {
-					p_script->member_info[name] = prop_info;
+					minfo.index = p_script->member_indices.size();
 					p_script->member_indices[name] = minfo;
 					p_script->members.insert(name);
 				}
@@ -2712,12 +2729,7 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 				const GDScriptParser::SignalNode *signal = member.signal;
 				StringName name = signal->identifier->name;
 
-				Vector<StringName> parameters_names;
-				parameters_names.resize(signal->parameters.size());
-				for (int j = 0; j < signal->parameters.size(); j++) {
-					parameters_names.write[j] = signal->parameters[j]->identifier->name;
-				}
-				p_script->_signals[name] = parameters_names;
+				p_script->_signals[name] = signal->method_info;
 			} break;
 
 			case GDScriptParser::ClassNode::Member::ENUM: {
@@ -2740,12 +2752,20 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 				prop_info.name = annotation->export_info.name;
 				prop_info.usage = annotation->export_info.usage;
 				prop_info.hint_string = annotation->export_info.hint_string;
+				minfo.property_info = prop_info;
 
-				p_script->member_info[name] = prop_info;
 				p_script->member_indices[name] = minfo;
 				p_script->members.insert(Variant());
 			} break;
 
+			case GDScriptParser::ClassNode::Member::FUNCTION: {
+				const GDScriptParser::FunctionNode *function_n = member.function;
+
+				Variant config = function_n->rpc_config;
+				if (config.get_type() != Variant::NIL) {
+					p_script->rpc_config[function_n->identifier->name] = config;
+				}
+			} break;
 			default:
 				break; // Nothing to do here.
 		}
@@ -2756,7 +2776,7 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 	parsed_classes.insert(p_script);
 	parsing_classes.erase(p_script);
 
-	// Populate sub-classes.
+	// Populate inner classes.
 	for (int i = 0; i < p_class->members.size(); i++) {
 		const GDScriptParser::ClassNode::Member &member = p_class->members[i];
 		if (member.type != member.CLASS) {
@@ -2769,7 +2789,7 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 
 		// Subclass might still be parsing, just skip it
 		if (!parsing_classes.has(subclass_ptr)) {
-			Error err = _populate_class_members(subclass_ptr, inner_class, p_keep_state);
+			Error err = _prepare_compilation(subclass_ptr, inner_class, p_keep_state);
 			if (err) {
 				return err;
 			}
@@ -2905,8 +2925,6 @@ Error GDScriptCompiler::_compile_class(GDScript *p_script, const GDScriptParser:
 		has_static_data = has_static_data || inner_class->has_static_data;
 	}
 
-	p_script->_init_rpc_methods_properties();
-
 	p_script->valid = true;
 	return OK;
 }
@@ -2927,7 +2945,9 @@ void GDScriptCompiler::convert_to_initializer_type(Variant &p_variant, const GDS
 
 void GDScriptCompiler::make_scripts(GDScript *p_script, const GDScriptParser::ClassNode *p_class, bool p_keep_state) {
 	p_script->fully_qualified_name = p_class->fqcn;
-	p_script->name = p_class->identifier ? p_class->identifier->name : "";
+	p_script->local_name = p_class->identifier ? p_class->identifier->name : StringName();
+	p_script->global_name = p_class->get_global_name();
+	p_script->simplified_icon_path = p_class->simplified_icon_path;
 
 	HashMap<StringName, Ref<GDScript>> old_subclasses;
 
@@ -2978,7 +2998,7 @@ Error GDScriptCompiler::compile(const GDScriptParser *p_parser, GDScript *p_scri
 	make_scripts(p_script, root, p_keep_state);
 
 	main_script->_owner = nullptr;
-	Error err = _populate_class_members(main_script, parser->get_tree(), p_keep_state);
+	Error err = _prepare_compilation(main_script, parser->get_tree(), p_keep_state);
 
 	if (err) {
 		return err;

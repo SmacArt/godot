@@ -342,6 +342,25 @@ Point2i Window::get_position() const {
 	return position;
 }
 
+void Window::move_to_center() {
+	ERR_MAIN_THREAD_GUARD;
+	ERR_FAIL_COND(!is_inside_tree());
+
+	Rect2 parent_rect;
+
+	if (is_embedded()) {
+		parent_rect = get_embedder()->get_visible_rect();
+	} else {
+		int parent_screen = DisplayServer::get_singleton()->window_get_current_screen(get_window_id());
+		parent_rect.position = DisplayServer::get_singleton()->screen_get_position(parent_screen);
+		parent_rect.size = DisplayServer::get_singleton()->screen_get_size(parent_screen);
+	}
+
+	if (parent_rect != Rect2()) {
+		set_position(parent_rect.position + (parent_rect.size - get_size()) / 2);
+	}
+}
+
 void Window::set_size(const Size2i &p_size) {
 	ERR_MAIN_THREAD_GUARD;
 
@@ -1250,7 +1269,9 @@ void Window::_notification(int p_what) {
 				notification(NOTIFICATION_TRANSLATION_CHANGED);
 			}
 #endif
-			notification(NOTIFICATION_THEME_CHANGED);
+
+			// Emits NOTIFICATION_THEME_CHANGED internally.
+			set_theme_context(ThemeDB::get_singleton()->get_nearest_theme_context(this));
 		} break;
 
 		case NOTIFICATION_READY: {
@@ -1294,6 +1315,8 @@ void Window::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
+			set_theme_context(nullptr, false);
+
 			if (transient) {
 				_clear_transient();
 			}
@@ -1781,7 +1804,7 @@ Rect2i Window::fit_rect_in_parent(Rect2i p_rect, const Rect2i &p_parent_rect) co
 		p_rect.position.x = 0;
 	}
 
-	int title_height = get_flag(Window::FLAG_BORDERLESS) ? 0 : get_theme_constant(SNAME("title_height"));
+	int title_height = get_flag(Window::FLAG_BORDERLESS) ? 0 : theme_cache.title_height;
 
 	if (p_rect.position.y < title_height) {
 		p_rect.position.y = title_height;
@@ -1870,6 +1893,11 @@ bool Window::has_theme_owner_node() const {
 	return theme_owner->has_owner_node();
 }
 
+void Window::set_theme_context(ThemeContext *p_context, bool p_propagate) {
+	ERR_MAIN_THREAD_GUARD;
+	theme_owner->set_owner_context(p_context, p_propagate);
+}
+
 void Window::set_theme(const Ref<Theme> &p_theme) {
 	ERR_MAIN_THREAD_GUARD;
 	if (theme == p_theme) {
@@ -1937,6 +1965,8 @@ void Window::_update_theme_item_cache() {
 	} else {
 		child_controls_changed();
 	}
+
+	ThemeDB::get_singleton()->update_class_instance_items(this);
 }
 
 void Window::_update_embedded_window() {
@@ -2109,6 +2139,33 @@ int Window::get_theme_constant(const StringName &p_name, const StringName &p_the
 	theme_constant_cache[p_theme_type][p_name] = constant;
 	return constant;
 }
+
+Variant Window::get_theme_item(Theme::DataType p_data_type, const StringName &p_name, const StringName &p_theme_type) const {
+	switch (p_data_type) {
+		case Theme::DATA_TYPE_COLOR:
+			return get_theme_color(p_name, p_theme_type);
+		case Theme::DATA_TYPE_CONSTANT:
+			return get_theme_constant(p_name, p_theme_type);
+		case Theme::DATA_TYPE_FONT:
+			return get_theme_font(p_name, p_theme_type);
+		case Theme::DATA_TYPE_FONT_SIZE:
+			return get_theme_font_size(p_name, p_theme_type);
+		case Theme::DATA_TYPE_ICON:
+			return get_theme_icon(p_name, p_theme_type);
+		case Theme::DATA_TYPE_STYLEBOX:
+			return get_theme_stylebox(p_name, p_theme_type);
+		case Theme::DATA_TYPE_MAX:
+			break; // Can't happen, but silences warning.
+	}
+
+	return Variant();
+}
+
+#ifdef TOOLS_ENABLED
+Ref<Texture2D> Window::get_editor_theme_icon(const StringName &p_name) const {
+	return get_theme_icon(p_name, SNAME("EditorIcons"));
+}
+#endif
 
 bool Window::has_theme_icon(const StringName &p_name, const StringName &p_theme_type) const {
 	ERR_READ_THREAD_GUARD_V(false);
@@ -2602,6 +2659,7 @@ void Window::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_position", "position"), &Window::set_position);
 	ClassDB::bind_method(D_METHOD("get_position"), &Window::get_position);
+	ClassDB::bind_method(D_METHOD("move_to_center"), &Window::move_to_center);
 
 	ClassDB::bind_method(D_METHOD("set_size", "size"), &Window::set_size);
 	ClassDB::bind_method(D_METHOD("get_size"), &Window::get_size);
@@ -2852,6 +2910,23 @@ void Window::_bind_methods() {
 	BIND_ENUM_CONSTANT(WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_KEYBOARD_FOCUS);
 
 	GDVIRTUAL_BIND(_get_contents_minimum_size);
+
+	BIND_THEME_ITEM(Theme::DATA_TYPE_STYLEBOX, Window, embedded_border);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_STYLEBOX, Window, embedded_unfocused_border);
+
+	BIND_THEME_ITEM(Theme::DATA_TYPE_FONT, Window, title_font);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_FONT_SIZE, Window, title_font_size);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, Window, title_color);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_CONSTANT, Window, title_height);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, Window, title_outline_modulate);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_CONSTANT, Window, title_outline_size);
+
+	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, Window, close);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, Window, close_pressed);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_CONSTANT, Window, close_h_offset);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_CONSTANT, Window, close_v_offset);
+
+	BIND_THEME_ITEM(Theme::DATA_TYPE_CONSTANT, Window, resize_margin);
 }
 
 Window::Window() {
@@ -2861,7 +2936,7 @@ Window::Window() {
 		max_size_used = max_size; // Update max_size_used.
 	}
 
-	theme_owner = memnew(ThemeOwner);
+	theme_owner = memnew(ThemeOwner(this));
 	RS::get_singleton()->viewport_set_update_mode(get_viewport_rid(), RS::VIEWPORT_UPDATE_DISABLED);
 }
 
