@@ -367,7 +367,7 @@ void TileMapEditorTilesPlugin::_update_atlas_view() {
 	int source_id = sources_list->get_item_metadata(sources_list->get_current());
 	TileSetSource *source = *tile_set->get_source(source_id);
 	TileSetAtlasSource *atlas_source = Object::cast_to<TileSetAtlasSource>(source);
-	ERR_FAIL_COND(!atlas_source);
+	ERR_FAIL_NULL(atlas_source);
 
 	tile_atlas_view->set_atlas_source(*tile_map->get_tileset(), atlas_source, source_id);
 	TilesEditorUtils::get_singleton()->synchronize_atlas_view(tile_atlas_view);
@@ -388,7 +388,7 @@ void TileMapEditorTilesPlugin::_update_scenes_collection_view() {
 	int source_id = sources_list->get_item_metadata(sources_list->get_current());
 	TileSetSource *source = *tile_set->get_source(source_id);
 	TileSetScenesCollectionSource *scenes_collection_source = Object::cast_to<TileSetScenesCollectionSource>(source);
-	ERR_FAIL_COND(!scenes_collection_source);
+	ERR_FAIL_NULL(scenes_collection_source);
 
 	// Clear the list.
 	scene_tiles_list->clear();
@@ -448,7 +448,7 @@ void TileMapEditorTilesPlugin::_scenes_list_multi_selected(int p_index, bool p_s
 	int source_id = sources_list->get_item_metadata(sources_list->get_current());
 	TileSetSource *source = *tile_set->get_source(source_id);
 	TileSetScenesCollectionSource *scenes_collection_source = Object::cast_to<TileSetScenesCollectionSource>(source);
-	ERR_FAIL_COND(!scenes_collection_source);
+	ERR_FAIL_NULL(scenes_collection_source);
 
 	TileMapCell selected = TileMapCell(source_id, Vector2i(), scene_id);
 
@@ -675,7 +675,7 @@ bool TileMapEditorTilesPlugin::forward_canvas_gui_input(const Ref<InputEvent> &p
 					}
 				} else if (tool_buttons_group->get_pressed_button() == select_tool_button) {
 					drag_start_mouse_pos = mpos;
-					if (tile_map_selection.has(tile_map->local_to_map(drag_start_mouse_pos)) && !mb->is_shift_pressed()) {
+					if (tile_map_selection.has(tile_map->local_to_map(drag_start_mouse_pos)) && !mb->is_shift_pressed() && !mb->is_command_or_control_pressed()) {
 						// Move the selection
 						_update_selection_pattern_from_tilemap_selection(); // Make sure the pattern is up to date before moving.
 						drag_type = DRAG_TYPE_MOVE;
@@ -1028,7 +1028,7 @@ TileMapCell TileMapEditorTilesPlugin::_pick_random_tile(Ref<TileMapPattern> p_pa
 		TileSetAtlasSource *atlas_source = Object::cast_to<TileSetAtlasSource>(source);
 		if (atlas_source) {
 			TileData *tile_data = atlas_source->get_tile_data(atlas_coords, alternative_tile);
-			ERR_FAIL_COND_V(!tile_data, TileMapCell());
+			ERR_FAIL_NULL_V(tile_data, TileMapCell());
 			sum += tile_data->get_probability();
 		} else {
 			sum += 1.0;
@@ -2217,7 +2217,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	paint_tool_button->set_toggle_mode(true);
 	paint_tool_button->set_button_group(tool_buttons_group);
 	paint_tool_button->set_shortcut(ED_SHORTCUT("tiles_editor/paint_tool", TTR("Paint"), Key::D));
-	paint_tool_button->set_tooltip_text(TTR("Shift: Draw line.") + "\n" + TTR("Shift+Ctrl: Draw rectangle."));
+	paint_tool_button->set_tooltip_text(TTR("Shift: Draw line.") + "\n" + keycode_get_string((Key)KeyModifierMask::CMD_OR_CTRL) + TTR("Shift: Draw rectangle."));
 	paint_tool_button->connect("pressed", callable_mp(this, &TileMapEditorTilesPlugin::_update_toolbar));
 	tilemap_tiles_tools_buttons->add_child(paint_tool_button);
 	viewport_shortcut_buttons.push_back(paint_tool_button);
@@ -2263,7 +2263,8 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	picker_button->set_flat(true);
 	picker_button->set_toggle_mode(true);
 	picker_button->set_shortcut(ED_SHORTCUT("tiles_editor/picker", TTR("Picker"), Key::P));
-	picker_button->set_tooltip_text(TTR("Alternatively hold Ctrl with other tools to pick tile."));
+	Key key = (OS::get_singleton()->has_feature("macos") || OS::get_singleton()->has_feature("web_macos") || OS::get_singleton()->has_feature("web_ios")) ? Key::META : Key::CTRL;
+	picker_button->set_tooltip_text(vformat(TTR("Alternatively hold %s with other tools to pick tile."), find_keycode_name(key)));
 	picker_button->connect("pressed", callable_mp(CanvasItemEditor::get_singleton(), &CanvasItemEditor::update_viewport));
 	tools_settings->add_child(picker_button);
 	viewport_shortcut_buttons.push_back(picker_button);
@@ -3735,7 +3736,7 @@ void TileMapEditor::_update_bottom_panel() {
 }
 
 Vector<Vector2i> TileMapEditor::get_line(TileMap *p_tile_map, Vector2i p_from_cell, Vector2i p_to_cell) {
-	ERR_FAIL_COND_V(!p_tile_map, Vector<Vector2i>());
+	ERR_FAIL_NULL_V(p_tile_map, Vector<Vector2i>());
 
 	Ref<TileSet> tile_set = p_tile_map->get_tileset();
 	ERR_FAIL_COND_V(!tile_set.is_valid(), Vector<Vector2i>());

@@ -247,6 +247,7 @@
 		<member name="application/boot_splash/image" type="String" setter="" getter="" default="&quot;&quot;">
 			Path to an image used as the boot splash. If left empty, the default Godot Engine splash will be displayed instead.
 			[b]Note:[/b] Only effective if [member application/boot_splash/show_image] is [code]true[/code].
+			[b]Note:[/b] The only supported format is PNG. Using another image format will result in an error.
 		</member>
 		<member name="application/boot_splash/minimum_display_time" type="int" setter="" getter="" default="0">
 			Minimum boot splash display time (in milliseconds). It is not recommended to set too high values for this setting.
@@ -398,6 +399,9 @@
 		</member>
 		<member name="audio/video/video_delay_compensation_ms" type="int" setter="" getter="" default="0">
 			Setting to hardcode audio delay when playing video. Best to leave this untouched unless you know what you are doing.
+		</member>
+		<member name="collada/use_ambient" type="bool" setter="" getter="" default="false">
+			If [code]true[/code], ambient lights will be imported from COLLADA models as [DirectionalLight3D]. If [code]false[/code], ambient lights will be ignored.
 		</member>
 		<member name="compression/formats/gzip/compression_level" type="int" setter="" getter="" default="-1">
 			The default compression level for gzip. Affects compressed scenes and resources. Higher levels result in smaller files at the cost of compression speed. Decompression speed is mostly unaffected by the compression level. [code]-1[/code] uses the default gzip compression level, which is identical to [code]6[/code] but could change in the future due to underlying zlib updates.
@@ -2113,11 +2117,11 @@
 			[codeblocks]
 			[gdscript]
 			# Set the default gravity strength to 9.8.
-			PhysicsServer3D.area_set_param(get_viewport().find_world().space, PhysicsServer3D.AREA_PARAM_GRAVITY, 9.8)
+			PhysicsServer3D.area_set_param(get_viewport().find_world_3d().space, PhysicsServer3D.AREA_PARAM_GRAVITY, 9.8)
 			[/gdscript]
 			[csharp]
 			// Set the default gravity strength to 9.8.
-			PhysicsServer3D.AreaSetParam(GetViewport().FindWorld().Space, PhysicsServer3D.AreaParameter.Gravity, 9.8);
+			PhysicsServer3D.AreaSetParam(GetViewport().FindWorld3D().Space, PhysicsServer3D.AreaParameter.Gravity, 9.8);
 			[/csharp]
 			[/codeblocks]
 		</member>
@@ -2127,11 +2131,11 @@
 			[codeblocks]
 			[gdscript]
 			# Set the default gravity direction to `Vector3(0, -1, 0)`.
-			PhysicsServer3D.area_set_param(get_viewport().find_world().get_space(), PhysicsServer3D.AREA_PARAM_GRAVITY_VECTOR, Vector3.DOWN)
+			PhysicsServer3D.area_set_param(get_viewport().find_world_3d().space, PhysicsServer3D.AREA_PARAM_GRAVITY_VECTOR, Vector3.DOWN)
 			[/gdscript]
 			[csharp]
 			// Set the default gravity direction to `Vector3(0, -1, 0)`.
-			PhysicsServer3D.AreaSetParam(GetViewport().FindWorld().Space, PhysicsServer3D.AreaParameter.GravityVector, Vector3.Down)
+			PhysicsServer3D.AreaSetParam(GetViewport().FindWorld3D().Space, PhysicsServer3D.AreaParameter.GravityVector, Vector3.Down)
 			[/csharp]
 			[/codeblocks]
 		</member>
