@@ -851,6 +851,10 @@ void EditorNode::_plugin_over_edit(EditorPlugin *p_plugin, Object *p_object) {
 	}
 }
 
+void EditorNode::_plugin_over_self_own(EditorPlugin *p_plugin) {
+	active_plugins[p_plugin->get_instance_id()].insert(p_plugin);
+}
+
 void EditorNode::_resources_changed(const Vector<String> &p_resources) {
 	List<Ref<Resource>> changed;
 
@@ -1701,16 +1705,19 @@ int EditorNode::_save_external_resources() {
 	return saved;
 }
 
-static void _reset_animation_players(Node *p_node, List<Ref<AnimatedValuesBackup>> *r_anim_backups) {
+static void _reset_animation_mixers(Node *p_node, List<Pair<AnimationMixer *, Ref<AnimatedValuesBackup>>> *r_anim_backups) {
 	for (int i = 0; i < p_node->get_child_count(); i++) {
-		AnimationPlayer *player = Object::cast_to<AnimationPlayer>(p_node->get_child(i));
-		if (player && player->is_reset_on_save_enabled() && player->can_apply_reset()) {
-			Ref<AnimatedValuesBackup> old_values = player->apply_reset();
-			if (old_values.is_valid()) {
-				r_anim_backups->push_back(old_values);
+		AnimationMixer *mixer = Object::cast_to<AnimationMixer>(p_node->get_child(i));
+		if (mixer && mixer->is_reset_on_save_enabled() && mixer->can_apply_reset()) {
+			Ref<AnimatedValuesBackup> backup = mixer->apply_reset();
+			if (backup.is_valid()) {
+				Pair<AnimationMixer *, Ref<AnimatedValuesBackup>> pair;
+				pair.first = mixer;
+				pair.second = backup;
+				r_anim_backups->push_back(pair);
 			}
 		}
-		_reset_animation_players(p_node->get_child(i), r_anim_backups);
+		_reset_animation_mixers(p_node->get_child(i), r_anim_backups);
 	}
 }
 
@@ -1730,8 +1737,8 @@ void EditorNode::_save_scene(String p_file, int idx) {
 	scene->propagate_notification(NOTIFICATION_EDITOR_PRE_SAVE);
 
 	editor_data.apply_changes_in_editors();
-	List<Ref<AnimatedValuesBackup>> anim_backups;
-	_reset_animation_players(scene, &anim_backups);
+	List<Pair<AnimationMixer *, Ref<AnimatedValuesBackup>>> anim_backups;
+	_reset_animation_mixers(scene, &anim_backups);
 	save_default_environment();
 
 	_save_editor_states(p_file, idx);
@@ -1773,8 +1780,8 @@ void EditorNode::_save_scene(String p_file, int idx) {
 	_save_external_resources();
 	editor_data.save_editor_external_data();
 
-	for (Ref<AnimatedValuesBackup> &E : anim_backups) {
-		E->restore();
+	for (Pair<AnimationMixer *, Ref<AnimatedValuesBackup>> &E : anim_backups) {
+		E.first->restore(E.second);
 	}
 
 	if (err == OK) {
@@ -2132,7 +2139,12 @@ void EditorNode::edit_item(Object *p_object, Object *p_editing_owner) {
 	for (EditorPlugin *plugin : active_plugins[owner_id]) {
 		if (!available_plugins.has(plugin)) {
 			to_remove.push_back(plugin);
-			_plugin_over_edit(plugin, nullptr);
+			if (plugin->can_auto_hide()) {
+				_plugin_over_edit(plugin, nullptr);
+			} else {
+				// If plugin can't be hidden, make it own itself and become responsible for closing.
+				_plugin_over_self_own(plugin);
+			}
 		}
 	}
 
@@ -2144,6 +2156,12 @@ void EditorNode::edit_item(Object *p_object, Object *p_editing_owner) {
 	for (EditorPlugin *plugin : available_plugins) {
 		if (active_plugins[owner_id].has(plugin)) {
 			// Plugin was already active, just change the object.
+			plugin->edit(p_object);
+			continue;
+		}
+
+		if (active_plugins.has(plugin->get_instance_id())) {
+			// Plugin is already active, but as self-owning, so it needs a separate check.
 			plugin->edit(p_object);
 			continue;
 		}
@@ -2211,7 +2229,11 @@ void EditorNode::hide_unused_editors(const Object *p_editing_owner) {
 	if (p_editing_owner) {
 		const ObjectID id = p_editing_owner->get_instance_id();
 		for (EditorPlugin *plugin : active_plugins[id]) {
-			_plugin_over_edit(plugin, nullptr);
+			if (plugin->can_auto_hide()) {
+				_plugin_over_edit(plugin, nullptr);
+			} else {
+				_plugin_over_self_own(plugin);
+			}
 		}
 		active_plugins.erase(id);
 	} else {
@@ -2219,10 +2241,23 @@ void EditorNode::hide_unused_editors(const Object *p_editing_owner) {
 		// This is to sweep properties that were removed from the inspector.
 		List<ObjectID> to_remove;
 		for (KeyValue<ObjectID, HashSet<EditorPlugin *>> &kv : active_plugins) {
-			if (!ObjectDB::get_instance(kv.key)) {
+			const Object *context = ObjectDB::get_instance(kv.key);
+			if (context) {
+				// In case of self-owning plugins, they are disabled here if they can auto hide.
+				const EditorPlugin *self_owning = Object::cast_to<EditorPlugin>(context);
+				if (self_owning && self_owning->can_auto_hide()) {
+					context = nullptr;
+				}
+			}
+
+			if (!context) {
 				to_remove.push_back(kv.key);
 				for (EditorPlugin *plugin : kv.value) {
-					_plugin_over_edit(plugin, nullptr);
+					if (plugin->can_auto_hide()) {
+						_plugin_over_edit(plugin, nullptr);
+					} else {
+						_plugin_over_self_own(plugin);
+					}
 				}
 			}
 		}
@@ -4470,7 +4505,7 @@ String EditorNode::_get_system_info() const {
 	}
 	if (driver_name == "vulkan") {
 		driver_name = "Vulkan";
-	} else if (driver_name == "opengl3") {
+	} else if (driver_name.begins_with("opengl3")) {
 		driver_name = "GLES3";
 	}
 

@@ -550,7 +550,7 @@ void SceneImportSettings::_update_camera() {
 	camera->set_orthogonal(camera_size * zoom, 0.0001, camera_size * 2);
 
 	Transform3D xf;
-	xf.basis = Basis(Vector3(1, 0, 0), rot_x) * Basis(Vector3(0, 1, 0), rot_y);
+	xf.basis = Basis(Vector3(0, 1, 0), rot_y) * Basis(Vector3(1, 0, 0), rot_x);
 	xf.origin = center;
 	xf.translate_local(0, 0, camera_size);
 
@@ -1556,6 +1556,7 @@ SceneImportSettings::SceneImportSettings() {
 		Ref<StandardMaterial3D> selection_mat;
 		selection_mat.instantiate();
 		selection_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+		selection_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
 		selection_mat->set_albedo(Color(1, 0.8, 1.0));
 
 		Ref<SurfaceTool> st;
@@ -1597,6 +1598,7 @@ SceneImportSettings::SceneImportSettings() {
 	{
 		collider_mat.instantiate();
 		collider_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+		collider_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
 		collider_mat->set_albedo(Color(0.5, 0.5, 1.0));
 	}
 
