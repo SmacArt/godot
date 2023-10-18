@@ -790,7 +790,7 @@ void EditorNode::_notification(int p_what) {
 }
 
 void EditorNode::_update_update_spinner() {
-	update_spinner->set_visible(EDITOR_GET("interface/editor/show_update_spinner"));
+	update_spinner->set_visible(!RenderingServer::get_singleton()->canvas_item_get_debug_redraw() && EDITOR_GET("interface/editor/show_update_spinner"));
 
 	const bool update_continuously = EDITOR_GET("interface/editor/update_continuously");
 	PopupMenu *update_popup = update_spinner->get_popup();
@@ -3664,6 +3664,8 @@ void EditorNode::fix_dependencies(const String &p_for_file) {
 
 int EditorNode::new_scene() {
 	int idx = editor_data.add_edited_scene(-1);
+	_set_current_scene(idx); // Before trying to remove an empty scene, set the current tab index to the newly added tab index.
+
 	// Remove placeholder empty scene.
 	if (editor_data.get_edited_scene_count() > 1) {
 		for (int i = 0; i < editor_data.get_edited_scene_count() - 1; i++) {
@@ -3674,9 +3676,7 @@ int EditorNode::new_scene() {
 			}
 		}
 	}
-	idx = MAX(idx, 0);
 
-	_set_current_scene(idx);
 	editor_data.clear_editor_states();
 	scene_tabs->update_scene_tabs();
 	return idx;
@@ -3834,6 +3834,12 @@ Error EditorNode::load_scene(const String &p_scene, bool p_ignore_broken_deps, b
 	// If we are, we'll edit it after the restoration is done.
 	if (!restoring_scenes) {
 		push_item(new_scene);
+	} else {
+		// Initialize history for restored scenes.
+		ObjectID id = new_scene->get_instance_id();
+		if (id != editor_history.get_current()) {
+			editor_history.add_object(id);
+		}
 	}
 
 	// Load the selected nodes.
@@ -4696,6 +4702,7 @@ void EditorNode::_dock_make_float(Control *p_dock, int p_slot_index, bool p_show
 	wrapper->set_meta("dock_slot", p_slot_index);
 	wrapper->set_meta("dock_index", dock_index);
 	wrapper->set_meta("dock_name", p_dock->get_name().operator String());
+	p_dock->show();
 
 	wrapper->connect("window_close_requested", callable_mp(this, &EditorNode::_dock_floating_close_request).bind(wrapper));
 
@@ -5199,14 +5206,16 @@ void EditorNode::_load_docks_from_config(Ref<ConfigFile> p_layout, const String 
 					if (wrapper->get_meta("dock_name") == name) {
 						if (restore_window_on_load && floating_docks_dump.has(name)) {
 							_restore_floating_dock(floating_docks_dump[name], wrapper, i);
-							return;
 						} else {
-							_dock_floating_close_request(wrapper);
-							atidx = wrapper->get_meta("dock_index");
+							atidx = wrapper->get_meta("dock_slot");
+							node = wrapper->get_wrapped_control();
+							wrapper->set_window_enabled(false);
 						}
+						break;
 					}
 				}
-
+			}
+			if (!node) {
 				// Well, it's not anywhere.
 				continue;
 			}
@@ -5229,7 +5238,7 @@ void EditorNode::_load_docks_from_config(Ref<ConfigFile> p_layout, const String 
 			if (restore_window_on_load && floating_docks_dump.has(name)) {
 				_restore_floating_dock(floating_docks_dump[name], node, i);
 			} else if (wrapper) {
-				_dock_floating_close_request(wrapper);
+				wrapper->set_window_enabled(false);
 			}
 		}
 

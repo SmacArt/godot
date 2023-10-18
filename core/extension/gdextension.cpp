@@ -35,6 +35,7 @@
 #include "core/object/method_bind.h"
 #include "core/os/os.h"
 #include "core/version.h"
+#include "gdextension_manager.h"
 
 extern void gdextension_setup_interface();
 extern GDExtensionInterfaceFunctionPtr gdextension_get_proc_address(const char *p_name);
@@ -218,7 +219,7 @@ public:
 #ifdef TOOLS_ENABLED
 		ERR_FAIL_COND_MSG(!valid, vformat("Cannot call invalid GDExtension method bind '%s'. It's probably cached - you may need to restart Godot.", name));
 #endif
-		ERR_FAIL_COND_MSG(vararg, "Validated methods don't have ptrcall support. This is most likely an engine bug.");
+		ERR_FAIL_COND_MSG(vararg, "Vararg methods don't have validated call support. This is most likely an engine bug.");
 		GDExtensionClassInstancePtr extension_instance = is_static() ? nullptr : p_object->_get_extension_instance();
 
 		if (validated_call_func) {
@@ -234,7 +235,7 @@ public:
 			void *ret_opaque = nullptr;
 			if (r_ret) {
 				VariantInternal::initialize(r_ret, return_value_info.type);
-				ret_opaque = VariantInternal::get_opaque_pointer(r_ret);
+				ret_opaque = r_ret->get_type() == Variant::NIL ? r_ret : VariantInternal::get_opaque_pointer(r_ret);
 			}
 
 			ptrcall(p_object, argptrs, ret_opaque);
@@ -949,11 +950,18 @@ Error GDExtensionResourceLoader::load_gdextension_resource(const String &p_path,
 }
 
 Ref<Resource> GDExtensionResourceLoader::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
-	Ref<GDExtension> lib;
-	Error err = load_gdextension_resource(p_path, lib);
-	if (err != OK && r_error) {
-		// Errors already logged in load_gdextension_resource().
-		*r_error = err;
+	// We can't have two GDExtension resource object representing the same library, because
+	// loading (or unloading) a GDExtension affects global data. So, we need reuse the same
+	// object if one has already been loaded (even if caching is disabled at the resource
+	// loader level).
+	GDExtensionManager *manager = GDExtensionManager::get_singleton();
+	Ref<GDExtension> lib = manager->get_extension(p_path);
+	if (lib.is_null()) {
+		Error err = load_gdextension_resource(p_path, lib);
+		if (err != OK && r_error) {
+			// Errors already logged in load_gdextension_resource().
+			*r_error = err;
+		}
 	}
 	return lib;
 }
