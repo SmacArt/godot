@@ -669,7 +669,11 @@ Node *ResourceImporterScene::_pre_fix_node(Node *p_node, Node *p_root, HashMap<R
 			fixed_name = _fixstr(name, "convcolonly");
 		}
 
-		ERR_FAIL_COND_V(fixed_name.is_empty(), nullptr);
+		if (fixed_name.is_empty()) {
+			p_node->set_owner(nullptr);
+			memdelete(p_node);
+			ERR_FAIL_V_MSG(nullptr, vformat("Skipped node `%s` because its name is empty after removing the suffix.", name));
+		}
 
 		ImporterMeshInstance3D *mi = Object::cast_to<ImporterMeshInstance3D>(p_node);
 		if (mi) {
@@ -2371,7 +2375,7 @@ Node *ResourceImporterScene::pre_import(const String &p_source_file, const HashM
 	Error err = OK;
 	HashMap<StringName, Variant> options_dupe = p_options;
 
-	Node *scene = importer->import_scene(p_source_file, EditorSceneFormatImporter::IMPORT_ANIMATION | EditorSceneFormatImporter::IMPORT_GENERATE_TANGENT_ARRAYS, options_dupe, nullptr, &err);
+	Node *scene = importer->import_scene(p_source_file, EditorSceneFormatImporter::IMPORT_ANIMATION | EditorSceneFormatImporter::IMPORT_GENERATE_TANGENT_ARRAYS | EditorSceneFormatImporter::IMPORT_FORCE_DISABLE_MESH_COMPRESSION, options_dupe, nullptr, &err);
 	if (!scene || err != OK) {
 		return nullptr;
 	}

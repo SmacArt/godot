@@ -74,7 +74,7 @@ fix build with our own copy of zstd (patch in `patches`).
 ## brotli
 
 - Upstream: https://github.com/google/brotli
-- Version: git (ed1995b6bda19244070ab5d331111f16f67c8054, 2023)
+- Version: 1.1.0 (ed738e842d2fbdf2d6459e39267a633c4a9b2f5d, 2023)
 - License: MIT
 
 Files extracted from upstream source:
@@ -672,7 +672,7 @@ with the provided patch.
 ## openxr
 
 - Upstream: https://github.com/KhronosGroup/OpenXR-SDK
-- Version: 1.0.30 (55224479ab13db8ebc8ab1e3d49197bce6201b0b, 2023)
+- Version: 1.0.31 (95fe35ffb383710a6e0567e958ead9a3b66e930c, 2023)
 - License: Apache 2.0
 
 Files extracted from upstream source:
@@ -689,6 +689,7 @@ Files extracted from upstream source:
 Exclude:
 
 - `src/external/android-jni-wrappers` and `src/external/jnipp` (not used yet)
+- Obsolete `src/xr_generated_dispatch_table.{c,h}`
 - All CMake stuff: `cmake/`, `CMakeLists.txt` and `*.cmake`
 - All Gradle stuff: `*gradle*`, `AndroidManifest.xml`
 - All following files (and their `.license` files):

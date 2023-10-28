@@ -68,6 +68,7 @@
 #include "servers/display_server.h"
 #include "servers/navigation_server_3d.h"
 #include "servers/physics_server_2d.h"
+#include "servers/rendering_server.h"
 
 #include "editor/audio_stream_preview.h"
 #include "editor/debugger/editor_debugger_node.h"
@@ -153,6 +154,7 @@
 #include "editor/project_settings_editor.h"
 #include "editor/register_exporters.h"
 #include "editor/scene_tree_dock.h"
+#include "editor/surface_upgrade_tool.h"
 #include "editor/window_wrapper.h"
 
 #include <stdio.h>
@@ -575,6 +577,10 @@ void EditorNode::update_preview_themes(int p_mode) {
 
 void EditorNode::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_POSTINITIALIZE: {
+			EditorHelp::generate_doc();
+		} break;
+
 		case NOTIFICATION_PROCESS: {
 			if (opening_prev && !confirmation->is_visible()) {
 				opening_prev = false;
@@ -1805,11 +1811,18 @@ void EditorNode::save_all_scenes() {
 	_save_all_scenes();
 }
 
-void EditorNode::save_scene_list(Vector<String> p_scene_filenames) {
+void EditorNode::save_scene_if_open(const String &p_scene_path) {
+	int idx = editor_data.get_edited_scene_from_path(p_scene_path);
+	if (idx >= 0) {
+		_save_scene(p_scene_path, idx);
+	}
+}
+
+void EditorNode::save_scene_list(const HashSet<String> &p_scene_paths) {
 	for (int i = 0; i < editor_data.get_edited_scene_count(); i++) {
 		Node *scene = editor_data.get_edited_scene_root(i);
 
-		if (scene && (p_scene_filenames.find(scene->get_scene_file_path()) >= 0)) {
+		if (scene && p_scene_paths.has(scene->get_scene_file_path())) {
 			_save_scene(scene->get_scene_file_path(), i);
 		}
 	}
@@ -2336,21 +2349,15 @@ void EditorNode::_edit_current(bool p_skip_foreign) {
 		int subr_idx = current_res->get_path().find("::");
 		if (subr_idx != -1) {
 			String base_path = current_res->get_path().substr(0, subr_idx);
-			if (!base_path.is_resource_file()) {
-				if (FileAccess::exists(base_path + ".import")) {
+			if (FileAccess::exists(base_path + ".import")) {
+				if (!base_path.is_resource_file()) {
 					if (get_edited_scene() && get_edited_scene()->get_scene_file_path() == base_path) {
 						info_is_warning = true;
 					}
-					editable_info = TTR("This resource belongs to a scene that was imported, so it's not editable.\nPlease read the documentation relevant to importing scenes to better understand this workflow.");
-				} else {
-					if ((!get_edited_scene() || get_edited_scene()->get_scene_file_path() != base_path) && ResourceLoader::get_resource_type(base_path) == "PackedScene") {
-						editable_info = TTR("This resource belongs to a scene that was instantiated or inherited.\nChanges to it must be made inside the original scene.");
-					}
 				}
-			} else {
-				if (FileAccess::exists(base_path + ".import")) {
-					editable_info = TTR("This resource belongs to a scene that was imported, so it's not editable.\nPlease read the documentation relevant to importing scenes to better understand this workflow.");
-				}
+				editable_info = TTR("This resource belongs to a scene that was imported, so it's not editable.\nPlease read the documentation relevant to importing scenes to better understand this workflow.");
+			} else if ((!get_edited_scene() || get_edited_scene()->get_scene_file_path() != base_path) && ResourceLoader::get_resource_type(base_path) == "PackedScene") {
+				editable_info = TTR("This resource belongs to a scene that was instantiated or inherited.\nChanges to it must be made inside the original scene.");
 			}
 		} else if (current_res->get_path().is_resource_file()) {
 			if (FileAccess::exists(current_res->get_path() + ".import")) {
@@ -3572,6 +3579,9 @@ void EditorNode::_set_main_scene_state(Dictionary p_state, Node *p_for_scene) {
 	ScriptEditor::get_singleton()->set_scene_root_script(editor_data.get_scene_root_script(editor_data.get_edited_scene()));
 	editor_data.notify_edited_scene_changed();
 	emit_signal(SNAME("scene_changed"));
+
+	// Reset SDFGI after everything else so that any last-second scene modifications will be processed.
+	RenderingServer::get_singleton()->sdfgi_reset();
 }
 
 bool EditorNode::is_changing_scene() const {
@@ -4770,21 +4780,15 @@ void EditorNode::_dock_select_input(const Ref<InputEvent> &p_input) {
 		Ref<InputEventMouseButton> mb = me;
 
 		if (mb.is_valid() && mb->get_button_index() == MouseButton::LEFT && mb->is_pressed() && dock_popup_selected_idx != nrect) {
-			Control *dock = dock_slot[dock_popup_selected_idx]->get_current_tab_control();
-			if (dock) {
-				dock_slot[dock_popup_selected_idx]->remove_child(dock);
-			}
+			dock_slot[nrect]->move_tab_from_tab_container(dock_slot[dock_popup_selected_idx], dock_slot[dock_popup_selected_idx]->get_current_tab(), dock_slot[nrect]->get_tab_count());
+
 			if (dock_slot[dock_popup_selected_idx]->get_tab_count() == 0) {
 				dock_slot[dock_popup_selected_idx]->hide();
-
 			} else {
 				dock_slot[dock_popup_selected_idx]->set_current_tab(0);
 			}
 
-			dock_slot[nrect]->add_child(dock);
 			dock_popup_selected_idx = nrect;
-			dock_slot[nrect]->set_current_tab(dock_slot[nrect]->get_tab_count() - 1);
-			dock_slot[nrect]->set_tab_title(dock_slot[nrect]->get_tab_count() - 1, TTRGET(dock->get_name()));
 			dock_slot[nrect]->show();
 			dock_select->queue_redraw();
 
@@ -5507,11 +5511,16 @@ bool EditorNode::ensure_main_scene(bool p_from_native) {
 void EditorNode::_immediate_dialog_confirmed() {
 	immediate_dialog_confirmed = true;
 }
-bool EditorNode::immediate_confirmation_dialog(const String &p_text, const String &p_ok_text, const String &p_cancel_text) {
+bool EditorNode::immediate_confirmation_dialog(const String &p_text, const String &p_ok_text, const String &p_cancel_text, uint32_t p_wrap_width) {
 	ConfirmationDialog *cd = memnew(ConfirmationDialog);
 	cd->set_text(p_text);
 	cd->set_ok_button_text(p_ok_text);
 	cd->set_cancel_button_text(p_cancel_text);
+	if (p_wrap_width > 0) {
+		cd->set_autowrap(true);
+		cd->get_label()->set_custom_minimum_size(Size2(p_wrap_width, 0) * EDSCALE);
+	}
+
 	cd->connect("confirmed", callable_mp(singleton, &EditorNode::_immediate_dialog_confirmed));
 	singleton->gui_base->add_child(cd);
 
@@ -6761,7 +6770,6 @@ EditorNode::EditorNode() {
 		DisplayServer::get_singleton()->cursor_set_custom_image(Ref<Resource>());
 	}
 
-	EditorHelp::generate_doc();
 	SceneState::set_disable_placeholders(true);
 	ResourceLoader::clear_translation_remaps(); // Using no remaps if in editor.
 	ResourceLoader::clear_path_remaps();
@@ -8029,6 +8037,8 @@ EditorNode::EditorNode() {
 	String exec = OS::get_singleton()->get_executable_path();
 	// Save editor executable path for third-party tools.
 	EditorSettings::get_singleton()->set_project_metadata("editor_metadata", "executable_path", exec);
+
+	surface_upgrade_tool = memnew(SurfaceUpgradeTool);
 }
 
 EditorNode::~EditorNode() {
@@ -8043,6 +8053,7 @@ EditorNode::~EditorNode() {
 	memdelete(editor_plugins_force_over);
 	memdelete(editor_plugins_force_input_forwarding);
 	memdelete(progress_hb);
+	memdelete(surface_upgrade_tool);
 
 	EditorSettings::destroy();
 	EditorColorMap::finish();
