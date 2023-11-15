@@ -1023,6 +1023,12 @@ void EditorNode::_resources_reimported(const Vector<String> &p_resources) {
 		}
 	}
 
+	// Editor may crash when related animation is playing while re-importing GLTF scene, stop it in advance.
+	AnimationPlayer *ap = AnimationPlayerEditor::get_singleton()->get_player();
+	if (ap && scenes.size() > 0) {
+		ap->stop(true);
+	}
+
 	for (const String &E : scenes) {
 		reload_scene(E);
 		reload_instances_with_path_in_edited_scenes(E);
@@ -1278,6 +1284,15 @@ void EditorNode::save_resource_in_path(const Ref<Resource> &p_resource, const St
 }
 
 void EditorNode::save_resource(const Ref<Resource> &p_resource) {
+	// If built-in resource, save the scene instead.
+	if (p_resource->is_built_in()) {
+		const String scene_path = p_resource->get_path().get_slice("::", 0);
+		if (!scene_path.is_empty()) {
+			save_scene_if_open(scene_path);
+			return;
+		}
+	}
+
 	// If the resource has been imported, ask the user to use a different path in order to save it.
 	String path = p_resource->get_path();
 	if (path.is_resource_file() && !FileAccess::exists(path + ".import")) {
@@ -4633,6 +4648,14 @@ void EditorNode::_editor_file_dialog_unregister(EditorFileDialog *p_dialog) {
 Vector<EditorNodeInitCallback> EditorNode::_init_callbacks;
 
 void EditorNode::_begin_first_scan() {
+	// In headless mode, scan right away.
+	// This allows users to continue using `godot --headless --editor --quit` to prepare a project.
+	if (!DisplayServer::get_singleton()->window_can_draw()) {
+		OS::get_singleton()->benchmark_begin_measure("editor_scan_and_import");
+		EditorFileSystem::get_singleton()->scan();
+		return;
+	}
+
 	if (!waiting_for_first_scan) {
 		return;
 	}
@@ -6725,7 +6748,7 @@ static void _execute_thread(void *p_ud) {
 	eta->done.set();
 }
 
-int EditorNode::execute_and_show_output(const String &p_title, const String &p_path, const List<String> &p_arguments, bool p_close_on_ok, bool p_close_on_errors) {
+int EditorNode::execute_and_show_output(const String &p_title, const String &p_path, const List<String> &p_arguments, bool p_close_on_ok, bool p_close_on_errors, String *r_output) {
 	if (execute_output_dialog) {
 		execute_output_dialog->set_title(p_title);
 		execute_output_dialog->get_ok_button()->set_disabled(true);
@@ -6771,6 +6794,9 @@ int EditorNode::execute_and_show_output(const String &p_title, const String &p_p
 		execute_output_dialog->get_ok_button()->set_disabled(false);
 	}
 
+	if (r_output) {
+		*r_output = eta.output;
+	}
 	return eta.exitcode;
 }
 
