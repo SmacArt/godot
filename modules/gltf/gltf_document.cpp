@@ -405,6 +405,7 @@ static Vector<real_t> _xform_to_array(const Transform3D p_transform) {
 
 Error GLTFDocument::_serialize_nodes(Ref<GLTFState> p_state) {
 	Array nodes;
+	const int scene_node_count = p_state->scene_nodes.size();
 	for (int i = 0; i < p_state->nodes.size(); i++) {
 		Dictionary node;
 		Ref<GLTFNode> gltf_node = p_state->nodes[i];
@@ -452,10 +453,13 @@ Error GLTFDocument::_serialize_nodes(Ref<GLTFState> p_state) {
 			node["children"] = children;
 		}
 
+		Node *scene_node = nullptr;
+		if (i < scene_node_count) {
+			scene_node = p_state->scene_nodes[i];
+		}
 		for (Ref<GLTFDocumentExtension> ext : document_extensions) {
 			ERR_CONTINUE(ext.is_null());
-			ERR_CONTINUE(!p_state->scene_nodes.find(i));
-			Error err = ext->export_node(p_state, gltf_node, node, p_state->scene_nodes[i]);
+			Error err = ext->export_node(p_state, gltf_node, node, scene_node);
 			ERR_CONTINUE(err != OK);
 		}
 
@@ -5049,7 +5053,7 @@ Error GLTFDocument::_serialize_animations(Ref<GLTFState> p_state) {
 		AnimationPlayer *animation_player = p_state->animation_players[player_i];
 		List<StringName> animations;
 		animation_player->get_animation_list(&animations);
-		for (StringName animation_name : animations) {
+		for (const StringName &animation_name : animations) {
 			_convert_animation(p_state, animation_player, animation_name);
 		}
 	}
@@ -6155,9 +6159,9 @@ T GLTFDocument::_interpolate_track(const Vector<real_t> &p_times, const Vector<T
 
 			const float c = (p_time - p_times[idx]) / (p_times[idx + 1] - p_times[idx]);
 
-			const T from = p_values[idx * 3 + 1];
+			const T &from = p_values[idx * 3 + 1];
 			const T c1 = from + p_values[idx * 3 + 2];
-			const T to = p_values[idx * 3 + 4];
+			const T &to = p_values[idx * 3 + 4];
 			const T c2 = to + p_values[idx * 3 + 3];
 
 			return interp.bezier(from, c1, c2, to, c);
@@ -6288,6 +6292,9 @@ void GLTFDocument::_import_animation(Ref<GLTFState> p_state, AnimationPlayer *p_
 					animation->add_track(Animation::TYPE_POSITION_3D);
 					animation->track_set_path(position_idx, transform_node_path);
 					animation->track_set_imported(position_idx, true); //helps merging later
+					if (track.position_track.interpolation == GLTFAnimation::INTERP_STEP) {
+						animation->track_set_interpolation_type(position_idx, Animation::InterpolationType::INTERPOLATION_NEAREST);
+					}
 					base_idx++;
 				}
 			}
@@ -6310,6 +6317,9 @@ void GLTFDocument::_import_animation(Ref<GLTFState> p_state, AnimationPlayer *p_
 					animation->add_track(Animation::TYPE_ROTATION_3D);
 					animation->track_set_path(rotation_idx, transform_node_path);
 					animation->track_set_imported(rotation_idx, true); //helps merging later
+					if (track.rotation_track.interpolation == GLTFAnimation::INTERP_STEP) {
+						animation->track_set_interpolation_type(rotation_idx, Animation::InterpolationType::INTERPOLATION_NEAREST);
+					}
 					base_idx++;
 				}
 			}
@@ -6332,6 +6342,9 @@ void GLTFDocument::_import_animation(Ref<GLTFState> p_state, AnimationPlayer *p_
 					animation->add_track(Animation::TYPE_SCALE_3D);
 					animation->track_set_path(scale_idx, transform_node_path);
 					animation->track_set_imported(scale_idx, true); //helps merging later
+					if (track.scale_track.interpolation == GLTFAnimation::INTERP_STEP) {
+						animation->track_set_interpolation_type(scale_idx, Animation::InterpolationType::INTERPOLATION_NEAREST);
+					}
 					base_idx++;
 				}
 			}
@@ -7056,9 +7069,9 @@ void GLTFDocument::_convert_animation(Ref<GLTFState> p_state, AnimationPlayer *p
 		} else if (String(final_track_path).contains(":")) {
 			//Process skeleton
 			const Vector<String> node_suffix = String(final_track_path).split(":");
-			const String node = node_suffix[0];
+			const String &node = node_suffix[0];
 			const NodePath node_path = node;
-			const String suffix = node_suffix[1];
+			const String &suffix = node_suffix[1];
 			Node *godot_node = animation_base_node->get_node_or_null(node_path);
 			if (!godot_node) {
 				continue;
@@ -7462,11 +7475,13 @@ Node *GLTFDocument::generate_scene(Ref<GLTFState> p_state, float p_bake_fps, boo
 		ERR_CONTINUE(!E.value);
 		for (Ref<GLTFDocumentExtension> ext : document_extensions) {
 			ERR_CONTINUE(ext.is_null());
-			ERR_CONTINUE(!p_state->json.has("nodes"));
-			Array nodes = p_state->json["nodes"];
-			ERR_CONTINUE(E.key >= nodes.size());
-			ERR_CONTINUE(E.key < 0);
-			Dictionary node_json = nodes[E.key];
+			Dictionary node_json;
+			if (p_state->json.has("nodes")) {
+				Array nodes = p_state->json["nodes"];
+				if (0 <= E.key && E.key < nodes.size()) {
+					node_json = nodes[E.key];
+				}
+			}
 			Ref<GLTFNode> gltf_node = p_state->nodes[E.key];
 			err = ext->import_node(p_state, gltf_node, node_json, E.value);
 			ERR_CONTINUE(err != OK);

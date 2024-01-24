@@ -267,7 +267,7 @@
 			<param index="0" name="idx" type="int" />
 			<param index="1" name="include_internal" type="bool" default="false" />
 			<description>
-				Fetches a child node by its index. Each child node has an index relative its siblings (see [method get_index]). The first child is at index 0. Negative values can also be used to start from the end of the list. This method can be used in combination with [method get_child_count] to iterate over this node's children.
+				Fetches a child node by its index. Each child node has an index relative its siblings (see [method get_index]). The first child is at index 0. Negative values can also be used to start from the end of the list. This method can be used in combination with [method get_child_count] to iterate over this node's children. If no child exists at the given index, this method returns [code]null[/code] and an error is generated.
 				If [param include_internal] is [code]false[/code], internal children are ignored (see [method add_child]'s [code]internal[/code] parameter).
 				[codeblock]
 				# Assuming the following are children of this node, in order:
@@ -739,7 +739,7 @@
 			<param index="0" name="new_parent" type="Node" />
 			<param index="1" name="keep_global_transform" type="bool" default="true" />
 			<description>
-				Changes the parent of this [Node] to the [param new_parent]. The node needs to already have a parent.
+				Changes the parent of this [Node] to the [param new_parent]. The node needs to already have a parent. The node's [member owner] is preserved if its owner is still reachable from the new location (i.e., the node is still a descendant of the new parent after the operation).
 				If [param keep_global_transform] is [code]true[/code], the node's global transform will be preserved if supported. [Node2D], [Node3D] and [Control] support this argument (but [Control] keeps only position).
 			</description>
 		</method>

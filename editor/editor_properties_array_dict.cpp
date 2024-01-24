@@ -34,11 +34,11 @@
 #include "core/io/marshalls.h"
 #include "editor/editor_properties.h"
 #include "editor/editor_properties_vector.h"
-#include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_string_names.h"
 #include "editor/gui/editor_spin_slider.h"
 #include "editor/inspector_dock.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/button.h"
 #include "scene/resources/packed_scene.h"
 
@@ -407,8 +407,8 @@ void EditorPropertyArray::update_property() {
 				new_prop->connect(SNAME("object_id_selected"), callable_mp(this, &EditorPropertyArray::_object_id_selected));
 				new_prop->set_h_size_flags(SIZE_EXPAND_FILL);
 				new_prop->set_read_only(is_read_only());
-				slot.prop->call_deferred("add_sibling", new_prop);
-				slot.prop->call_deferred("queue_free");
+				slot.prop->add_sibling(new_prop, false);
+				slot.prop->queue_free();
 				slot.prop = new_prop;
 				slot.set_index(idx);
 			}
@@ -462,7 +462,7 @@ bool EditorPropertyArray::_is_drop_valid(const Dictionary &p_drag_data) const {
 		Vector<String> files = drag_data["files"];
 
 		for (int i = 0; i < files.size(); i++) {
-			String file = files[i];
+			const String &file = files[i];
 			String ftype = EditorFileSystem::get_singleton()->get_file_type(file);
 
 			for (int j = 0; j < allowed_type.get_slice_count(","); j++) {
@@ -504,7 +504,7 @@ void EditorPropertyArray::drop_data_fw(const Point2 &p_point, const Variant &p_d
 
 		// Loop the file array and add to existing array.
 		for (int i = 0; i < files.size(); i++) {
-			String file = files[i];
+			const String &file = files[i];
 
 			Ref<Resource> res = ResourceLoader::load(file);
 			if (res.is_valid()) {

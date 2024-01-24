@@ -31,11 +31,9 @@
 #include "scene_tree_editor.h"
 
 #include "core/config/project_settings.h"
-#include "core/object/message_queue.h"
 #include "core/object/script_language.h"
 #include "editor/editor_file_system.h"
 #include "editor/editor_node.h"
-#include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
@@ -43,6 +41,7 @@
 #include "editor/plugins/animation_player_editor_plugin.h"
 #include "editor/plugins/canvas_item_editor_plugin.h"
 #include "editor/plugins/script_editor_plugin.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/flow_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/tab_container.h"
@@ -236,7 +235,7 @@ void SceneTreeEditor::_add_nodes(Node *p_node, TreeItem *p_parent) {
 			item->add_button(0, get_editor_theme_icon(SNAME("Script")), BUTTON_SCRIPT);
 		} else {
 			//has no script (or script is a custom type)
-			_set_item_custom_color(item, get_theme_color(SNAME("disabled_font_color"), EditorStringName(Editor)));
+			_set_item_custom_color(item, get_theme_color(SNAME("font_disabled_color"), EditorStringName(Editor)));
 			item->set_selectable(0, false);
 
 			if (!scr.is_null()) { // make sure to mark the script if a custom type
@@ -268,7 +267,7 @@ void SceneTreeEditor::_add_nodes(Node *p_node, TreeItem *p_parent) {
 		item->set_selectable(0, marked_selectable);
 		_set_item_custom_color(item, get_theme_color(SNAME("accent_color"), EditorStringName(Editor)));
 	} else if (!p_node->can_process()) {
-		_set_item_custom_color(item, get_theme_color(SNAME("disabled_font_color"), EditorStringName(Editor)));
+		_set_item_custom_color(item, get_theme_color(SNAME("font_disabled_color"), EditorStringName(Editor)));
 	} else if (!marked_selectable && !marked_children_selectable) {
 		Node *node = p_node;
 		while (node) {
@@ -493,7 +492,7 @@ void SceneTreeEditor::_add_nodes(Node *p_node, TreeItem *p_parent) {
 		}
 
 		if (!valid) {
-			_set_item_custom_color(item, get_theme_color(SNAME("disabled_font_color"), EditorStringName(Editor)));
+			_set_item_custom_color(item, get_theme_color(SNAME("font_disabled_color"), EditorStringName(Editor)));
 			item->set_selectable(0, false);
 		}
 	}
@@ -593,7 +592,7 @@ void SceneTreeEditor::_node_script_changed(Node *p_node) {
 		return;
 	}
 
-	MessageQueue::get_singleton()->push_call(this, "_update_tree");
+	callable_mp(this, &SceneTreeEditor::_update_tree).call_deferred(false);
 	tree_dirty = true;
 }
 
@@ -626,7 +625,7 @@ void SceneTreeEditor::_node_renamed(Node *p_node) {
 	emit_signal(SNAME("node_renamed"));
 
 	if (!tree_dirty) {
-		MessageQueue::get_singleton()->push_call(this, "_update_tree");
+		callable_mp(this, &SceneTreeEditor::_update_tree).call_deferred(false);
 		tree_dirty = true;
 	}
 }
@@ -719,7 +718,7 @@ bool SceneTreeEditor::_update_filter(TreeItem *p_parent, bool p_scroll_to_select
 		}
 		p_parent->set_selectable(0, true);
 	} else if (keep_for_children) {
-		p_parent->set_custom_color(0, get_theme_color(SNAME("disabled_font_color"), EditorStringName(Editor)));
+		p_parent->set_custom_color(0, get_theme_color(SNAME("font_disabled_color"), EditorStringName(Editor)));
 		p_parent->set_selectable(0, false);
 		p_parent->deselect(0);
 	}
@@ -747,7 +746,7 @@ bool SceneTreeEditor::_item_matches_all_terms(TreeItem *p_item, PackedStringArra
 	}
 
 	for (int i = 0; i < p_terms.size(); i++) {
-		String term = p_terms[i];
+		const String &term = p_terms[i];
 
 		// Recognize special filter.
 		if (term.contains(":") && !term.get_slicec(':', 0).is_empty()) {
@@ -843,12 +842,12 @@ void SceneTreeEditor::_test_update_tree() {
 		return; // did not change
 	}
 
-	MessageQueue::get_singleton()->push_call(this, "_update_tree");
+	callable_mp(this, &SceneTreeEditor::_update_tree).call_deferred(false);
 	tree_dirty = true;
 }
 
 void SceneTreeEditor::_tree_process_mode_changed() {
-	MessageQueue::get_singleton()->push_call(this, "_update_tree");
+	callable_mp(this, &SceneTreeEditor::_update_tree).call_deferred(false);
 	tree_dirty = true;
 }
 
@@ -863,7 +862,7 @@ void SceneTreeEditor::_tree_changed() {
 		return;
 	}
 
-	MessageQueue::get_singleton()->push_call(this, "_test_update_tree");
+	callable_mp(this, &SceneTreeEditor::_test_update_tree).call_deferred();
 	pending_test_update = true;
 }
 
@@ -1052,10 +1051,9 @@ void SceneTreeEditor::_rename_node(Node *p_node, const String &p_name) {
 		}
 	}
 
+	new_name = p_node->get_parent()->prevalidate_child_name(p_node, new_name);
 	if (new_name == p_node->get_name()) {
-		if (item->get_text(0).is_empty()) {
-			item->set_text(0, new_name);
-		}
+		item->set_text(0, new_name);
 		return;
 	}
 
@@ -1484,7 +1482,6 @@ void SceneTreeEditor::set_connecting_signal(bool p_enable) {
 void SceneTreeEditor::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_update_tree"), &SceneTreeEditor::_update_tree, DEFVAL(false)); // Still used by UndoRedo.
 	ClassDB::bind_method("_rename_node", &SceneTreeEditor::_rename_node);
-	ClassDB::bind_method("_test_update_tree", &SceneTreeEditor::_test_update_tree);
 
 	ClassDB::bind_method(D_METHOD("update_tree"), &SceneTreeEditor::update_tree);
 
@@ -1642,7 +1639,7 @@ void SceneTreeDialog::_notification(int p_what) {
 				tree->update_tree();
 
 				// Select the search bar by default.
-				filter->call_deferred(SNAME("grab_focus"));
+				callable_mp((Control *)filter, &Control::grab_focus).call_deferred();
 			}
 		} break;
 
