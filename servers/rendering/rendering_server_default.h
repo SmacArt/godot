@@ -335,6 +335,9 @@ public:
 	FUNC3(multimesh_instance_set_color, RID, int, const Color &)
 	FUNC3(multimesh_instance_set_custom_data, RID, int, const Color &)
 
+	FUNC2(multimesh_set_custom_aabb, RID, const AABB &)
+	FUNC1RC(AABB, multimesh_get_custom_aabb, RID)
+
 	FUNC1RC(RID, multimesh_get_mesh, RID)
 	FUNC1RC(AABB, multimesh_get_aabb, RID)
 
@@ -722,7 +725,9 @@ public:
 
 	FUNC7(environment_set_adjustment, RID, bool, float, float, float, bool, RID)
 
-	FUNC10(environment_set_fog, RID, bool, const Color &, float, float, float, float, float, float, float)
+	FUNC11(environment_set_fog, RID, bool, const Color &, float, float, float, float, float, float, float, EnvironmentFogMode)
+
+	FUNC4(environment_set_fog_depth, RID, float, float, float)
 	FUNC14(environment_set_volumetric_fog, RID, bool, float, const Color &, const Color &, float, float, float, float, float, bool, float, float, float)
 
 	FUNC2(environment_set_volumetric_fog_volume_size, int, int)

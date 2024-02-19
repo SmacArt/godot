@@ -868,7 +868,7 @@ TreeItem *TreeItem::_get_prev_in_tree(bool p_wrap, bool p_include_invisible) {
 		} else if (!current) {
 			if (p_wrap) {
 				current = this;
-				TreeItem *temp = this->get_next_visible();
+				TreeItem *temp = get_next_visible();
 				while (temp) {
 					current = temp;
 					temp = temp->get_next_visible();
@@ -894,7 +894,7 @@ TreeItem *TreeItem::_get_prev_in_tree(bool p_wrap, bool p_include_invisible) {
 
 TreeItem *TreeItem::get_prev_visible(bool p_wrap) {
 	TreeItem *loop = this;
-	TreeItem *prev_item = this->_get_prev_in_tree(p_wrap);
+	TreeItem *prev_item = _get_prev_in_tree(p_wrap);
 	while (prev_item && !prev_item->is_visible()) {
 		prev_item = prev_item->_get_prev_in_tree(p_wrap);
 		if (prev_item == loop) {
@@ -935,7 +935,7 @@ TreeItem *TreeItem::_get_next_in_tree(bool p_wrap, bool p_include_invisible) {
 
 TreeItem *TreeItem::get_next_visible(bool p_wrap) {
 	TreeItem *loop = this;
-	TreeItem *next_item = this->_get_next_in_tree(p_wrap);
+	TreeItem *next_item = _get_next_in_tree(p_wrap);
 	while (next_item && !next_item->is_visible()) {
 		next_item = next_item->_get_next_in_tree(p_wrap);
 		if (next_item == loop) {
@@ -948,12 +948,12 @@ TreeItem *TreeItem::get_next_visible(bool p_wrap) {
 }
 
 TreeItem *TreeItem::get_prev_in_tree(bool p_wrap) {
-	TreeItem *prev_item = this->_get_prev_in_tree(p_wrap, true);
+	TreeItem *prev_item = _get_prev_in_tree(p_wrap, true);
 	return prev_item;
 }
 
 TreeItem *TreeItem::get_next_in_tree(bool p_wrap) {
-	TreeItem *next_item = this->_get_next_in_tree(p_wrap, true);
+	TreeItem *next_item = _get_next_in_tree(p_wrap, true);
 	return next_item;
 }
 
@@ -1220,6 +1220,12 @@ int TreeItem::get_button_by_id(int p_column, int p_id) const {
 	}
 
 	return -1;
+}
+
+Color TreeItem::get_button_color(int p_column, int p_index) const {
+	ERR_FAIL_INDEX_V(p_column, cells.size(), Color());
+	ERR_FAIL_INDEX_V(p_index, cells[p_column].buttons.size(), Color());
+	return cells[p_column].buttons[p_index].color;
 }
 
 void TreeItem::set_button_tooltip_text(int p_column, int p_index, const String &p_tooltip) {
@@ -1662,6 +1668,7 @@ void TreeItem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_button_tooltip_text", "column", "button_index"), &TreeItem::get_button_tooltip_text);
 	ClassDB::bind_method(D_METHOD("get_button_id", "column", "button_index"), &TreeItem::get_button_id);
 	ClassDB::bind_method(D_METHOD("get_button_by_id", "column", "id"), &TreeItem::get_button_by_id);
+	ClassDB::bind_method(D_METHOD("get_button_color", "column", "id"), &TreeItem::get_button_color);
 	ClassDB::bind_method(D_METHOD("get_button", "column", "button_index"), &TreeItem::get_button);
 	ClassDB::bind_method(D_METHOD("set_button_tooltip_text", "column", "button_index", "tooltip"), &TreeItem::set_button_tooltip_text);
 	ClassDB::bind_method(D_METHOD("set_button", "column", "button_index", "button"), &TreeItem::set_button);
@@ -2580,12 +2587,8 @@ int Tree::_count_selected_items(TreeItem *p_from) const {
 		}
 	}
 
-	if (p_from->get_first_child()) {
-		count += _count_selected_items(p_from->get_first_child());
-	}
-
-	if (p_from->get_next()) {
-		count += _count_selected_items(p_from->get_next());
+	for (TreeItem *c = p_from->get_first_child(); c; c = c->get_next()) {
+		count += _count_selected_items(c);
 	}
 
 	return count;
@@ -3391,7 +3394,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 	Ref<InputEventKey> k = p_event;
 
 	bool is_command = k.is_valid() && k->is_command_or_control_pressed();
-	if (p_event->is_action("ui_right", true) && p_event->is_pressed()) {
+	if (p_event->is_action("ui_right") && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3399,17 +3402,12 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 		if (!selected_item || select_mode == SELECT_ROW || selected_col > (columns.size() - 1)) {
 			return;
 		}
-		if (k.is_valid() && k->is_alt_pressed()) {
-			selected_item->set_collapsed(false);
-			TreeItem *next = selected_item->get_first_child();
-			while (next && next != selected_item->next) {
-				next->set_collapsed(false);
-				next = next->get_next_visible();
-			}
+		if (k.is_valid() && k->is_shift_pressed()) {
+			selected_item->set_collapsed_recursive(false);
 		} else {
 			_go_right();
 		}
-	} else if (p_event->is_action("ui_left", true) && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_left") && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3418,32 +3416,27 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 			return;
 		}
 
-		if (k.is_valid() && k->is_alt_pressed()) {
-			selected_item->set_collapsed(true);
-			TreeItem *next = selected_item->get_first_child();
-			while (next && next != selected_item->next) {
-				next->set_collapsed(true);
-				next = next->get_next_visible();
-			}
+		if (k.is_valid() && k->is_shift_pressed()) {
+			selected_item->set_collapsed_recursive(true);
 		} else {
 			_go_left();
 		}
 
-	} else if (p_event->is_action("ui_up", true) && p_event->is_pressed() && !is_command) {
+	} else if (p_event->is_action("ui_up") && p_event->is_pressed() && !is_command) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
 
 		_go_up();
 
-	} else if (p_event->is_action("ui_down", true) && p_event->is_pressed() && !is_command) {
+	} else if (p_event->is_action("ui_down") && p_event->is_pressed() && !is_command) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
 
 		_go_down();
 
-	} else if (p_event->is_action("ui_page_down", true) && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_page_down") && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3481,7 +3474,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 		}
 
 		ensure_cursor_is_visible();
-	} else if (p_event->is_action("ui_page_up", true) && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_page_up") && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3518,7 +3511,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 			prev->select(selected_col);
 		}
 		ensure_cursor_is_visible();
-	} else if (p_event->is_action("ui_accept", true) && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_accept") && p_event->is_pressed()) {
 		if (selected_item) {
 			//bring up editor if possible
 			if (!edit_selected()) {
@@ -3527,7 +3520,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 			}
 		}
 		accept_event();
-	} else if (p_event->is_action("ui_select", true) && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_select") && p_event->is_pressed()) {
 		if (select_mode == SELECT_MULTI) {
 			if (!selected_item) {
 				return;

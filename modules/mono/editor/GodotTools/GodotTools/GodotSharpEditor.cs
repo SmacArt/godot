@@ -34,6 +34,7 @@ namespace GodotTools
             public const string ProblemsLayout = "dotnet/build/problems_layout";
         }
 
+#nullable disable
         private EditorSettings _editorSettings;
 
         private PopupMenu _menuPopup;
@@ -51,10 +52,9 @@ namespace GodotTools
         public GodotIdeManager GodotIdeManager { get; private set; }
 
         public MSBuildPanel MSBuildPanel { get; private set; }
+#nullable enable
 
         public bool SkipBuildBeforePlaying { get; set; } = false;
-
-        public DateTime LastValidBuildDateTime { get; private set; }
 
         [UsedImplicitly]
         private bool CreateProjectSolutionIfNeeded()
@@ -69,29 +69,23 @@ namespace GodotTools
 
         private bool CreateProjectSolution()
         {
-            string errorMessage = null;
+            string? errorMessage = null;
             using (var pr = new EditorProgress("create_csharp_solution", "Generating solution...".TTR(), 2))
             {
                 pr.Step("Generating C# project...".TTR());
 
-                string csprojDir = Path.GetDirectoryName(GodotSharpDirs.ProjectCsProjPath);
-                string slnDir = Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath);
+                string csprojDir = Path.GetDirectoryName(GodotSharpDirs.ProjectCsProjPath)!;
+                string slnDir = Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath)!;
                 string name = GodotSharpDirs.ProjectAssemblyName;
                 string guid = CsProjOperations.GenerateGameProject(csprojDir, name);
 
                 if (guid.Length > 0)
                 {
-                    var solution = new DotNetSolution(name)
-                    {
-                        DirectoryPath = slnDir
-                    };
+                    var solution = new DotNetSolution(name, slnDir);
 
-                    var projectInfo = new DotNetSolution.ProjectInfo
-                    {
-                        Guid = guid,
-                        PathRelativeToSolution = Path.GetRelativePath(slnDir, GodotSharpDirs.ProjectCsProjPath),
-                        Configs = new List<string> { "Debug", "ExportDebug", "ExportRelease" }
-                    };
+                    var projectInfo = new DotNetSolution.ProjectInfo(guid,
+                        Path.GetRelativePath(slnDir, GodotSharpDirs.ProjectCsProjPath),
+                        new List<string> { "Debug", "ExportDebug", "ExportRelease" });
 
                     solution.AddNewProject(name, projectInfo);
 
@@ -344,7 +338,7 @@ namespace GodotTools
                         }
                     }
 
-                    args.Add(Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath));
+                    args.Add(Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath)!);
 
                     string scriptPath = ProjectSettings.GlobalizePath(script.ResourcePath);
 
@@ -441,21 +435,6 @@ namespace GodotTools
             }
         }
 
-        private void UpdateLastValidBuildDateTime()
-        {
-            var dllName = $"{GodotSharpDirs.ProjectAssemblyName}.dll";
-            var path = Path.Combine(GodotSharpDirs.ProjectBaseOutputPath, "Debug", dllName);
-            LastValidBuildDateTime = File.GetLastWriteTime(path);
-        }
-
-        private void BuildFinished(BuildResult buildResult)
-        {
-            if (buildResult == BuildResult.Success)
-            {
-                UpdateLastValidBuildDateTime();
-            }
-        }
-
         private void BuildStateChanged()
         {
             if (_bottomPanelBtn != null)
@@ -465,8 +444,6 @@ namespace GodotTools
         public override void _EnablePlugin()
         {
             base._EnablePlugin();
-
-            UpdateLastValidBuildDateTime();
 
             ProjectSettings.SettingsChanged += GodotSharpDirs.DetermineProjectLocation;
 
@@ -478,7 +455,7 @@ namespace GodotTools
 
             // First we try to find the .NET Sdk ourselves to make sure we get the
             // correct version first, otherwise pick the latest.
-            if (DotNetFinder.TryFindDotNetSdk(dotNetSdkSearchVersion, out var sdkVersion, out string sdkPath))
+            if (DotNetFinder.TryFindDotNetSdk(dotNetSdkSearchVersion, out var sdkVersion, out string? sdkPath))
             {
                 if (Godot.OS.IsStdOutVerbose())
                     Console.WriteLine($"Found .NET Sdk version '{sdkVersion}': {sdkPath}");
@@ -640,7 +617,6 @@ namespace GodotTools
             var inspectorPlugin = new InspectorPlugin();
             AddInspectorPlugin(inspectorPlugin);
             _inspectorPluginWeak = WeakRef(inspectorPlugin);
-            BuildManager.BuildFinished += BuildFinished;
 
             BuildManager.Initialize();
             RiderPathManager.Initialize();
@@ -657,7 +633,6 @@ namespace GodotTools
 
             // Custom signals aren't automatically disconnected currently.
             MSBuildPanel.BuildStateChanged -= BuildStateChanged;
-            BuildManager.BuildFinished -= BuildFinished;
         }
 
         public override void _ExitTree()
@@ -715,8 +690,9 @@ namespace GodotTools
         }
 
         // Singleton
-
+#nullable disable
         public static GodotSharpEditor Instance { get; private set; }
+#nullable enable
 
         [UsedImplicitly]
         private static IntPtr InternalCreateInstance(IntPtr unmanagedCallbacks, int unmanagedCallbacksSize)

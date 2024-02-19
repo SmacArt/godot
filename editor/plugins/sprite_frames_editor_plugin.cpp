@@ -1880,7 +1880,7 @@ SpriteFramesEditor::SpriteFramesEditor() {
 	add_child(file);
 
 	frame_list = memnew(ItemList);
-	frame_list->set_auto_translate(false);
+	frame_list->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 	frame_list->set_v_size_flags(SIZE_EXPAND_FILL);
 	frame_list->set_icon_mode(ItemList::ICON_MODE_TOP);
 	frame_list->set_texture_filter(TEXTURE_FILTER_NEAREST_WITH_MIPMAPS);
@@ -2178,7 +2178,7 @@ SpriteFramesEditor::SpriteFramesEditor() {
 	min_thumbnail_zoom = 0.1f * MAX(1.0f, EDSCALE);
 	// Default the zoom to match the editor scale, but don't dezoom on editor scales below 100% to prevent pixel art from looking bad.
 	sheet_zoom = MAX(1.0f, EDSCALE);
-	max_sheet_zoom = 16.0f * MAX(1.0f, EDSCALE);
+	max_sheet_zoom = 128.0f * MAX(1.0f, EDSCALE);
 	min_sheet_zoom = 0.01f * MAX(1.0f, EDSCALE);
 	_zoom_reset();
 

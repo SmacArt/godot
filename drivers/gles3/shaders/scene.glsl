@@ -13,6 +13,7 @@ DISABLE_LIGHT_DIRECTIONAL = false
 DISABLE_LIGHT_OMNI = false
 DISABLE_LIGHT_SPOT = false
 DISABLE_FOG = false
+USE_DEPTH_FOG = false
 USE_RADIANCE_MAP = true
 USE_LIGHTMAP = false
 USE_SH_LIGHTMAP = false
@@ -31,6 +32,7 @@ USE_ADDITIVE_LIGHTING = false
 // these are false, we are doing a directional light pass.
 ADDITIVE_OMNI = false
 ADDITIVE_SPOT = false
+RENDER_MATERIAL = false
 
 
 #[vertex]
@@ -90,7 +92,7 @@ layout(location = 3) in vec4 color_attrib;
 layout(location = 4) in vec2 uv_attrib;
 #endif
 
-#if defined(UV2_USED) || defined(USE_LIGHTMAP)
+#if defined(UV2_USED) || defined(USE_LIGHTMAP) || defined(RENDER_MATERIAL)
 layout(location = 5) in vec2 uv2_attrib;
 #endif
 
@@ -154,18 +156,21 @@ layout(std140) uniform SceneData { // ubo:2
 	highp mat4 inv_view_matrix;
 	highp mat4 view_matrix;
 
+	// Used for billboards to cast correct shadows.
+	highp mat4 main_cam_inv_view_matrix;
+
 	vec2 viewport_size;
 	vec2 screen_pixel_size;
 
 	mediump vec4 ambient_light_color_energy;
 
 	mediump float ambient_color_sky_mix;
-	bool material_uv2_mode;
+	float pad2;
 	float emissive_exposure_normalization;
 	bool use_ambient_light;
+
 	bool use_ambient_cubemap;
 	bool use_reflection_cubemap;
-
 	float fog_aerial_perspective;
 	float time;
 
@@ -177,15 +182,21 @@ layout(std140) uniform SceneData { // ubo:2
 	float IBL_exposure_normalization;
 
 	bool fog_enabled;
+	uint fog_mode;
 	float fog_density;
 	float fog_height;
 	float fog_height_density;
 
+	float fog_depth_curve;
+	float pad;
+	float fog_depth_begin;
+
 	vec3 fog_light_color;
+	float fog_depth_end;
+
 	float fog_sun_scatter;
 
 	float shadow_bias;
-	float pad;
 	uint camera_visible_layers;
 	bool pancake_shadows;
 }
@@ -248,6 +259,10 @@ uniform highp vec3 compressed_aabb_size;
 uniform highp vec4 uv_scale;
 
 uniform highp uint model_flags;
+
+#ifdef RENDER_MATERIAL
+uniform mediump vec2 uv_offset;
+#endif
 
 /* Varyings */
 
@@ -511,6 +526,12 @@ void main() {
 #else
 	gl_Position = projection_matrix * vec4(vertex_interp, 1.0);
 #endif
+
+#ifdef RENDER_MATERIAL
+	gl_Position.xy = (uv2_attrib.xy + uv_offset) * 2.0 - 1.0;
+	gl_Position.z = 0.00001;
+	gl_Position.w = 1.0;
+#endif
 }
 
 /* clang-format off */
@@ -626,18 +647,21 @@ layout(std140) uniform SceneData { // ubo:2
 	highp mat4 inv_view_matrix;
 	highp mat4 view_matrix;
 
+	// Used for billboards to cast correct shadows.
+	highp mat4 main_cam_inv_view_matrix;
+
 	vec2 viewport_size;
 	vec2 screen_pixel_size;
 
 	mediump vec4 ambient_light_color_energy;
 
 	mediump float ambient_color_sky_mix;
-	bool material_uv2_mode;
+	float pad2;
 	float emissive_exposure_normalization;
 	bool use_ambient_light;
+
 	bool use_ambient_cubemap;
 	bool use_reflection_cubemap;
-
 	float fog_aerial_perspective;
 	float time;
 
@@ -649,15 +673,21 @@ layout(std140) uniform SceneData { // ubo:2
 	float IBL_exposure_normalization;
 
 	bool fog_enabled;
+	uint fog_mode;
 	float fog_density;
 	float fog_height;
 	float fog_height_density;
 
+	float fog_depth_curve;
+	float pad;
+	float fog_depth_begin;
+
 	vec3 fog_light_color;
+	float fog_depth_end;
+
 	float fog_sun_scatter;
 
 	float shadow_bias;
-	float pad;
 	uint camera_visible_layers;
 	bool pancake_shadows;
 }
@@ -867,10 +897,16 @@ uniform highp sampler2DArray color_buffer; // texunit:-5
 vec3 multiview_uv(vec2 uv) {
 	return vec3(uv, ViewIndex);
 }
+ivec3 multiview_uv(ivec2 uv) {
+	return ivec3(uv, int(ViewIndex));
+}
 #else
 uniform highp sampler2D depth_buffer; // texunit:-6
 uniform highp sampler2D color_buffer; // texunit:-5
 vec2 multiview_uv(vec2 uv) {
+	return uv;
+}
+ivec2 multiview_uv(ivec2 uv) {
 	return uv;
 }
 #endif
@@ -878,7 +914,19 @@ vec2 multiview_uv(vec2 uv) {
 uniform highp mat4 world_transform;
 uniform mediump float opaque_prepass_threshold;
 
+#ifndef MODE_RENDER_DEPTH
+#ifdef RENDER_MATERIAL
+layout(location = 0) out vec4 albedo_output_buffer;
+layout(location = 1) out vec4 normal_output_buffer;
+layout(location = 2) out vec4 orm_output_buffer;
+layout(location = 3) out vec4 emission_output_buffer;
+
+#else // !RENDER_MATERIAL
+// Normal color rendering.
 layout(location = 0) out vec4 frag_color;
+
+#endif // !RENDER_MATERIAL
+#endif // !MODE_RENDER_DEPTH
 
 vec3 F0(float metallic, float specular, vec3 albedo) {
 	float dielectric = 0.16 * specular * specular;
@@ -936,7 +984,7 @@ void light_compute(vec3 N, vec3 L, vec3 V, float A, vec3 light_color, bool is_di
 #endif
 		inout vec3 diffuse_light, inout vec3 specular_light) {
 
-#if defined(USE_LIGHT_SHADER_CODE)
+#if defined(LIGHT_CODE_USED)
 	// light is written by the light shader
 
 	highp mat4 model_matrix = world_transform;
@@ -1072,7 +1120,7 @@ void light_compute(vec3 N, vec3 L, vec3 V, float A, vec3 light_color, bool is_di
 	alpha = min(alpha, clamp(1.0 - attenuation, 0.0, 1.0));
 #endif
 
-#endif // USE_LIGHT_SHADER_CODE
+#endif // LIGHT_CODE_USED
 }
 
 float get_omni_spot_attenuation(float distance, float inv_range, float decay) {
@@ -1215,7 +1263,14 @@ vec4 fog_process(vec3 vertex) {
 	}
 #endif // !DISABLE_LIGHT_DIRECTIONAL
 
-	float fog_amount = 1.0 - exp(min(0.0, -length(vertex) * scene_data.fog_density));
+	float fog_amount = 0.0;
+
+#ifdef USE_DEPTH_FOG
+	float fog_z = smoothstep(scene_data.fog_depth_begin, scene_data.fog_depth_end, length(vertex));
+	fog_amount = pow(fog_z, scene_data.fog_depth_curve) * scene_data.fog_density;
+#else
+	fog_amount = 1 - exp(min(0.0, -length(vertex) * scene_data.fog_density));
+#endif // USE_DEPTH_FOG
 
 	if (abs(scene_data.fog_height_density) >= 0.0001) {
 		float y = (scene_data.inv_view_matrix * vec4(vertex, 1.0)).y;
@@ -1660,6 +1715,23 @@ void main() {
 
 // Nothing happens, so a tree-ssa optimizer will result in no fragment shader :)
 #else // !MODE_RENDER_DEPTH
+
+#ifdef RENDER_MATERIAL
+
+	albedo_output_buffer.rgb = albedo;
+	albedo_output_buffer.a = alpha;
+
+	normal_output_buffer.rgb = normal * 0.5 + 0.5;
+	normal_output_buffer.a = 0.0;
+
+	orm_output_buffer.r = ao;
+	orm_output_buffer.g = roughness;
+	orm_output_buffer.b = metallic;
+	orm_output_buffer.a = 1.0;
+
+	emission_output_buffer.rgb = emission;
+	emission_output_buffer.a = 0.0;
+#else // !RENDER_MATERIAL
 #ifdef BASE_PASS
 #ifdef MODE_UNSHADED
 	frag_color = vec4(albedo, alpha);
@@ -1914,6 +1986,6 @@ void main() {
 
 	frag_color.rgb += additive_light_color;
 #endif // USE_ADDITIVE_LIGHTING
-
+#endif // !RENDER_MATERIAL
 #endif //!MODE_RENDER_DEPTH
 }

@@ -1867,7 +1867,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	tool_anim->set_flat(false);
 	tool_anim->set_tooltip_text(TTR("Animation Tools"));
 	tool_anim->set_text(TTR("Animation"));
-	tool_anim->get_popup()->add_shortcut(ED_SHORTCUT("animation_player_editor/new_animation", TTR("New")), TOOL_NEW_ANIM);
+	tool_anim->get_popup()->add_shortcut(ED_SHORTCUT("animation_player_editor/new_animation", TTR("New...")), TOOL_NEW_ANIM);
 	tool_anim->get_popup()->add_separator();
 	tool_anim->get_popup()->add_shortcut(ED_SHORTCUT("animation_player_editor/animation_libraries", TTR("Manage Animations...")), TOOL_ANIM_LIBRARY);
 	tool_anim->get_popup()->add_separator();
@@ -1886,7 +1886,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	animation->set_h_size_flags(SIZE_EXPAND_FILL);
 	animation->set_tooltip_text(TTR("Display list of animations in player."));
 	animation->set_clip_text(true);
-	animation->set_auto_translate(false);
+	animation->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 
 	autoplay = memnew(Button);
 	autoplay->set_theme_type_variation("FlatButton");
@@ -1985,7 +1985,7 @@ AnimationPlayerEditor::AnimationPlayerEditor(AnimationPlayerEditorPlugin *p_plug
 	blend_editor.tree->connect(SNAME("item_edited"), callable_mp(this, &AnimationPlayerEditor::_blend_edited));
 
 	blend_editor.next = memnew(OptionButton);
-	blend_editor.next->set_auto_translate(false);
+	blend_editor.next->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
 	blend_vb->add_margin_child(TTR("Next (Auto Queue):"), blend_editor.next);
 
 	autoplay->connect(SNAME("pressed"), callable_mp(this, &AnimationPlayerEditor::_autoplay_pressed));
@@ -2157,6 +2157,7 @@ void AnimationPlayerEditorPlugin::_update_dummy_player(AnimationMixer *p_mixer) 
 		Node *parent = p_mixer->get_parent();
 		ERR_FAIL_NULL(parent);
 		dummy_player = memnew(AnimationPlayer);
+		dummy_player->set_active(false); // Inactive as default, it will be activated if the AnimationPlayerEditor visibility is changed.
 		parent->add_child(dummy_player);
 	}
 	player = dummy_player;

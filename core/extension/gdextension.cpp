@@ -518,6 +518,12 @@ void GDExtension::_register_extension_class_method(GDExtensionClassLibraryPtr p_
 
 	ClassDB::bind_method_custom(class_name, method);
 }
+
+void GDExtension::_register_extension_class_virtual_method(GDExtensionClassLibraryPtr p_library, GDExtensionConstStringNamePtr p_class_name, const GDExtensionClassVirtualMethodInfo *p_method_info) {
+	StringName class_name = *reinterpret_cast<const StringName *>(p_class_name);
+	ClassDB::add_extension_class_virtual_method(class_name, p_method_info);
+}
+
 void GDExtension::_register_extension_class_integer_constant(GDExtensionClassLibraryPtr p_library, GDExtensionConstStringNamePtr p_class_name, GDExtensionConstStringNamePtr p_enum_name, GDExtensionConstStringNamePtr p_constant_name, GDExtensionInt p_constant_value, GDExtensionBool p_is_bitfield) {
 	GDExtension *self = reinterpret_cast<GDExtension *>(p_library);
 
@@ -653,6 +659,8 @@ void GDExtension::_unregister_extension_class(GDExtensionClassLibraryPtr p_libra
 	if (!ext->is_reloading) {
 		self->extension_classes.erase(class_name);
 	}
+
+	GDExtensionEditorHelp::remove_class(class_name);
 #else
 	self->extension_classes.erase(class_name);
 #endif
@@ -792,16 +800,15 @@ void GDExtension::deinitialize_library(InitializationLevel p_level) {
 	ERR_FAIL_COND(p_level > int32_t(level_initialized));
 
 	level_initialized = int32_t(p_level) - 1;
+
+	ERR_FAIL_NULL(initialization.deinitialize);
+
 	initialization.deinitialize(initialization.userdata, GDExtensionInitializationLevel(p_level));
 }
 
 void GDExtension::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("open_library", "path", "entry_symbol"), &GDExtension::open_library);
-	ClassDB::bind_method(D_METHOD("close_library"), &GDExtension::close_library);
 	ClassDB::bind_method(D_METHOD("is_library_open"), &GDExtension::is_library_open);
-
 	ClassDB::bind_method(D_METHOD("get_minimum_library_initialization_level"), &GDExtension::get_minimum_library_initialization_level);
-	ClassDB::bind_method(D_METHOD("initialize_library", "level"), &GDExtension::initialize_library);
 
 	BIND_ENUM_CONSTANT(INITIALIZATION_LEVEL_CORE);
 	BIND_ENUM_CONSTANT(INITIALIZATION_LEVEL_SERVERS);
@@ -832,6 +839,7 @@ void GDExtension::initialize_gdextensions() {
 #endif // DISABLE_DEPRECATED
 	register_interface_function("classdb_register_extension_class2", (GDExtensionInterfaceFunctionPtr)&GDExtension::_register_extension_class2);
 	register_interface_function("classdb_register_extension_class_method", (GDExtensionInterfaceFunctionPtr)&GDExtension::_register_extension_class_method);
+	register_interface_function("classdb_register_extension_class_virtual_method", (GDExtensionInterfaceFunctionPtr)&GDExtension::_register_extension_class_virtual_method);
 	register_interface_function("classdb_register_extension_class_integer_constant", (GDExtensionInterfaceFunctionPtr)&GDExtension::_register_extension_class_integer_constant);
 	register_interface_function("classdb_register_extension_class_property", (GDExtensionInterfaceFunctionPtr)&GDExtension::_register_extension_class_property);
 	register_interface_function("classdb_register_extension_class_property_indexed", (GDExtensionInterfaceFunctionPtr)&GDExtension::_register_extension_class_property_indexed);
@@ -902,7 +910,40 @@ Error GDExtensionResourceLoader::load_gdextension_resource(const String &p_path,
 		return ERR_INVALID_DATA;
 	}
 
-	String library_path = GDExtension::find_extension_library(p_path, config, [](String p_feature) { return OS::get_singleton()->has_feature(p_feature); });
+	// Optionally check maximum compatibility.
+	if (config->has_section_key("configuration", "compatibility_maximum")) {
+		uint32_t compatibility_maximum[3] = { 0, 0, 0 };
+		String compat_string = config->get_value("configuration", "compatibility_maximum");
+		Vector<int> parts = compat_string.split_ints(".");
+		for (int i = 0; i < 3; i++) {
+			if (i < parts.size() && parts[i] >= 0) {
+				compatibility_maximum[i] = parts[i];
+			} else {
+				// If a version part is missing, set the maximum to an arbitrary high value.
+				compatibility_maximum[i] = 9999;
+			}
+		}
+
+		compatible = true;
+		if (VERSION_MAJOR != compatibility_maximum[0]) {
+			compatible = VERSION_MAJOR < compatibility_maximum[0];
+		} else if (VERSION_MINOR != compatibility_maximum[1]) {
+			compatible = VERSION_MINOR < compatibility_maximum[1];
+		}
+#if VERSION_PATCH
+		// #if check to avoid -Wtype-limits warning when 0.
+		else {
+			compatible = VERSION_PATCH <= compatibility_maximum[2];
+		}
+#endif
+
+		if (!compatible) {
+			ERR_PRINT(vformat("GDExtension only compatible with Godot version %s or earlier: %s", compat_string, p_path));
+			return ERR_INVALID_DATA;
+		}
+	}
+
+	String library_path = GDExtension::find_extension_library(p_path, config, [](const String &p_feature) { return OS::get_singleton()->has_feature(p_feature); });
 
 	if (library_path.is_empty()) {
 		const String os_arch = OS::get_singleton()->get_name().to_lower() + "." + Engine::get_singleton()->get_architecture_name();
@@ -1195,5 +1236,18 @@ void GDExtensionEditorPlugins::remove_extension_class(const StringName &p_class_
 	} else {
 		extension_classes.erase(p_class_name);
 	}
+}
+
+GDExtensionEditorHelp::EditorHelpLoadXmlBufferFunc GDExtensionEditorHelp::editor_help_load_xml_buffer = nullptr;
+GDExtensionEditorHelp::EditorHelpRemoveClassFunc GDExtensionEditorHelp::editor_help_remove_class = nullptr;
+
+void GDExtensionEditorHelp::load_xml_buffer(const uint8_t *p_buffer, int p_size) {
+	ERR_FAIL_NULL(editor_help_load_xml_buffer);
+	editor_help_load_xml_buffer(p_buffer, p_size);
+}
+
+void GDExtensionEditorHelp::remove_class(const String &p_class) {
+	ERR_FAIL_NULL(editor_help_remove_class);
+	editor_help_remove_class(p_class);
 }
 #endif // TOOLS_ENABLED

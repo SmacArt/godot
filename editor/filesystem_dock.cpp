@@ -39,6 +39,7 @@
 #include "core/templates/list.h"
 #include "editor/create_dialog.h"
 #include "editor/directory_create_dialog.h"
+#include "editor/editor_dock_manager.h"
 #include "editor/editor_feature_profile.h"
 #include "editor/editor_node.h"
 #include "editor/editor_resource_preview.h"
@@ -494,43 +495,17 @@ void FileSystemDock::_update_display_mode(bool p_force) {
 
 void FileSystemDock::_notification(int p_what) {
 	switch (p_what) {
-		case NOTIFICATION_TRANSLATION_CHANGED:
-		case NOTIFICATION_LAYOUT_DIRECTION_CHANGED:
-		case NOTIFICATION_ENTER_TREE: {
-			if (initialized) {
-				return;
-			}
-			initialized = true;
+		case NOTIFICATION_READY: {
 			EditorFeatureProfileManager::get_singleton()->connect("current_feature_profile_changed", callable_mp(this, &FileSystemDock::_feature_profile_changed));
-
 			EditorFileSystem::get_singleton()->connect("filesystem_changed", callable_mp(this, &FileSystemDock::_fs_changed));
 			EditorResourcePreview::get_singleton()->connect("preview_invalidated", callable_mp(this, &FileSystemDock::_preview_invalidated));
 
-			button_reload->set_icon(get_editor_theme_icon(SNAME("Reload")));
 			button_file_list_display_mode->connect("pressed", callable_mp(this, &FileSystemDock::_toggle_file_display));
-
 			files->connect("item_activated", callable_mp(this, &FileSystemDock::_file_list_activate_file));
 			button_hist_next->connect("pressed", callable_mp(this, &FileSystemDock::_fw_history));
 			button_hist_prev->connect("pressed", callable_mp(this, &FileSystemDock::_bw_history));
-
-			tree_search_box->set_right_icon(get_editor_theme_icon(SNAME("Search")));
-			tree_search_box->set_clear_button_enabled(true);
-			tree_button_sort->set_icon(get_editor_theme_icon(SNAME("Sort")));
-
-			file_list_search_box->set_right_icon(get_editor_theme_icon(SNAME("Search")));
-			file_list_search_box->set_clear_button_enabled(true);
-			file_list_button_sort->set_icon(get_editor_theme_icon(SNAME("Sort")));
-
-			if (is_layout_rtl()) {
-				button_hist_next->set_icon(get_editor_theme_icon(SNAME("Back")));
-				button_hist_prev->set_icon(get_editor_theme_icon(SNAME("Forward")));
-			} else {
-				button_hist_next->set_icon(get_editor_theme_icon(SNAME("Forward")));
-				button_hist_prev->set_icon(get_editor_theme_icon(SNAME("Back")));
-			}
 			file_list_popup->connect("id_pressed", callable_mp(this, &FileSystemDock::_file_list_rmb_option));
 			tree_popup->connect("id_pressed", callable_mp(this, &FileSystemDock::_tree_rmb_option));
-
 			current_path_line_edit->connect("text_submitted", callable_mp(this, &FileSystemDock::_navigate_to_path).bind(false));
 
 			always_show_folders = bool(EDITOR_GET("docks/filesystem/always_show_folders"));
@@ -582,16 +557,11 @@ void FileSystemDock::_notification(int p_what) {
 			}
 		} break;
 
+		case NOTIFICATION_TRANSLATION_CHANGED:
+		case NOTIFICATION_LAYOUT_DIRECTION_CHANGED:
 		case NOTIFICATION_THEME_CHANGED: {
-			overwrite_dialog_scroll->add_theme_style_override("panel", get_theme_stylebox("panel", "Tree"));
+			_update_display_mode(true);
 
-			if (is_visible_in_tree()) {
-				_update_display_mode(true);
-			}
-		} break;
-
-		case EditorSettings::NOTIFICATION_EDITOR_SETTINGS_CHANGED: {
-			// Update icons.
 			button_reload->set_icon(get_editor_theme_icon(SNAME("Reload")));
 
 			StringName mode_icon = "Panels1";
@@ -602,13 +572,6 @@ void FileSystemDock::_notification(int p_what) {
 			}
 			button_toggle_display_mode->set_icon(get_editor_theme_icon(mode_icon));
 
-			if (is_layout_rtl()) {
-				button_hist_next->set_icon(get_editor_theme_icon(SNAME("Back")));
-				button_hist_prev->set_icon(get_editor_theme_icon(SNAME("Forward")));
-			} else {
-				button_hist_next->set_icon(get_editor_theme_icon(SNAME("Forward")));
-				button_hist_prev->set_icon(get_editor_theme_icon(SNAME("Back")));
-			}
 			if (file_list_display_mode == FILE_LIST_DISPLAY_LIST) {
 				button_file_list_display_mode->set_icon(get_editor_theme_icon(SNAME("FileThumbnail")));
 			} else {
@@ -616,13 +579,25 @@ void FileSystemDock::_notification(int p_what) {
 			}
 
 			tree_search_box->set_right_icon(get_editor_theme_icon(SNAME("Search")));
-			tree_search_box->set_clear_button_enabled(true);
 			tree_button_sort->set_icon(get_editor_theme_icon(SNAME("Sort")));
 
 			file_list_search_box->set_right_icon(get_editor_theme_icon(SNAME("Search")));
-			file_list_search_box->set_clear_button_enabled(true);
 			file_list_button_sort->set_icon(get_editor_theme_icon(SNAME("Sort")));
 
+			button_dock_placement->set_icon(get_editor_theme_icon(SNAME("GuiTabMenuHl")));
+
+			if (is_layout_rtl()) {
+				button_hist_next->set_icon(get_editor_theme_icon(SNAME("Back")));
+				button_hist_prev->set_icon(get_editor_theme_icon(SNAME("Forward")));
+			} else {
+				button_hist_next->set_icon(get_editor_theme_icon(SNAME("Forward")));
+				button_hist_prev->set_icon(get_editor_theme_icon(SNAME("Back")));
+			}
+
+			overwrite_dialog_scroll->add_theme_style_override("panel", get_theme_stylebox("panel", "Tree"));
+		} break;
+
+		case EditorSettings::NOTIFICATION_EDITOR_SETTINGS_CHANGED: {
 			// Update editor dark theme & always show folders states from editor settings, redraw if needed.
 			bool do_redraw = false;
 
@@ -1004,6 +979,9 @@ void FileSystemDock::_update_file_list(bool p_keep_selection) {
 			}
 		}
 	} else {
+		if (!directory.begins_with("res://")) {
+			directory = "res://" + directory;
+		}
 		// Get infos on the directory + file.
 		if (directory.ends_with("/") && directory != "res://") {
 			directory = directory.substr(0, directory.length() - 1);
@@ -2150,7 +2128,8 @@ void FileSystemDock::_file_option(int p_option, const Vector<String> &p_selected
 				terminal_emulators.push_back(terminal_emulator_setting);
 			}
 
-			String arguments = EDITOR_GET("filesystem/external_programs/terminal_emulator_flags");
+			String flags = EDITOR_GET("filesystem/external_programs/terminal_emulator_flags");
+			String arguments = flags;
 			if (arguments.is_empty()) {
 				// NOTE: This default value is ignored further below if the terminal executable is `powershell` or `cmd`,
 				// due to these terminals requiring nonstandard syntax to start in a specified folder.
@@ -2160,16 +2139,13 @@ void FileSystemDock::_file_option(int p_option, const Vector<String> &p_selected
 #ifdef LINUXBSD_ENABLED
 			String chosen_terminal_emulator;
 			for (const String &terminal_emulator : terminal_emulators) {
+				String pipe;
 				List<String> test_args; // Required for `execute()`, as it doesn't accept `Vector<String>`.
-				test_args.push_back("-v");
-				test_args.push_back(terminal_emulator);
-				// Silence command name being printed when found. (stderr is already silenced by `OS::execute()` by default.)
-				// FIXME: This doesn't appear to silence stdout.
-				test_args.push_back(">");
-				test_args.push_back("/dev/null");
-				int exit_code = 0;
-				const Error err = OS::get_singleton()->execute("command", test_args, nullptr, &exit_code);
-				if (err == OK && exit_code == EXIT_SUCCESS) {
+				test_args.push_back("-cr");
+				test_args.push_back("command -v " + terminal_emulator);
+				const Error err = OS::get_singleton()->execute("bash", test_args, &pipe);
+				// Check if a path to the terminal executable exists.
+				if (err == OK && pipe.contains("/")) {
 					chosen_terminal_emulator = terminal_emulator;
 					break;
 				} else if (err == ERR_CANT_FORK) {
@@ -2186,8 +2162,14 @@ void FileSystemDock::_file_option(int p_option, const Vector<String> &p_selected
 			// Prepend default arguments based on the terminal emulator name.
 			// Use `String.ends_with()` so that installations in non-default paths
 			// or `/usr/local/bin` are detected correctly.
-			if (chosen_terminal_emulator.ends_with("konsole")) {
-				terminal_emulator_args.push_back("--workdir");
+			if (flags.is_empty()) {
+				if (chosen_terminal_emulator.ends_with("konsole")) {
+					terminal_emulator_args.push_back("--workdir");
+				} else if (chosen_terminal_emulator.ends_with("gnome-terminal")) {
+					terminal_emulator_args.push_back("--working-directory");
+				} else if (chosen_terminal_emulator.ends_with("urxvt")) {
+					terminal_emulator_args.push_back("-cd");
+				}
 			}
 #endif
 
@@ -2559,6 +2541,10 @@ void FileSystemDock::_search_changed(const String &p_text, const Control *p_from
 void FileSystemDock::_rescan() {
 	_set_scanning_mode();
 	EditorFileSystem::get_singleton()->scan();
+}
+
+void FileSystemDock::_change_bottom_dock_placement() {
+	EditorDockManager::get_singleton()->bottom_dock_show_placement_popup(button_dock_placement->get_screen_rect(), this);
 }
 
 void FileSystemDock::_change_split_mode() {
@@ -3634,6 +3620,43 @@ MenuButton *FileSystemDock::_create_file_menu_button() {
 	return button;
 }
 
+bool FileSystemDock::_can_dock_horizontal() const {
+	return true;
+}
+
+void FileSystemDock::_set_dock_horizontal(bool p_enable) {
+	if (button_dock_placement->is_visible() == p_enable) {
+		return;
+	}
+
+	if (p_enable) {
+		set_meta("_dock_display_mode", get_display_mode());
+		set_meta("_dock_file_display_mode", get_file_list_display_mode());
+
+		FileSystemDock::DisplayMode new_display_mode = FileSystemDock::DisplayMode(int(get_meta("_bottom_display_mode", int(FileSystemDock::DISPLAY_MODE_HSPLIT))));
+		FileSystemDock::FileListDisplayMode new_file_display_mode = FileSystemDock::FileListDisplayMode(int(get_meta("_bottom_file_display_mode", int(FileSystemDock::FILE_LIST_DISPLAY_THUMBNAILS))));
+
+		set_display_mode(new_display_mode);
+		set_file_list_display_mode(new_file_display_mode);
+		set_custom_minimum_size(Size2(0, 200) * EDSCALE);
+	} else {
+		set_meta("_bottom_display_mode", get_display_mode());
+		set_meta("_bottom_file_display_mode", get_file_list_display_mode());
+
+		FileSystemDock::DisplayMode new_display_mode = FileSystemDock::DISPLAY_MODE_TREE_ONLY;
+		FileSystemDock::FileListDisplayMode new_file_display_mode = FileSystemDock::FILE_LIST_DISPLAY_LIST;
+
+		new_display_mode = FileSystemDock::DisplayMode(int(get_meta("_dock_display_mode", new_display_mode)));
+		new_file_display_mode = FileSystemDock::FileListDisplayMode(int(get_meta("_dock_file_display_mode", new_file_display_mode)));
+
+		set_display_mode(new_display_mode);
+		set_file_list_display_mode(new_file_display_mode);
+		set_custom_minimum_size(Size2(0, 0));
+	}
+
+	button_dock_placement->set_visible(p_enable);
+}
+
 void FileSystemDock::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_file_list_thumbnail_done"), &FileSystemDock::_file_list_thumbnail_done);
 	ClassDB::bind_method(D_METHOD("_tree_thumbnail_done"), &FileSystemDock::_tree_thumbnail_done);
@@ -3642,6 +3665,9 @@ void FileSystemDock::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("add_resource_tooltip_plugin", "plugin"), &FileSystemDock::add_resource_tooltip_plugin);
 	ClassDB::bind_method(D_METHOD("remove_resource_tooltip_plugin", "plugin"), &FileSystemDock::remove_resource_tooltip_plugin);
+
+	ClassDB::bind_method(D_METHOD("_set_dock_horizontal", "enable"), &FileSystemDock::_set_dock_horizontal);
+	ClassDB::bind_method(D_METHOD("_can_dock_horizontal"), &FileSystemDock::_can_dock_horizontal);
 
 	ADD_SIGNAL(MethodInfo("inherit", PropertyInfo(Variant::STRING, "file")));
 	ADD_SIGNAL(MethodInfo("instantiate", PropertyInfo(Variant::PACKED_STRING_ARRAY, "files")));
@@ -3796,6 +3822,12 @@ FileSystemDock::FileSystemDock() {
 	button_toggle_display_mode->set_flat(true);
 	toolbar_hbc->add_child(button_toggle_display_mode);
 
+	button_dock_placement = memnew(Button);
+	button_dock_placement->set_flat(true);
+	button_dock_placement->connect("pressed", callable_mp(this, &FileSystemDock::_change_bottom_dock_placement));
+	button_dock_placement->hide();
+	toolbar_hbc->add_child(button_dock_placement);
+
 	toolbar2_hbc = memnew(HBoxContainer);
 	toolbar2_hbc->add_theme_constant_override("separation", 0);
 	top_vbc->add_child(toolbar2_hbc);
@@ -3803,6 +3835,7 @@ FileSystemDock::FileSystemDock() {
 	tree_search_box = memnew(LineEdit);
 	tree_search_box->set_h_size_flags(SIZE_EXPAND_FILL);
 	tree_search_box->set_placeholder(TTR("Filter Files"));
+	tree_search_box->set_clear_button_enabled(true);
 	tree_search_box->connect("text_changed", callable_mp(this, &FileSystemDock::_search_changed).bind(tree_search_box));
 	toolbar2_hbc->add_child(tree_search_box);
 
@@ -3852,6 +3885,7 @@ FileSystemDock::FileSystemDock() {
 	file_list_search_box = memnew(LineEdit);
 	file_list_search_box->set_h_size_flags(SIZE_EXPAND_FILL);
 	file_list_search_box->set_placeholder(TTR("Filter Files"));
+	file_list_search_box->set_clear_button_enabled(true);
 	file_list_search_box->connect("text_changed", callable_mp(this, &FileSystemDock::_search_changed).bind(file_list_search_box));
 	path_hb->add_child(file_list_search_box);
 

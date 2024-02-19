@@ -48,6 +48,9 @@ public:
 	uint32_t camera_visible_layers;
 	bool cam_orthogonal = false;
 
+	// For billboards to cast correct shadows.
+	Transform3D main_cam_transform;
+
 	// For stereo rendering
 	uint32_t view_count = 1;
 	Vector3 view_eye_offset[RendererSceneRender::MAX_RENDER_VIEWS];
@@ -94,6 +97,8 @@ private:
 		float inv_projection_matrix_view[RendererSceneRender::MAX_RENDER_VIEWS][16];
 		float eye_offset[RendererSceneRender::MAX_RENDER_VIEWS][4];
 
+		float main_cam_inv_view_matrix[16];
+
 		float viewport_size[2];
 		float screen_pixel_size[2];
 
@@ -126,26 +131,31 @@ private:
 
 		// Fog
 		uint32_t fog_enabled;
+		uint32_t fog_mode;
 		float fog_density;
 		float fog_height;
+
 		float fog_height_density;
+		float fog_depth_curve;
+		float pad;
+		float fog_depth_begin;
 
 		float fog_light_color[3];
-		float fog_sun_scatter;
+		float fog_depth_end;
 
+		float fog_sun_scatter;
 		float fog_aerial_perspective;
 		float time;
 		float reflection_multiplier;
-		uint32_t material_uv2_mode;
 
 		float taa_jitter[2];
+		uint32_t material_uv2_mode;
 		float emissive_exposure_normalization; // Needed to normalize emissive when using physical units.
-		float IBL_exposure_normalization; // Adjusts for baked exposure.
 
+		float IBL_exposure_normalization; // Adjusts for baked exposure.
 		uint32_t pancake_shadows;
 		uint32_t camera_visible_layers;
 		float pass_alpha_multiplier;
-		uint32_t pad3;
 	};
 
 	struct UBODATA {

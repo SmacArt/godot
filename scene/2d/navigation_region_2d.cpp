@@ -253,6 +253,10 @@ void NavigationRegion2D::_bake_finished(Ref<NavigationPolygon> p_navigation_poly
 	emit_signal(SNAME("bake_finished"));
 }
 
+bool NavigationRegion2D::is_baking() const {
+	return NavigationServer2D::get_singleton()->is_baking_navigation_polygon(navigation_polygon);
+}
+
 void NavigationRegion2D::_navigation_polygon_changed() {
 	if (is_inside_tree() && (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_navigation_hint())) {
 		queue_redraw();
@@ -266,6 +270,14 @@ void NavigationRegion2D::_navigation_polygon_changed() {
 #ifdef DEBUG_ENABLED
 void NavigationRegion2D::_navigation_map_changed(RID p_map) {
 	if (is_inside_tree() && get_world_2d()->get_navigation_map() == p_map) {
+		queue_redraw();
+	}
+}
+#endif // DEBUG_ENABLED
+
+#ifdef DEBUG_ENABLED
+void NavigationRegion2D::_navigation_debug_changed() {
+	if (is_inside_tree()) {
 		queue_redraw();
 	}
 }
@@ -320,6 +332,7 @@ void NavigationRegion2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_travel_cost"), &NavigationRegion2D::get_travel_cost);
 
 	ClassDB::bind_method(D_METHOD("bake_navigation_polygon", "on_thread"), &NavigationRegion2D::bake_navigation_polygon, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("is_baking"), &NavigationRegion2D::is_baking);
 
 	ClassDB::bind_method(D_METHOD("_navigation_polygon_changed"), &NavigationRegion2D::_navigation_polygon_changed);
 
@@ -369,7 +382,7 @@ NavigationRegion2D::NavigationRegion2D() {
 
 #ifdef DEBUG_ENABLED
 	NavigationServer2D::get_singleton()->connect(SNAME("map_changed"), callable_mp(this, &NavigationRegion2D::_navigation_map_changed));
-	NavigationServer2D::get_singleton()->connect(SNAME("navigation_debug_changed"), callable_mp(this, &NavigationRegion2D::_navigation_map_changed));
+	NavigationServer2D::get_singleton()->connect(SNAME("navigation_debug_changed"), callable_mp(this, &NavigationRegion2D::_navigation_debug_changed));
 #endif // DEBUG_ENABLED
 }
 
@@ -386,7 +399,7 @@ NavigationRegion2D::~NavigationRegion2D() {
 
 #ifdef DEBUG_ENABLED
 	NavigationServer2D::get_singleton()->disconnect(SNAME("map_changed"), callable_mp(this, &NavigationRegion2D::_navigation_map_changed));
-	NavigationServer2D::get_singleton()->disconnect(SNAME("navigation_debug_changed"), callable_mp(this, &NavigationRegion2D::_navigation_map_changed));
+	NavigationServer2D::get_singleton()->disconnect(SNAME("navigation_debug_changed"), callable_mp(this, &NavigationRegion2D::_navigation_debug_changed));
 #endif // DEBUG_ENABLED
 }
 

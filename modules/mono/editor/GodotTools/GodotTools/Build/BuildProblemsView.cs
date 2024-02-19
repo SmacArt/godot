@@ -8,8 +8,6 @@ using GodotTools.Internals;
 using static GodotTools.Internals.Globals;
 using FileAccess = Godot.FileAccess;
 
-#nullable enable
-
 namespace GodotTools.Build
 {
     public partial class BuildProblemsView : HBoxContainer
@@ -244,7 +242,9 @@ namespace GodotTools.Build
             if (string.IsNullOrEmpty(projectDir))
                 return;
 
-            string file = Path.Combine(projectDir.SimplifyGodotPath(), diagnostic.File.SimplifyGodotPath());
+            string? file = !string.IsNullOrEmpty(diagnostic.File) ?
+                Path.Combine(projectDir.SimplifyGodotPath(), diagnostic.File.SimplifyGodotPath()) :
+                null;
 
             if (!File.Exists(file))
                 return;
@@ -308,14 +308,14 @@ namespace GodotTools.Build
                 return false;
 
             string searchText = _searchBox.Text;
-            if (!string.IsNullOrEmpty(searchText) &&
-                (!diagnostic.Message.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                !(diagnostic.File?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)))
-            {
-                return false;
-            }
+            if (string.IsNullOrEmpty(searchText))
+                return true;
+            if (diagnostic.Message.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (diagnostic.File?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+                return true;
 
-            return true;
+            return false;
         }
 
         private Color? GetProblemItemColor(BuildDiagnostic diagnostic)
@@ -516,7 +516,7 @@ namespace GodotTools.Build
 
         public override void _Ready()
         {
-            var editorSettings = GodotSharpEditor.Instance.GetEditorInterface().GetEditorSettings();
+            var editorSettings = EditorInterface.Singleton.GetEditorSettings();
             _layout = editorSettings.GetSetting(GodotSharpEditor.Settings.ProblemsLayout).As<ProblemsLayout>();
 
             Name = "Problems".TTR();
@@ -655,7 +655,7 @@ namespace GodotTools.Build
             switch ((long)what)
             {
                 case EditorSettings.NotificationEditorSettingsChanged:
-                    var editorSettings = GodotSharpEditor.Instance.GetEditorInterface().GetEditorSettings();
+                    var editorSettings = EditorInterface.Singleton.GetEditorSettings();
                     _layout = editorSettings.GetSetting(GodotSharpEditor.Settings.ProblemsLayout).As<ProblemsLayout>();
                     _toggleLayoutButton.ButtonPressed = GetToggleLayoutPressedState();
                     UpdateProblemsView();

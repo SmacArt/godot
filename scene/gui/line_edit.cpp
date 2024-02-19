@@ -138,15 +138,20 @@ void LineEdit::_backspace(bool p_word, bool p_all_to_left) {
 		return;
 	}
 
-	if (p_all_to_left) {
-		deselect();
-		text = text.substr(0, caret_column);
-		_text_changed();
+	if (selection.enabled) {
+		selection_delete();
 		return;
 	}
 
-	if (selection.enabled) {
-		selection_delete();
+	if (caret_column == 0) {
+		return; // Nothing to do.
+	}
+
+	if (p_all_to_left) {
+		text = text.substr(caret_column);
+		_shape();
+		set_caret_column(0);
+		_text_changed();
 		return;
 	}
 
@@ -174,24 +179,20 @@ void LineEdit::_delete(bool p_word, bool p_all_to_right) {
 		return;
 	}
 
-	if (p_all_to_right) {
-		deselect();
-		text = text.substr(caret_column, text.length() - caret_column);
-		_shape();
-		set_caret_column(0);
-		_text_changed();
-		return;
-	}
-
 	if (selection.enabled) {
 		selection_delete();
 		return;
 	}
 
-	int text_len = text.length();
-
-	if (caret_column == text_len) {
+	if (caret_column == text.length()) {
 		return; // Nothing to do.
+	}
+
+	if (p_all_to_right) {
+		text = text.substr(0, caret_column);
+		_shape();
+		_text_changed();
+		return;
 	}
 
 	if (p_word) {
