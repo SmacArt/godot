@@ -438,6 +438,12 @@
 				Returns [code]true[/code] if the given [param column] is selected.
 			</description>
 		</method>
+		<method name="is_visible_in_tree" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [member visible] is [code]true[/code] and all its ancestors are also visible.
+			</description>
+		</method>
 		<method name="move_after">
 			<return type="void" />
 			<param index="0" name="item" type="TreeItem" />
@@ -574,8 +580,8 @@
 			<param index="1" name="object" type="Object" />
 			<param index="2" name="callback" type="StringName" />
 			<description>
-				Sets the given column's custom draw callback to [param callback] method on [param object].
-				The [param callback] should accept two arguments: the [TreeItem] that is drawn and its position and size as a [Rect2].
+				Sets the given column's custom draw callback to the [param callback] method on [param object].
+				The method named [param callback] should accept two arguments: the [TreeItem] that is drawn and its position and size as a [Rect2].
 			</description>
 		</method>
 		<method name="set_custom_draw_callback">

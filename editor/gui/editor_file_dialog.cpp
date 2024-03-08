@@ -86,6 +86,7 @@ void EditorFileDialog::_update_theme_item_cache() {
 	theme_cache.mode_list = get_editor_theme_icon(SNAME("FileList"));
 	theme_cache.favorites_up = get_editor_theme_icon(SNAME("MoveUp"));
 	theme_cache.favorites_down = get_editor_theme_icon(SNAME("MoveDown"));
+	theme_cache.create_folder = get_editor_theme_icon(SNAME("FolderCreate"));
 
 	theme_cache.folder = get_editor_theme_icon(SNAME("Folder"));
 	theme_cache.folder_icon_color = get_theme_color(SNAME("folder_icon_color"), SNAME("FileDialog"));
@@ -135,6 +136,9 @@ void EditorFileDialog::_notification(int p_what) {
 		} break;
 
 		case EditorSettings::NOTIFICATION_EDITOR_SETTINGS_CHANGED: {
+			if (!EditorSettings::get_singleton()->check_changed_settings_in_group("filesystem/file_dialog")) {
+				break;
+			}
 			bool is_showing_hidden = EDITOR_GET("filesystem/file_dialog/show_hidden_files");
 			if (show_hidden_files != is_showing_hidden) {
 				set_show_hidden_files(is_showing_hidden);
@@ -220,6 +224,7 @@ void EditorFileDialog::shortcut_input(const Ref<InputEvent> &p_event) {
 			}
 			if (ED_IS_SHORTCUT("file_dialog/focus_path", p_event)) {
 				dir->grab_focus();
+				dir->select_all();
 				handled = true;
 			}
 			if (ED_IS_SHORTCUT("file_dialog/move_favorite_up", p_event)) {
@@ -284,7 +289,7 @@ void EditorFileDialog::update_dir() {
 	}
 }
 
-void EditorFileDialog::_dir_submitted(String p_dir) {
+void EditorFileDialog::_dir_submitted(const String &p_dir) {
 	dir_access->change_dir(p_dir);
 	invalidate();
 	update_dir();
@@ -1325,6 +1330,7 @@ void EditorFileDialog::_update_icons() {
 	refresh->set_icon(theme_cache.reload);
 	favorite->set_icon(theme_cache.favorite);
 	show_hidden->set_icon(theme_cache.toggle_hidden);
+	makedir->set_icon(theme_cache.create_folder);
 
 	fav_up->set_icon(theme_cache.favorites_up);
 	fav_down->set_icon(theme_cache.favorites_down);
@@ -1778,7 +1784,10 @@ EditorFileDialog::EditorFileDialog() {
 	ED_SHORTCUT("file_dialog/toggle_mode", TTR("Toggle Mode"), KeyModifierMask::ALT | Key::V);
 	ED_SHORTCUT("file_dialog/create_folder", TTR("Create Folder"), KeyModifierMask::CMD_OR_CTRL | Key::N);
 	ED_SHORTCUT("file_dialog/delete", TTR("Delete"), Key::KEY_DELETE);
-	ED_SHORTCUT("file_dialog/focus_path", TTR("Focus Path"), KeyModifierMask::CMD_OR_CTRL | Key::D);
+	ED_SHORTCUT("file_dialog/focus_path", TTR("Focus Path"), KeyModifierMask::CMD_OR_CTRL | Key::L);
+	// Allow both Cmd + L and Cmd + Shift + G to match Safari's and Finder's shortcuts respectively.
+	ED_SHORTCUT_OVERRIDE_ARRAY("file_dialog/focus_path", "macos",
+			{ int32_t(KeyModifierMask::META | Key::L), int32_t(KeyModifierMask::META | KeyModifierMask::SHIFT | Key::G) });
 	ED_SHORTCUT("file_dialog/move_favorite_up", TTR("Move Favorite Up"), KeyModifierMask::CMD_OR_CTRL | Key::UP);
 	ED_SHORTCUT("file_dialog/move_favorite_down", TTR("Move Favorite Down"), KeyModifierMask::CMD_OR_CTRL | Key::DOWN);
 
@@ -1872,8 +1881,11 @@ EditorFileDialog::EditorFileDialog() {
 	drives->connect("item_selected", callable_mp(this, &EditorFileDialog::_select_drive));
 	pathhb->add_child(drives);
 
+	pathhb->add_child(memnew(VSeparator));
+
 	makedir = memnew(Button);
-	makedir->set_text(TTR("Create Folder"));
+	makedir->set_theme_type_variation("FlatButton");
+	makedir->set_tooltip_text(TTR("Create a new folder."));
 	makedir->connect("pressed", callable_mp(this, &EditorFileDialog::_make_dir));
 	pathhb->add_child(makedir);
 
