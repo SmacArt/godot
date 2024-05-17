@@ -105,6 +105,7 @@ class RenderingDeviceDriverD3D12 : public RenderingDeviceDriver {
 		bool primitive_in_multiviewport = false;
 		bool ss_image_supported = false; // We can provide a density map attachment on our framebuffer.
 		uint32_t ss_image_tile_size = 0;
+		uint32_t ss_max_fragment_size = 0;
 		bool additional_rates_supported = false;
 	};
 
@@ -379,7 +380,7 @@ private:
 
 	struct FenceInfo {
 		ComPtr<ID3D12Fence> d3d_fence = nullptr;
-		HANDLE event_handle = NULL;
+		HANDLE event_handle = nullptr;
 		UINT64 fence_value = 0;
 	};
 

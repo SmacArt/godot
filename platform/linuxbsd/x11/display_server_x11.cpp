@@ -128,8 +128,10 @@ bool DisplayServerX11::has_feature(Feature p_feature) const {
 		//case FEATURE_HIDPI:
 		case FEATURE_ICON:
 #ifdef DBUS_ENABLED
-		case FEATURE_NATIVE_DIALOG:
+		case FEATURE_NATIVE_DIALOG_FILE:
 #endif
+		//case FEATURE_NATIVE_DIALOG:
+		//case FEATURE_NATIVE_DIALOG_INPUT:
 		//case FEATURE_NATIVE_ICON:
 		case FEATURE_SWAP_BUFFERS:
 #ifdef DBUS_ENABLED
@@ -1005,7 +1007,8 @@ int DisplayServerX11::get_screen_count() const {
 	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		XineramaScreenInfo *xsi = XineramaQueryScreens(x11_display, &count);
 		XFree(xsi);
-	} else {
+	}
+	if (count == 0) {
 		count = XScreenCount(x11_display);
 	}
 
@@ -1066,25 +1069,29 @@ Rect2i DisplayServerX11::_screen_get_rect(int p_screen) const {
 	ERR_FAIL_COND_V(p_screen < 0, rect);
 
 	// Using Xinerama Extension.
+	bool found = false;
 	int event_base, error_base;
 	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		int count;
 		XineramaScreenInfo *xsi = XineramaQueryScreens(x11_display, &count);
-
-		// Check if screen is valid.
-		if (p_screen < count) {
-			rect.position.x = xsi[p_screen].x_org;
-			rect.position.y = xsi[p_screen].y_org;
-			rect.size.width = xsi[p_screen].width;
-			rect.size.height = xsi[p_screen].height;
-		} else {
-			ERR_PRINT("Invalid screen index: " + itos(p_screen) + "(count: " + itos(count) + ").");
-		}
-
 		if (xsi) {
+			if (count > 0) {
+				// Check if screen is valid.
+				if (p_screen < count) {
+					rect.position.x = xsi[p_screen].x_org;
+					rect.position.y = xsi[p_screen].y_org;
+					rect.size.width = xsi[p_screen].width;
+					rect.size.height = xsi[p_screen].height;
+					found = true;
+				} else {
+					ERR_PRINT(vformat("Invalid screen index: %d (count: %d).", p_screen, count));
+				}
+			}
 			XFree(xsi);
 		}
-	} else {
+	}
+
+	if (!found) {
 		int count = XScreenCount(x11_display);
 		if (p_screen < count) {
 			Window root = XRootWindow(x11_display, p_screen);
@@ -1095,7 +1102,7 @@ Rect2i DisplayServerX11::_screen_get_rect(int p_screen) const {
 			rect.size.width = xwa.width;
 			rect.size.height = xwa.height;
 		} else {
-			ERR_PRINT("Invalid screen index: " + itos(p_screen) + "(count: " + itos(count) + ").");
+			ERR_PRINT(vformat("Invalid screen index: %d (count: %d).", p_screen, count));
 		}
 	}
 
@@ -1501,25 +1508,33 @@ Ref<Image> DisplayServerX11::screen_get_image(int p_screen) const {
 
 	XImage *image = nullptr;
 
+	bool found = false;
 	int event_base, error_base;
 	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		int xin_count;
 		XineramaScreenInfo *xsi = XineramaQueryScreens(x11_display, &xin_count);
-		if (p_screen < xin_count) {
-			int x_count = XScreenCount(x11_display);
-			for (int i = 0; i < x_count; i++) {
-				Window root = XRootWindow(x11_display, i);
-				XWindowAttributes root_attrs;
-				XGetWindowAttributes(x11_display, root, &root_attrs);
-				if ((xsi[p_screen].x_org >= root_attrs.x) && (xsi[p_screen].x_org <= root_attrs.x + root_attrs.width) && (xsi[p_screen].y_org >= root_attrs.y) && (xsi[p_screen].y_org <= root_attrs.y + root_attrs.height)) {
-					image = XGetImage(x11_display, root, xsi[p_screen].x_org, xsi[p_screen].y_org, xsi[p_screen].width, xsi[p_screen].height, AllPlanes, ZPixmap);
-					break;
+		if (xsi) {
+			if (xin_count > 0) {
+				if (p_screen < xin_count) {
+					int x_count = XScreenCount(x11_display);
+					for (int i = 0; i < x_count; i++) {
+						Window root = XRootWindow(x11_display, i);
+						XWindowAttributes root_attrs;
+						XGetWindowAttributes(x11_display, root, &root_attrs);
+						if ((xsi[p_screen].x_org >= root_attrs.x) && (xsi[p_screen].x_org <= root_attrs.x + root_attrs.width) && (xsi[p_screen].y_org >= root_attrs.y) && (xsi[p_screen].y_org <= root_attrs.y + root_attrs.height)) {
+							found = true;
+							image = XGetImage(x11_display, root, xsi[p_screen].x_org, xsi[p_screen].y_org, xsi[p_screen].width, xsi[p_screen].height, AllPlanes, ZPixmap);
+							break;
+						}
+					}
+				} else {
+					ERR_PRINT(vformat("Invalid screen index: %d (count: %d).", p_screen, xin_count));
 				}
 			}
-		} else {
-			ERR_FAIL_V_MSG(Ref<Image>(), "Invalid screen index: " + itos(p_screen) + "(count: " + itos(xin_count) + ").");
+			XFree(xsi);
 		}
-	} else {
+	}
+	if (!found) {
 		int x_count = XScreenCount(x11_display);
 		if (p_screen < x_count) {
 			Window root = XRootWindow(x11_display, p_screen);
@@ -1529,7 +1544,7 @@ Ref<Image> DisplayServerX11::screen_get_image(int p_screen) const {
 
 			image = XGetImage(x11_display, root, root_attrs.x, root_attrs.y, root_attrs.width, root_attrs.height, AllPlanes, ZPixmap);
 		} else {
-			ERR_FAIL_V_MSG(Ref<Image>(), "Invalid screen index: " + itos(p_screen) + "(count: " + itos(x_count) + ").");
+			ERR_PRINT(vformat("Invalid screen index: %d (count: %d).", p_screen, x_count));
 		}
 	}
 
@@ -1995,8 +2010,7 @@ void DisplayServerX11::window_set_current_screen(int p_screen, WindowID p_window
 		Size2i wsize = window_get_size(p_window);
 		wpos += srect.position;
 		if (srect != Rect2i()) {
-			wpos.x = CLAMP(wpos.x, srect.position.x, srect.position.x + srect.size.width - wsize.width / 3);
-			wpos.y = CLAMP(wpos.y, srect.position.y, srect.position.y + srect.size.height - wsize.height / 3);
+			wpos = wpos.clamp(srect.position, srect.position + srect.size - wsize / 3);
 		}
 		window_set_position(wpos, p_window);
 	}
@@ -2224,8 +2238,7 @@ void DisplayServerX11::window_set_size(const Size2i p_size, WindowID p_window) {
 	ERR_FAIL_COND(!windows.has(p_window));
 
 	Size2i size = p_size;
-	size.x = MAX(1, size.x);
-	size.y = MAX(1, size.y);
+	size = size.maxi(1);
 
 	WindowData &wd = windows[p_window];
 
@@ -4268,7 +4281,9 @@ bool DisplayServerX11::_window_focus_check() {
 }
 
 void DisplayServerX11::process_events() {
-	_THREAD_SAFE_METHOD_
+	ERR_FAIL_COND(!Thread::is_main_thread());
+
+	_THREAD_SAFE_LOCK_
 
 #ifdef DISPLAY_SERVER_X11_DEBUG_LOGS_ENABLED
 	static int frame = 0;
@@ -4706,19 +4721,6 @@ void DisplayServerX11::process_events() {
 					break;
 				}
 
-				const WindowData &wd = windows[window_id];
-
-				XWindowAttributes xwa;
-				XSync(x11_display, False);
-				XGetWindowAttributes(x11_display, wd.x11_window, &xwa);
-
-				// Set focus when menu window is re-used.
-				// RevertToPointerRoot is used to make sure we don't lose all focus in case
-				// a subwindow and its parent are both destroyed.
-				if ((xwa.map_state == IsViewable) && !wd.no_focus && !wd.is_popup && _window_focus_check()) {
-					_set_input_focus(wd.x11_window, RevertToPointerRoot);
-				}
-
 				_window_changed(&event);
 			} break;
 
@@ -5005,7 +5007,7 @@ void DisplayServerX11::process_events() {
 						files.write[i] = files[i].replace("file://", "").uri_decode();
 					}
 
-					if (!windows[window_id].drop_files_callback.is_null()) {
+					if (windows[window_id].drop_files_callback.is_valid()) {
 						windows[window_id].drop_files_callback.call(files);
 					}
 
@@ -5110,6 +5112,14 @@ void DisplayServerX11::process_events() {
 		*/
 	}
 
+#ifdef DBUS_ENABLED
+	if (portal_desktop) {
+		portal_desktop->process_file_dialog_callbacks();
+	}
+#endif
+
+	_THREAD_SAFE_UNLOCK_
+
 	Input::get_singleton()->flush_buffered_events();
 }
 
@@ -5120,17 +5130,6 @@ void DisplayServerX11::release_rendering_thread() {
 	}
 	if (gl_manager_egl) {
 		gl_manager_egl->release_current();
-	}
-#endif
-}
-
-void DisplayServerX11::make_rendering_thread() {
-#if defined(GLES3_ENABLED)
-	if (gl_manager) {
-		gl_manager->make_current();
-	}
-	if (gl_manager_egl) {
-		gl_manager_egl->make_current();
 	}
 #endif
 }
@@ -5225,7 +5224,7 @@ void DisplayServerX11::set_icon(const Ref<Image> &p_icon) {
 			if (g_set_icon_error) {
 				g_set_icon_error = false;
 
-				WARN_PRINT("Icon too large, attempting to resize icon.");
+				WARN_PRINT(vformat("Icon too large (%dx%d), attempting to downscale icon.", w, h));
 
 				int new_width, new_height;
 				if (w > h) {
@@ -5464,8 +5463,7 @@ DisplayServerX11::WindowID DisplayServerX11::_create_window(WindowMode p_mode, V
 	} else {
 		Rect2i srect = screen_get_usable_rect(rq_screen);
 		Point2i wpos = p_rect.position;
-		wpos.x = CLAMP(wpos.x, srect.position.x, srect.position.x + srect.size.width - p_rect.size.width / 3);
-		wpos.y = CLAMP(wpos.y, srect.position.y, srect.position.y + srect.size.height - p_rect.size.height / 3);
+		wpos = wpos.clamp(srect.position, srect.position + srect.size - p_rect.size / 3);
 
 		win_rect.position = wpos;
 	}

@@ -510,6 +510,12 @@ HashSet<String> EditorExportPlatform::get_features(const Ref<EditorExportPreset>
 		result.insert("template_release");
 	}
 
+#ifdef REAL_T_IS_DOUBLE
+	result.insert("double");
+#else
+	result.insert("single");
+#endif // REAL_T_IS_DOUBLE
+
 	if (!p_preset->get_custom_features().is_empty()) {
 		Vector<String> tmp_custom_list = p_preset->get_custom_features().split(",");
 
@@ -1185,6 +1191,11 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 				}
 
 				String importer_type = config->get_value("remap", "importer");
+
+				if (importer_type == "skip") {
+					// Skip file.
+					continue;
+				}
 
 				if (importer_type == "keep") {
 					// Just keep file as-is.

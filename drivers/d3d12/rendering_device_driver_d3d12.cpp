@@ -5912,6 +5912,9 @@ uint64_t RenderingDeviceDriverD3D12::limit_get(Limit p_limit) {
 		case LIMIT_VRS_TEXEL_WIDTH:
 		case LIMIT_VRS_TEXEL_HEIGHT:
 			return vrs_capabilities.ss_image_tile_size;
+		case LIMIT_VRS_MAX_FRAGMENT_WIDTH:
+		case LIMIT_VRS_MAX_FRAGMENT_HEIGHT:
+			return vrs_capabilities.ss_max_fragment_size;
 		default: {
 #ifdef DEV_ENABLED
 			WARN_PRINT("Returning maximum value for unknown limit " + itos(p_limit) + ".");
@@ -5999,7 +6002,7 @@ RenderingDeviceDriverD3D12::~RenderingDeviceDriverD3D12() {
 }
 
 bool RenderingDeviceDriverD3D12::is_in_developer_mode() {
-	HKEY hkey = NULL;
+	HKEY hkey = nullptr;
 	LSTATUS result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock", 0, KEY_READ, &hkey);
 	if (result != ERROR_SUCCESS) {
 		return false;
@@ -6218,6 +6221,7 @@ Error RenderingDeviceDriverD3D12::_check_capabilities() {
 				vrs_capabilities.primitive_in_multiviewport = options6.PerPrimitiveShadingRateSupportedWithViewportIndexing;
 				vrs_capabilities.ss_image_supported = true;
 				vrs_capabilities.ss_image_tile_size = options6.ShadingRateImageTileSize;
+				vrs_capabilities.ss_max_fragment_size = 8; // TODO figure out if this is supplied and/or needed
 				vrs_capabilities.additional_rates_supported = options6.AdditionalShadingRatesSupported;
 			}
 		}

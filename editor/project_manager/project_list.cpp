@@ -216,7 +216,7 @@ ProjectListItemControl::ProjectListItemControl() {
 	// This makes the project's "hover" style display correctly when hovering the favorite icon.
 	favorite_button->set_mouse_filter(MOUSE_FILTER_PASS);
 	favorite_box->add_child(favorite_button);
-	favorite_button->connect("pressed", callable_mp(this, &ProjectListItemControl::_favorite_button_pressed));
+	favorite_button->connect(SceneStringName(pressed), callable_mp(this, &ProjectListItemControl::_favorite_button_pressed));
 
 	project_icon = memnew(TextureRect);
 	project_icon->set_name("ProjectIcon");
@@ -262,7 +262,7 @@ ProjectListItemControl::ProjectListItemControl() {
 		explore_button->set_name("ExploreButton");
 		explore_button->set_flat(true);
 		path_hb->add_child(explore_button);
-		explore_button->connect("pressed", callable_mp(this, &ProjectListItemControl::_explore_button_pressed));
+		explore_button->connect(SceneStringName(pressed), callable_mp(this, &ProjectListItemControl::_explore_button_pressed));
 
 		project_path = memnew(Label);
 		project_path->set_name("ProjectPath");
@@ -469,23 +469,19 @@ void ProjectList::update_project_list() {
 	// If you have 150 projects, it may read through 150 files on your disk at once + load 150 icons.
 	// FIXME: Does it really have to be a full, hard reload? Runtime updates should be made much cheaper.
 
-	// Clear whole list
-	for (int i = 0; i < _projects.size(); ++i) {
-		Item &project = _projects.write[i];
-		CRASH_COND(project.control == nullptr);
-		memdelete(project.control); // Why not queue_free()?
-	}
-	_projects.clear();
-	_last_clicked = "";
-	_selected_project_paths.clear();
+	if (ProjectManager::get_singleton()->is_initialized()) {
+		// Clear whole list
+		for (int i = 0; i < _projects.size(); ++i) {
+			Item &project = _projects.write[i];
+			CRASH_COND(project.control == nullptr);
+			memdelete(project.control); // Why not queue_free()?
+		}
 
-	List<String> sections;
-	_config.load(_config_path);
-	_config.get_sections(&sections);
+		_projects.clear();
+		_last_clicked = "";
+		_selected_project_paths.clear();
 
-	for (const String &path : sections) {
-		bool favorite = _config.get_value(path, "favorite", false);
-		_projects.push_back(load_project_data(path, favorite));
+		load_project_list();
 	}
 
 	// Create controls
@@ -549,7 +545,7 @@ void ProjectList::sort_projects() {
 			}
 
 			// When searching, display projects whose name or path contain the search term and whose tags match the searched tags.
-			item_visible = !missing_tags && (search_term.is_empty() || item.project_name.findn(search_term) != -1 || search_path.findn(search_term) != -1);
+			item_visible = !missing_tags && (search_term.is_empty() || item.project_name.containsn(search_term) || search_path.containsn(search_term));
 		}
 
 		item.control->set_visible(item_visible);
@@ -590,7 +586,21 @@ void ProjectList::find_projects_multiple(const PackedStringArray &p_paths) {
 	}
 
 	save_config();
-	update_project_list();
+
+	if (ProjectManager::get_singleton()->is_initialized()) {
+		update_project_list();
+	}
+}
+
+void ProjectList::load_project_list() {
+	List<String> sections;
+	_config.load(_config_path);
+	_config.get_sections(&sections);
+
+	for (const String &path : sections) {
+		bool favorite = _config.get_value(path, "favorite", false);
+		_projects.push_back(load_project_data(path, favorite));
+	}
 }
 
 void ProjectList::_scan_folder_recursive(const String &p_path, List<String> *r_projects) {
@@ -701,7 +711,7 @@ void ProjectList::_create_project_item_control(int p_index) {
 	hb->set_is_missing(item.missing);
 	hb->set_is_grayed(item.grayed);
 
-	hb->connect("gui_input", callable_mp(this, &ProjectList::_list_item_input).bind(hb));
+	hb->connect(SceneStringName(gui_input), callable_mp(this, &ProjectList::_list_item_input).bind(hb));
 	hb->connect("favorite_pressed", callable_mp(this, &ProjectList::_on_favorite_pressed).bind(hb));
 
 #if !defined(ANDROID_ENABLED) && !defined(WEB_ENABLED)
