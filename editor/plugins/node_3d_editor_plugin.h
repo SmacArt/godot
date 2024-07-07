@@ -65,7 +65,7 @@ class ViewportRotationControl : public Control {
 	GDCLASS(ViewportRotationControl, Control);
 
 	struct Axis2D {
-		Vector2i screen_point;
+		Vector2 screen_point;
 		float z_axis = -99.0;
 		int axis = -1;
 	};
@@ -241,6 +241,7 @@ private:
 	real_t freelook_speed;
 	Vector2 previous_mouse_position;
 
+	PanelContainer *info_panel = nullptr;
 	Label *info_label = nullptr;
 	Label *cinema_label = nullptr;
 	Label *locked_label = nullptr;
@@ -255,6 +256,8 @@ private:
 	ViewportNavigationControl *look_control = nullptr;
 	ViewportRotationControl *rotation_control = nullptr;
 	Gradient *frame_time_gradient = nullptr;
+	PanelContainer *frame_time_panel = nullptr;
+	VBoxContainer *frame_time_vbox = nullptr;
 	Label *cpu_time_label = nullptr;
 	Label *gpu_time_label = nullptr;
 	Label *fps_label = nullptr;
@@ -296,8 +299,8 @@ private:
 
 	ObjectID clicked;
 	ObjectID material_target;
-	Vector<_RayResult> selection_results;
-	Vector<_RayResult> selection_results_menu;
+	Vector<Node3D *> selection_results;
+	Vector<Node3D *> selection_results_menu;
 	bool clicked_wants_append = false;
 	bool selection_in_progress = false;
 
@@ -443,7 +446,8 @@ private:
 	void _reset_preview_material() const;
 	void _remove_preview_material();
 	bool _cyclical_dependency_exists(const String &p_target_scene_path, Node *p_desired_node) const;
-	bool _create_instance(Node *parent, String &path, const Point2 &p_point);
+	bool _create_instance(Node *p_parent, const String &p_path, const Point2 &p_point);
+	bool _create_audio_node(Node *p_parent, const String &p_path, const Point2 &p_point);
 	void _perform_drop_data();
 
 	bool can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
