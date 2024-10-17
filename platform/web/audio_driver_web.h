@@ -58,6 +58,7 @@ private:
 
 	WASM_EXPORT static void _state_change_callback(int p_state);
 	WASM_EXPORT static void _latency_update_callback(float p_latency);
+	WASM_EXPORT static void _sample_playback_finished_callback(const char *p_playback_object_id);
 
 	static AudioDriverWeb *singleton;
 
@@ -95,6 +96,7 @@ public:
 	virtual void stop_sample_playback(const Ref<AudioSamplePlayback> &p_playback) override;
 	virtual void set_sample_playback_pause(const Ref<AudioSamplePlayback> &p_playback, bool p_paused) override;
 	virtual bool is_sample_playback_active(const Ref<AudioSamplePlayback> &p_playback) override;
+	virtual double get_sample_playback_position(const Ref<AudioSamplePlayback> &p_playback) override;
 	virtual void update_sample_playback_pitch_scale(const Ref<AudioSamplePlayback> &p_playback, float p_pitch_scale = 0.0f) override;
 	virtual void set_sample_playback_bus_volumes_linear(const Ref<AudioSamplePlayback> &p_playback, const HashMap<StringName, Vector<AudioFrame>> &p_bus_volumes) override;
 

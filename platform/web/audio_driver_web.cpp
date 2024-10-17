@@ -33,6 +33,8 @@
 #include "godot_audio.h"
 
 #include "core/config/project_settings.h"
+#include "core/object/object.h"
+#include "scene/main/node.h"
 #include "servers/audio/audio_stream.h"
 
 #include <emscripten.h>
@@ -49,6 +51,21 @@ void AudioDriverWeb::_state_change_callback(int p_state) {
 
 void AudioDriverWeb::_latency_update_callback(float p_latency) {
 	AudioDriverWeb::audio_context.output_latency = p_latency;
+}
+
+void AudioDriverWeb::_sample_playback_finished_callback(const char *p_playback_object_id) {
+	const ObjectID playback_id = ObjectID(String::to_int(p_playback_object_id));
+
+	Object *playback_object = ObjectDB::get_instance(playback_id);
+	if (playback_object == nullptr) {
+		return;
+	}
+	Ref<AudioSamplePlayback> playback = Object::cast_to<AudioSamplePlayback>(playback_object);
+	if (playback.is_null()) {
+		return;
+	}
+
+	AudioServer::get_singleton()->stop_sample_playback(playback);
 }
 
 void AudioDriverWeb::_audio_driver_process(int p_from, int p_samples) {
@@ -132,6 +149,9 @@ Error AudioDriverWeb::init() {
 	if (!input_rb) {
 		return ERR_OUT_OF_MEMORY;
 	}
+
+	godot_audio_sample_set_finished_callback(&_sample_playback_finished_callback);
+
 	return OK;
 }
 
@@ -274,6 +294,7 @@ void AudioDriverWeb::start_sample_playback(const Ref<AudioSamplePlayback> &p_pla
 			itos(p_playback->stream->get_instance_id()).utf8().get_data(),
 			AudioServer::get_singleton()->get_bus_index(p_playback->bus),
 			p_playback->offset,
+			p_playback->pitch_scale,
 			volume_ptrw);
 }
 
@@ -290,6 +311,11 @@ void AudioDriverWeb::set_sample_playback_pause(const Ref<AudioSamplePlayback> &p
 bool AudioDriverWeb::is_sample_playback_active(const Ref<AudioSamplePlayback> &p_playback) {
 	ERR_FAIL_COND_V_MSG(p_playback.is_null(), false, "Parameter p_playback is null.");
 	return godot_audio_sample_is_active(itos(p_playback->get_instance_id()).utf8().get_data()) != 0;
+}
+
+double AudioDriverWeb::get_sample_playback_position(const Ref<AudioSamplePlayback> &p_playback) {
+	ERR_FAIL_COND_V_MSG(p_playback.is_null(), false, "Parameter p_playback is null.");
+	return godot_audio_get_sample_playback_position(itos(p_playback->get_instance_id()).utf8().get_data());
 }
 
 void AudioDriverWeb::update_sample_playback_pitch_scale(const Ref<AudioSamplePlayback> &p_playback, float p_pitch_scale) {

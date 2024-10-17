@@ -463,7 +463,7 @@ void AnimatedSprite2D::play(const StringName &p_name, float p_custom_scale, bool
 		name = animation;
 	}
 
-	ERR_FAIL_NULL_MSG(frames, vformat("There is no animation with name '%s'.", name));
+	ERR_FAIL_COND_MSG(frames.is_null(), vformat("There is no animation with name '%s'.", name));
 	ERR_FAIL_COND_MSG(!frames->get_animation_names().has(name), vformat("There is no animation with name '%s'.", name));
 
 	if (frames->get_frame_count(name) == 0) {
@@ -541,7 +541,7 @@ void AnimatedSprite2D::set_animation(const StringName &p_name) {
 
 	emit_signal(SceneStringName(animation_changed));
 
-	if (frames == nullptr) {
+	if (frames.is_null()) {
 		animation = StringName();
 		stop();
 		ERR_FAIL_MSG(vformat("There is no animation with name '%s'.", p_name));
@@ -574,7 +574,7 @@ StringName AnimatedSprite2D::get_animation() const {
 PackedStringArray AnimatedSprite2D::get_configuration_warnings() const {
 	PackedStringArray warnings = Node2D::get_configuration_warnings();
 	if (frames.is_null()) {
-		warnings.push_back(RTR("A SpriteFrames resource must be created or set in the \"Frames\" property in order for AnimatedSprite2D to display frames."));
+		warnings.push_back(RTR("A SpriteFrames resource must be created or set in the \"Sprite Frames\" property in order for AnimatedSprite2D to display frames."));
 	}
 	return warnings;
 }
